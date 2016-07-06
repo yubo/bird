@@ -1,0 +1,9 @@
+Makefile
+*.cache
+bird
+birdc
+birdcl
+*.log
+config.*
+configure
+obj/
