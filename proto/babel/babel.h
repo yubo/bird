@@ -100,7 +100,7 @@ enum babel_ae_type {
 struct babel_config {
   struct proto_config c;
 
-  list iface_list;              /* Patterns configured -- keep it first; see babel_reconfigure why */
+  union list iface_list;              /* Patterns configured -- keep it first; see babel_reconfigure why */
 };
 
 struct babel_iface_config {
@@ -114,7 +114,7 @@ struct babel_iface_config {
   u16 ihu_interval;
   u16 update_interval;
 
-  u16 rx_buffer;			/* RX buffer size, 0 for MTU */
+  u16 rx_buffer;			/* RX struct buffer size, 0 for MTU */
   u16 tx_length;			/* TX packet length limit (including headers), 0 for MTU */
   int tx_tos;
   int tx_priority;
@@ -122,25 +122,25 @@ struct babel_iface_config {
 
 struct babel_proto {
   struct proto p;
-  timer *timer;
+  struct timer *timer;
   struct fib rtable;
-  list interfaces;			/* Interfaces we really know about (struct babel_iface) */
+  union list interfaces;			/* Interfaces we really know about (struct babel_iface) */
   u64 router_id;
   u16 update_seqno;			/* To be increased on request */
   u8 triggered;				/* For triggering global updates */
 
-  slab *route_slab;
-  slab *source_slab;
-  slab *msg_slab;
+  struct slab *route_slab;
+  struct slab *source_slab;
+  struct slab *msg_slab;
 
-  slab *seqno_slab;
-  list seqno_cache;			/* Seqno requests in the cache (struct babel_seqno_request) */
+  struct slab *seqno_slab;
+  union list seqno_cache;			/* Seqno requests in the cache (struct babel_seqno_request) */
 
   struct tbf log_pkt_tbf;		/* TBF for packet messages */
 };
 
 struct babel_iface {
-  node n;
+  struct node n;
 
   struct babel_proto *proto;
   struct iface *iface;
@@ -149,13 +149,13 @@ struct babel_iface {
 
   u8 up;
 
-  pool *pool;
+  struct pool *pool;
   char *ifname;
-  sock *sk;
+  struct birdsock *sk;
   ip_addr addr;
   int tx_length;
-  list neigh_list;			/* List of neighbors seen on this iface (struct babel_neighbor) */
-  list msg_queue;
+  union list neigh_list;			/* List of neighbors seen on this iface (struct babel_neighbor) */
+  union list msg_queue;
 
   u16 hello_seqno;			/* To be increased on each hello */
 
@@ -164,12 +164,12 @@ struct babel_iface {
   bird_clock_t next_triggered;
   bird_clock_t want_triggered;
 
-  timer *timer;
-  event *send_event;
+  struct timer *timer;
+  struct event *send_event;
 };
 
 struct babel_neighbor {
-  node n;
+  struct node n;
   struct babel_iface *ifa;
 
   ip_addr addr;
@@ -181,11 +181,11 @@ struct babel_neighbor {
   bird_clock_t hello_expiry;
   bird_clock_t ihu_expiry;
 
-  list routes;				/* Routes this neighbour has sent us (struct babel_route) */
+  union list routes;				/* Routes this neighbour has sent us (struct babel_route) */
 };
 
 struct babel_source {
-  node n;
+  struct node n;
 
   u64 router_id;
   u16 seqno;
@@ -194,8 +194,8 @@ struct babel_source {
 };
 
 struct babel_route {
-  node n;
-  node neigh_route;
+  struct node n;
+  struct node neigh_route;
   struct babel_entry    *e;
   struct babel_neighbor *neigh;
 
@@ -217,13 +217,13 @@ struct babel_entry {
 
   bird_clock_t updated;
 
-  list sources;				/* Source entries for this prefix (struct babel_source). */
-  list routes;				/* Routes for this prefix (struct babel_route) */
+  union list sources;				/* Source entries for this prefix (struct babel_source). */
+  union list routes;				/* Routes for this prefix (struct babel_route) */
 };
 
 /* Stores forwarded seqno requests for duplicate suppression. */
 struct babel_seqno_request {
-  node n;
+  struct node n;
   ip_addr prefix;
   u8  plen;
   u64 router_id;
@@ -306,7 +306,7 @@ union babel_msg {
 };
 
 struct babel_msg_node {
-  node n;
+  struct node n;
   union babel_msg msg;
 };
 

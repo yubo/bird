@@ -163,13 +163,13 @@ put_time16(void *p, u16 v)
 static inline ip6_addr
 get_ip6_px(const void *p, int plen)
 {
-  ip6_addr addr = IPA_NONE;
+  struct ip6_addr addr = IPA_NONE;
   memcpy(&addr, p, (plen + 7) / 8);
   return ip6_ntoh(addr);
 }
 
 static inline void
-put_ip6_px(void *p, ip6_addr addr, int plen)
+put_ip6_px(void *p, struct ip6_addr addr, int plen)
 {
   addr = ip6_hton(addr);
   memcpy(p, &addr, (plen + 7) / 8);
@@ -182,7 +182,7 @@ get_ip6_ll(const void *p)
 }
 
 static inline void
-put_ip6_ll(void *p, ip6_addr addr)
+put_ip6_ll(void *p, struct ip6_addr addr)
 {
   put_u32(p+0, _I2(addr));
   put_u32(p+4, _I3(addr));
@@ -434,7 +434,7 @@ babel_read_next_hop(struct babel_tlv *hdr, union babel_msg *m UNUSED,
     return PARSE_IGNORE;
 
   case BABEL_AE_IP6:
-    if (TLV_OPT_LENGTH(tlv) < sizeof(ip6_addr))
+    if (TLV_OPT_LENGTH(tlv) < sizeof(struct ip6_addr))
       return PARSE_ERROR;
 
     state->next_hop = ipa_from_ip6(get_ip6(&tlv->addr));
@@ -757,7 +757,7 @@ babel_write_tlv(struct babel_tlv *hdr,
 static int
 babel_send_to(struct babel_iface *ifa, ip_addr dest)
 {
-  sock *sk = ifa->sk;
+  struct birdsock *sk = ifa->sk;
   struct babel_pkt_header *hdr = (void *) sk->tbuf;
   int len = get_u16(&hdr->length) + sizeof(struct babel_pkt_header);
 
@@ -770,7 +770,7 @@ babel_send_to(struct babel_iface *ifa, ip_addr dest)
  * @ifa: Interface holding the transmission buffer
  * @queue: TLV queue to write (containing internal-format TLVs)
  *
- * This function writes a packet to the interface transmission buffer with as
+ * This function writes a packet to the interface transmission struct buffer with as
  * many TLVs from the &queue as will fit in the buffer. It returns the number of
  * bytes written (NOT counting the packet header). The function is called by
  * babel_send_queue() and babel_send_unicast() to construct packets for
@@ -780,7 +780,7 @@ babel_send_to(struct babel_iface *ifa, ip_addr dest)
  * The TLVs in the queue are freed after they are written to the buffer.
  */
 static int
-babel_write_queue(struct babel_iface *ifa, list *queue)
+babel_write_queue(struct babel_iface *ifa, union list *queue)
 {
   struct babel_proto *p = ifa->proto;
   struct babel_write_state state = {};
@@ -828,7 +828,7 @@ static inline void
 babel_kick_queue(struct babel_iface *ifa)
 {
   /*
-   * Only schedule send event if there is not already data in the socket buffer.
+   * Only schedule send struct event if there is not already data in the socket buffer.
    * Otherwise we may overwrite the data already in the buffer.
    */
 
@@ -851,7 +851,7 @@ babel_send_unicast(union babel_msg *msg, struct babel_iface *ifa, ip_addr dest)
 {
   struct babel_proto *p = ifa->proto;
   struct babel_msg_node *msgn = sl_alloc(p->msg_slab);
-  list queue;
+  union list queue;
 
   msgn->msg = *msg;
   init_list(&queue);
@@ -870,7 +870,7 @@ babel_send_unicast(union babel_msg *msg, struct babel_iface *ifa, ip_addr dest)
  * @ifa: Interface to enqueue to
  *
  * This function is called to enqueue a TLV for subsequent transmission on an
- * interface. The transmission event is triggered whenever a TLV is enqueued;
+ * interface. The transmission struct event is triggered whenever a TLV is enqueued;
  * this ensures that TLVs will be transmitted in a timely manner, but that TLVs
  * which are enqueued in rapid succession can be transmitted together in one
  * packet.
@@ -908,7 +908,7 @@ babel_process_packet(struct babel_pkt_header *pkt, int len,
   struct babel_proto *p = ifa->proto;
   struct babel_tlv *tlv;
   struct babel_msg_node *msg;
-  list msgs;
+  union list msgs;
   int res;
 
   int plen = sizeof(struct babel_pkt_header) + get_u16(&pkt->length);
@@ -991,7 +991,7 @@ babel_process_packet(struct babel_pkt_header *pkt, int len,
 }
 
 static void
-babel_err_hook(sock *sk, int err)
+babel_err_hook(struct birdsock *sk, int err)
 {
   struct babel_iface *ifa = sk->data;
   struct babel_proto *p = ifa->proto;
@@ -1002,7 +1002,7 @@ babel_err_hook(sock *sk, int err)
 
 
 static void
-babel_tx_hook(sock *sk)
+babel_tx_hook(struct birdsock *sk)
 {
   struct babel_iface *ifa = sk->data;
 
@@ -1014,7 +1014,7 @@ babel_tx_hook(sock *sk)
 
 
 static int
-babel_rx_hook(sock *sk, int len)
+babel_rx_hook(struct birdsock *sk, int len)
 {
   struct babel_iface *ifa = sk->data;
   struct babel_proto *p = ifa->proto;
@@ -1057,7 +1057,7 @@ babel_open_socket(struct babel_iface *ifa)
 {
   struct babel_proto *p = ifa->proto;
 
-  sock *sk;
+  struct birdsock *sk;
   sk = sk_new(ifa->pool);
   sk->type = SK_UDP;
   sk->sport = ifa->cf->port;

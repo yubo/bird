@@ -146,7 +146,7 @@ setkey_md5(sockaddr *src, sockaddr *dst, char *passwd, uint type)
  * Manipulation with the IPsec SA/SP database
  */
 static int
-sk_set_md5_in_sasp_db(sock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd)
+sk_set_md5_in_sasp_db(struct birdsock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd)
 {
   sockaddr src, dst;
   sockaddr_fill(&src, s->af, local, ifa, 0);

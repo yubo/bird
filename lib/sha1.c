@@ -171,14 +171,14 @@ sha1_update(struct sha1_context *ctx, const byte *buf, uint len)
 {
   if (ctx->count)
   {
-    /* Fill rest of internal buffer */
+    /* Fill rest of internal struct buffer */
     for (; len && ctx->count < SHA1_BLOCK_SIZE; len--)
       ctx->buf[ctx->count++] = *buf++;
 
     if (ctx->count < SHA1_BLOCK_SIZE)
       return;
 
-    /* Process data from internal buffer */
+    /* Process data from internal struct buffer */
     sha1_transform(ctx, ctx->buf);
     ctx->nblocks++;
     ctx->count = 0;
@@ -187,7 +187,7 @@ sha1_update(struct sha1_context *ctx, const byte *buf, uint len)
   if (!len)
     return;
 
-  /* Process data from input buffer */
+  /* Process data from input struct buffer */
   while (len >= SHA1_BLOCK_SIZE)
   {
     sha1_transform(ctx, buf);
@@ -196,7 +196,7 @@ sha1_update(struct sha1_context *ctx, const byte *buf, uint len)
     len -= SHA1_BLOCK_SIZE;
   }
 
-  /* Copy remaining data to internal buffer */
+  /* Copy remaining data to internal struct buffer */
   memcpy(ctx->buf, buf, len);
   ctx->count = len;
 }

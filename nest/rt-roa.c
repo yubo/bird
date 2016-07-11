@@ -17,9 +17,9 @@
 #include "conf/conf.h"
 
 
-pool *roa_pool;
-static slab *roa_slab;			/* Slab of struct roa_item */
-static list roa_table_list;		/* List of struct roa_table */
+struct pool *roa_pool;
+static struct slab *roa_slab;			/* Slab of struct roa_item */
+static union list roa_table_list;		/* List of struct roa_table */
 struct roa_table *roa_table_default;	/* The first ROA table in the config */
 
 static inline int

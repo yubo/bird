@@ -10,11 +10,11 @@
  * The BFD protocol is implemented in three files: |bfd.c| containing the
  * protocol logic and the protocol glue with BIRD core, |packets.c| handling BFD
  * packet processing, RX, TX and protocol sockets. |io.c| then contains generic
- * code for the event loop, threads and event sources (sockets, microsecond
+ * code for the struct event loop, threads and struct event sources (sockets, microsecond
  * timers). This generic code will be merged to the main BIRD I/O code in the
  * future.
  *
- * The BFD implementation uses a separate thread with an internal event loop for
+ * The BFD implementation uses a separate thread with an internal struct event loop for
  * handling the protocol logic, which requires high-res and low-latency timing,
  * so it is not affected by the rest of BIRD, which has several low-granularity
  * hooks in the main loop, uses second-based timers and cannot offer good
@@ -24,8 +24,8 @@
  * main thread.
  *
  * BFD sessions are represented by structure &bfd_session that contains a state
- * related to the session and two timers (TX timer for periodic packets and hold
- * timer for session timeout). These sessions are allocated from @session_slab
+ * related to the session and two timers (TX struct timer for periodic packets and hold
+ * struct timer for session timeout). These sessions are allocated from @session_slab
  * and are accessible by two hash tables, @session_hash_id (by session ID) and
  * @session_hash_ip (by IP addresses of neighbors). Slab and both hashes are in
  * the main protocol structure &bfd_proto. The protocol logic related to BFD
@@ -48,7 +48,7 @@
  * BFD requests are the external API for the other protocols. When a protocol
  * wants a BFD session, it calls bfd_request_session(), which creates a
  * structure &bfd_request containing approprite information and an notify hook.
- * This structure is a resource associated with the caller's resource pool. When
+ * This structure is a struct resource associated with the caller's struct resource pool. When
  * a BFD protocol is available, a BFD request is submitted to the protocol, an
  * appropriate BFD session is found or created and the request is attached to
  * the session. When a session changes state, all attached requests (and related
@@ -60,20 +60,20 @@
  * BFD neighbors are just a way to statically configure BFD sessions without
  * requests from other protocol. Structures &bfd_neighbor are part of BFD
  * configuration (like static routes in the static protocol). BFD neighbors are
- * handled by BFD protocol like it is a BFD client -- when a BFD neighbor is
+ * handled by BFD protocol like it is a BFD client -- when a BFD struct neighbor is
  * ready, the protocol just creates a BFD request like any other protocol.
  *
- * The protocol uses a new generic event loop (structure &birdloop) from |io.c|,
+ * The protocol uses a new generic struct event loop (structure &birdloop) from |io.c|,
  * which supports sockets, timers and events like the main loop. Timers
  * (structure &timer2) are new microsecond based timers, while sockets and
  * events are the same. A birdloop is associated with a thread (field @thread)
- * in which event hooks are executed. Most functions for setting event sources
+ * in which struct event hooks are executed. Most functions for setting struct event sources
  * (like sk_start() or tm2_start()) must be called from the context of that
  * thread. Birdloop allows to temporarily acquire the context of that thread for
  * the main thread by calling birdloop_enter() and then birdloop_leave(), which
- * also ensures mutual exclusion with all event hooks. Note that resources
+ * also ensures mutual exclusion with all struct event hooks. Note that resources
  * associated with a birdloop (like timers) should be attached to the
- * independent resource pool, detached from the main resource tree.
+ * independent struct resource pool, detached from the main struct resource tree.
  *
  * There are two kinds of interaction between the BFD core (running in the BFD
  * thread) and the rest of BFD (running in the main thread). The first kind are
@@ -114,8 +114,8 @@
 #define HASH_IP_EQ(a,b)		ipa_equal(a,b)
 #define HASH_IP_FN(k)		ipa_hash32(k)
 
-static list bfd_proto_list;
-static list bfd_wait_list;
+static union list bfd_proto_list;
+static union list bfd_wait_list;
 
 const char *bfd_state_names[] = { "AdminDown", "Down", "Init", "Up" };
 
@@ -171,11 +171,11 @@ bfd_session_update_tx_interval(struct bfd_session *s)
   s->tx_timer->recurrent = tx_int_l;
   s->tx_timer->randomize = tx_int_h - tx_int_l;
 
-  /* Do not set timer if no previous event */
+  /* Do not set struct timer if no previous struct event */
   if (!s->last_tx)
     return;
 
-  /* Set timer relative to last tx_timer event */
+  /* Set struct timer relative to last tx_timer struct event */
   tm2_set(s->tx_timer, s->last_tx + tx_int_l);
 }
 
@@ -210,7 +210,7 @@ bfd_session_control_tx_timer(struct bfd_session *s, int reset)
   if (s->rem_min_rx_int == 0)
     goto stop;
 
-  /* So TX timer should run */
+  /* So TX struct timer should run */
   if (reset || !tm2_active(s->tx_timer))
   {
     s->last_tx = 0;
@@ -335,7 +335,7 @@ bfd_session_set_min_tx(struct bfd_session *s, u32 val)
 
   s->des_min_tx_new = val;
 
-  /* Postpone timer update if des_min_tx_int increases and the session is up */
+  /* Postpone struct timer update if des_min_tx_int increases and the session is up */
   if ((s->loc_state != BFD_STATE_UP) || (val < s->des_min_tx_int))
   {
     s->des_min_tx_int = val;
@@ -355,7 +355,7 @@ bfd_session_set_min_rx(struct bfd_session *s, u32 val)
 
   s->req_min_rx_new = val;
 
-  /* Postpone timer update if req_min_rx_int decreases and the session is up */
+  /* Postpone struct timer update if req_min_rx_int decreases and the session is up */
   if ((s->loc_state != BFD_STATE_UP) || (val > s->req_min_rx_int))
   {
     s->req_min_rx_int = val;
@@ -378,7 +378,7 @@ bfd_find_session_by_addr(struct bfd_proto *p, ip_addr addr)
 }
 
 static void
-bfd_tx_timer_hook(timer2 *t)
+bfd_tx_timer_hook(struct timer2 *t)
 {
   struct bfd_session *s = t->data;
 
@@ -387,7 +387,7 @@ bfd_tx_timer_hook(timer2 *t)
 }
 
 static void
-bfd_hold_timer_hook(timer2 *t)
+bfd_hold_timer_hook(struct timer2 *t)
 {
   bfd_session_timeout(t->data);
 }
@@ -477,11 +477,11 @@ bfd_remove_session(struct bfd_proto *p, struct bfd_session *s)
 {
   ip_addr ip = s->addr;
 
-  /* Caller should ensure that request list is empty */
+  /* Caller should ensure that request union list is empty */
 
   birdloop_enter(p->loop);
 
-  /* Remove session from notify list if scheduled for notification */
+  /* Remove session from notify union list if scheduled for notification */
   /* No need for bfd_lock_sessions(), we are already protected by birdloop_enter() */
   if (NODE_VALID(&s->n))
     rem_node(&s->n);
@@ -645,7 +645,7 @@ bfd_add_request(struct bfd_proto *p, struct bfd_request *req)
 static void
 bfd_submit_request(struct bfd_request *req)
 {
-  node *n;
+  struct node *n;
 
   WALK_LIST(n, bfd_proto_list)
     if (bfd_add_request(SKIP_BACK(struct bfd_proto, bfd_node, n), req))
@@ -660,7 +660,7 @@ bfd_submit_request(struct bfd_request *req)
 static void
 bfd_take_requests(struct bfd_proto *p)
 {
-  node *n, *nn;
+  struct node *n, *nn;
 
   WALK_LIST_DELSAFE(n, nn, bfd_wait_list)
     bfd_add_request(p, SKIP_BACK(struct bfd_request, n, n));
@@ -669,7 +669,7 @@ bfd_take_requests(struct bfd_proto *p)
 static void
 bfd_drop_requests(struct bfd_proto *p)
 {
-  node *n;
+  struct node *n;
 
   HASH_WALK(p->session_hash_id, next_id, s)
   {
@@ -683,7 +683,7 @@ bfd_drop_requests(struct bfd_proto *p)
 static struct resclass bfd_request_class;
 
 struct bfd_request *
-bfd_request_session(pool *p, ip_addr addr, ip_addr local, struct iface *iface,
+bfd_request_session(struct pool *p, ip_addr addr, ip_addr local, struct iface *iface,
 		    void (*hook)(struct bfd_request *), void *data)
 {
   struct bfd_request *req = ralloc(p, &bfd_request_class);
@@ -704,7 +704,7 @@ bfd_request_session(pool *p, ip_addr addr, ip_addr local, struct iface *iface,
 }
 
 static void
-bfd_request_free(resource *r)
+bfd_request_free(struct resource *r)
 {
   struct bfd_request *req = (struct bfd_request *) r;
   struct bfd_session *s = req->session;
@@ -719,7 +719,7 @@ bfd_request_free(resource *r)
 }
 
 static void
-bfd_request_dump(resource *r)
+bfd_request_dump(struct resource *r)
 {
   struct bfd_request *req = (struct bfd_request *) r;
 
@@ -782,7 +782,7 @@ bfd_start_neighbor(struct bfd_proto *p, struct bfd_neighbor *n)
 
   if (nb->data)
   {
-    log(L_ERR "%s: Duplicate neighbor %I", p->p.name, n->addr);
+    log(L_ERR "%s: Duplicate struct neighbor %I", p->p.name, n->addr);
     return;
   }
 
@@ -853,13 +853,13 @@ void pipe_drain(int fd);
 void pipe_kick(int fd);
 
 static int
-bfd_notify_hook(sock *sk, int len)
+bfd_notify_hook(struct birdsock *sk, int len)
 {
   struct bfd_proto *p = sk->data;
   struct bfd_session *s;
-  list tmp_list;
+  union list tmp_list;
   u8 state, diag;
-  node *n, *nn;
+  struct node *n, *nn;
 
   pipe_drain(sk->fd);
 
@@ -900,7 +900,7 @@ bfd_notify_kick(struct bfd_proto *p)
 }
 
 static void
-bfd_noterr_hook(sock *sk, int err)
+bfd_noterr_hook(struct birdsock *sk, int err)
 {
   struct bfd_proto *p = sk->data;
   log(L_ERR "%s: Notify socket error: %m", p->p.name, err);
@@ -910,7 +910,7 @@ static void
 bfd_notify_init(struct bfd_proto *p)
 {
   int pfds[2];
-  sock *sk;
+  struct birdsock *sk;
 
   int rv = pipe(pfds);
   if (rv < 0)
@@ -926,7 +926,7 @@ bfd_notify_init(struct bfd_proto *p)
     die("bfd: sk_open failed");
   p->notify_rs = sk;
 
-  /* The write sock is not added to any event loop */
+  /* The write struct birdsock is not added to any struct event loop */
   sk = sk_new(p->p.pool);
   sk->type = SK_MAGIC;
   sk->fd = pfds[1];

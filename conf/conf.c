@@ -15,7 +15,7 @@
  * lexical analyzer and parser.
  *
  * The configuration manager stores each config as a &config structure
- * accompanied by a linear pool from which all information associated
+ * accompanied by a linear struct pool from which all information associated
  * with the config and pointed to by the &config structure is allocated.
  *
  * There can exist up to four different configurations at one time: an active
@@ -27,7 +27,7 @@
  * reconfiguration, which works in a similar way. Reconfiguration could also
  * have timeout (using @config_timer) and undo is automatically called if the
  * new configuration is not confirmed later. The new config (@new_config) and
- * associated linear pool (@cfg_mem) is non-NULL only during parsing.
+ * associated linear struct pool (@cfg_mem) is non-NULL only during parsing.
  *
  * Loading of new configuration is very simple: just call config_alloc() to get
  * a new &config structure, then use config_parse() to parse a configuration
@@ -67,8 +67,8 @@ static int future_cftype;		/* Type of scheduled transition, may also be RECONFIG
 /* Note that when future_cftype is RECONFIG_UNDO, then future_config is NULL,
    therefore proper check for future scheduled config checks future_cftype */
 
-static event *config_event;		/* Event for finalizing reconfiguration */
-static timer *config_timer;		/* Timer for scheduled configuration rollback */
+static struct event *config_event;		/* Event for finalizing reconfiguration */
+static struct timer *config_timer;		/* Timer for scheduled configuration rollback */
 
 /* These are public just for cmd_show_status(), should not be accessed elsewhere */
 int shutting_down;			/* Shutdown requested, do not accept new config changes */
@@ -81,17 +81,17 @@ int undo_available;			/* Undo was not requested from last reconfiguration */
  * @name: name of the config
  *
  * This function creates new &config structure, attaches a resource
- * pool and a linear memory pool to it and makes it available for
+ * struct pool and a linear memory struct pool to it and makes it available for
  * further use. Returns a pointer to the structure.
  */
 struct config *
 config_alloc(byte *name)
 {
-  pool *p = rp_new(&root_pool, "Config");
-  linpool *l = lp_new(p, 4080);
+  struct pool *p = rp_new(&root_pool, "Config");
+  struct linpool *l = lp_new(p, 4080);
   struct config *c = lp_allocz(l, sizeof(struct config));
 
-  /* Duplication of name string in local linear pool */
+  /* Duplication of name string in local linear struct pool */
   uint nlen = strlen(name) + 1;
   char *ndup = lp_allocu(l, nlen);
   memcpy(ndup, name, nlen);
@@ -318,8 +318,8 @@ config_done(void *unused UNUSED)
  * using config_del_obstacle(), the old configuration is freed and
  * everything runs according to the new one.
  *
- * When @timeout is nonzero, the undo timer is activated with given
- * timeout. The timer is deactivated when config_commit(),
+ * When @timeout is nonzero, the undo struct timer is activated with given
+ * timeout. The struct timer is deactivated when config_commit(),
  * config_confirm() or config_undo() is called.
  *
  * Result: %CONF_DONE if the configuration has been accepted immediately,
@@ -369,12 +369,12 @@ config_commit(struct config *c, int type, int timeout)
 /**
  * config_confirm - confirm a commited configuration
  *
- * When the undo timer is activated by config_commit() with nonzero timeout,
+ * When the undo struct timer is activated by config_commit() with nonzero timeout,
  * this function can be used to deactivate it and therefore confirm
  * the current configuration.
  *
  * Result: %CONF_CONFIRM when the current configuration is confirmed,
- * %CONF_NONE when there is nothing to confirm (i.e. undo timer is not active).
+ * %CONF_NONE when there is nothing to confirm (i.e. undo struct timer is not active).
  */
 int
 config_confirm(void)
@@ -525,7 +525,7 @@ cf_error(char *msg, ...)
  * @c: string to copy
  *
  * cfg_strdup() creates a new copy of the string in the memory
- * pool associated with the configuration being currently parsed.
+ * struct pool associated with the configuration being currently parsed.
  * It's often used when a string literal occurs in the configuration
  * and we want to preserve it for further use.
  */
@@ -540,9 +540,9 @@ cfg_strdup(char *c)
 
 
 void
-cfg_copy_list(list *dest, list *src, unsigned node_size)
+cfg_copy_list(union list *dest, union list *src, unsigned node_size)
 {
-  node *dn, *sn;
+  struct node *dn, *sn;
 
   init_list(dest);
   WALK_LIST(sn, *src)

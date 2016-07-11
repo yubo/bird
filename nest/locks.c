@@ -10,7 +10,7 @@
  * DOC: Object locks
  *
  * The lock module provides a simple mechanism for avoiding conflicts between
- * various protocols which would like to use a single physical resource (for
+ * various protocols which would like to use a single physical struct resource (for
  * example a network port). It would be easy to say that such collisions can
  * occur only when the user specifies an invalid configuration and therefore
  * he deserves to get what he has asked for, but unfortunately they can also
@@ -20,10 +20,10 @@
  *
  * The solution is very simple: when any protocol wishes to use a network port
  * or some other non-shareable resource, it asks the core to lock it and it doesn't
- * use the resource until it's notified that it has acquired the lock.
+ * use the struct resource until it's notified that it has acquired the lock.
  *
  * Object locks are represented by &object_lock structures which are in turn a
- * kind of resource. Lockable resources are uniquely determined by resource type
+ * kind of resource. Lockable resources are uniquely determined by struct resource type
  * (%OBJLOCK_UDP for a UDP port etc.), IP address (usually a broadcast or
  * multicast address the port is bound to), port number, interface and optional
  * instance ID.
@@ -36,8 +36,8 @@
 #include "nest/locks.h"
 #include "nest/iface.h"
 
-static list olock_list;
-static event *olock_event;
+static union list olock_list;
+static struct event *olock_event;
 
 static inline int
 olock_same(struct object_lock *x, struct object_lock *y)
@@ -51,10 +51,10 @@ olock_same(struct object_lock *x, struct object_lock *y)
 }
 
 static void
-olock_free(resource *r)
+olock_free(struct resource *r)
 {
   struct object_lock *q, *l = (struct object_lock *) r;
-  node *n;
+  struct node *n;
 
   DBG("olock: Freeing %p\n", l);
   switch (l->state)
@@ -85,7 +85,7 @@ olock_free(resource *r)
 }
 
 static void
-olock_dump(resource *r)
+olock_dump(struct resource *r)
 {
   struct object_lock *l = (struct object_lock *) r;
   static char *olock_states[] = { "free", "locked", "waiting", "event" };
@@ -105,14 +105,14 @@ static struct resclass olock_class = {
 
 /**
  * olock_new - create an object lock
- * @p: resource pool to create the lock in.
+ * @p: struct resource struct pool to create the lock in.
  *
- * The olock_new() function creates a new resource of type &object_lock
+ * The olock_new() function creates a new struct resource of type &object_lock
  * and returns a pointer to it. After filling in the structure, the caller
  * should call olock_acquire() to do the real locking.
  */
 struct object_lock *
-olock_new(pool *p)
+olock_new(struct pool *p)
 {
   struct object_lock *l = ralloc(p, &olock_class);
 
@@ -126,8 +126,8 @@ olock_new(pool *p)
  * @l: the lock to acquire
  *
  * This function attempts to acquire exclusive access to the non-shareable
- * resource described by the lock @l. It returns immediately, but as soon
- * as the resource becomes available, it calls the hook() function set up
+ * struct resource described by the lock @l. It returns immediately, but as soon
+ * as the struct resource becomes available, it calls the hook() function set up
  * by the caller.
  *
  * When you want to release the resource, just rfree() the lock.
@@ -135,7 +135,7 @@ olock_new(pool *p)
 void
 olock_acquire(struct object_lock *l)
 {
-  node *n;
+  struct node *n;
   struct object_lock *q;
 
   WALK_LIST(n, olock_list)
@@ -158,7 +158,7 @@ olock_acquire(struct object_lock *l)
 static void
 olock_run_event(void *unused UNUSED)
 {
-  node *n;
+  struct node *n;
   struct object_lock *q;
 
   DBG("olock: Processing events\n");

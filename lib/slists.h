@@ -11,14 +11,14 @@
 
 /*
  *  These linked lists work in a way similar to standard lists defined
- *  in lib/lists.h, but in addition to all usual list functions they
+ *  in lib/lists.h, but in addition to all usual union list functions they
  *  provide fast deletion/insertion/everything-safe asynchronous
  *  walking.
  *
  *  Example:
- *		slist l;
- *		siterator i;
- *		snode *n;
+ *		struct slist l;
+ *		struct siterator i;
+ *		struct snode *n;
  *
  *	       	s_init(&i, &l);		// Initialize iteration
  *		...
@@ -29,7 +29,7 @@
  *		     ...
  *		     if (decided_to_stop) {
  *			s_put(&i, n);	// Store current position (maybe even
- *					// that we stay at list end)
+ *					// that we stay at union list end)
  *			return;		// and return
  *		     }
  *		     ...
@@ -37,35 +37,35 @@
  *		// After finishing, don't link the iterator back
  */
 
-typedef struct snode {
-  struct snode *next, *prev;
-  struct siterator *readers;
-} snode;
+struct snode {
+	struct snode *next, *prev;
+	struct siterator *readers;
+};
 
-typedef struct slist {			/* In fact two overlayed snodes */
-  struct snode *head, *null, *tail;
-  struct siterator *tail_readers;
-} slist;
+struct slist {			/* In fact two overlayed snodes */
+	struct snode *head, *null, *tail;
+	struct siterator *tail_readers;
+};
 
-typedef struct siterator {
-  /*
-   * Caution: Layout of this structure depends hard on layout of the
-   *	      snode. Our `next' must be at position of snode `readers'
-   *	      field, our `null' must be at position of `prev' and it must
-   *	      contain NULL in order to distinguish between siterator
-   *	      and snode (snodes with NULL `prev' field never carry
-   *	      iterators). You are not expected to understand this.
-   */
-  struct siterator *prev, *null, *next;
-  /*
-   * For recently merged nodes this can be NULL, but then it's NULL
-   * for all successors as well. This is done to speed up iterator
-   * merging when there are lots of deletions.
-   */
-  snode *node;
-} siterator;
+struct siterator {
+	/*
+	 * Caution: Layout of this structure depends hard on layout of the
+	 *          snode. Our `next' must be at position of struct snode `readers'
+	 *          field, our `null' must be at position of `prev' and it must
+	 *          contain NULL in order to distinguish between siterator
+	 *          and struct snode (snodes with NULL `prev' field never carry
+	 *          iterators). You are not expected to understand this.
+	 */
+	struct siterator *prev, *null, *next;
+	/*
+	 * For recently merged nodes this can be NULL, but then it's NULL
+	 * for all successors as well. This is done to speed up iterator
+	 * merging when there are lots of deletions.
+	 */
+	struct snode *node;
+};
 
-#define SNODE (snode *)
+#define SNODE (struct snode *)
 #define SHEAD(list) ((void *)((list).head))
 #define STAIL(list) ((void *)((list).tail))
 #define SNODE_NEXT(n) ((void *)((SNODE (n))->next))
@@ -76,16 +76,23 @@ typedef struct siterator {
      for(n=SHEAD(list); nxt=SNODE_NEXT(n); n=(void *) nxt)
 #define EMPTY_SLIST(list) (!(list).head->next)
 
-void s_add_tail(slist *, snode *);
-void s_add_head(slist *, snode *);
-void s_rem_node(snode *);
-void s_add_tail_list(slist *, slist *);
-void s_init_list(slist *);
-void s_insert_node(snode *, snode *);
+void s_add_tail(struct slist *, struct snode *);
+void s_add_head(struct slist *, struct snode *);
+void s_rem_node(struct snode *);
+void s_add_tail_list(struct slist *, struct slist *);
+void s_init_list(struct slist *);
+void s_insert_node(struct snode *, struct snode *);
 
-snode *s_get(siterator *);
-void s_put(siterator *, snode *n);
-static inline void s_init(siterator *i, slist *l) { s_put(i, SHEAD(*l)); }
-static inline int s_is_used(siterator *i) { return (i->prev != NULL); }
+struct snode *s_get(struct siterator *);
+void s_put(struct siterator *, struct snode *n);
+static inline void s_init(struct siterator * i, struct slist *l)
+{
+	s_put(i, SHEAD(*l));
+}
+
+static inline int s_is_used(struct siterator * i)
+{
+	return (i->prev != NULL);
+}
 
 #endif

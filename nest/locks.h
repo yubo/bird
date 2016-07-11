@@ -24,7 +24,7 @@
  */
 
 struct object_lock {
-  resource r;
+  struct resource r;
   ip_addr addr;		/* Identification of a object: IP address */
   uint type;		/* ... object type (OBJLOCK_xxx) */
   uint port;		/* ... port number */
@@ -33,12 +33,12 @@ struct object_lock {
   void (*hook)(struct object_lock *);	/* Called when the lock succeeds */
   void *data;		/* User data */
   /* ... internal to lock manager, don't touch ... */
-  node n;		/* Node in list of olocks */
+  struct node n;		/* Node in union list of olocks */
   int state;		/* OLOCK_STATE_xxx */
-  list waiters;		/* Locks waiting for the same resource */
+  union list waiters;		/* Locks waiting for the same struct resource */
 };
 
-struct object_lock *olock_new(pool *);
+struct object_lock *olock_new(struct pool *);
 void olock_acquire(struct object_lock *);
 void olock_init(void);
 

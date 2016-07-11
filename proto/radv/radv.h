@@ -45,10 +45,10 @@
 struct radv_config
 {
   struct proto_config c;
-  list patt_list;		/* List of iface configs (struct radv_iface_config) */
-  list pref_list;		/* Global list of prefix configs (struct radv_prefix_config) */
-  list rdnss_list;		/* Global list of RDNSS configs (struct radv_rdnss_config) */
-  list dnssl_list;		/* Global list of DNSSL configs (struct radv_dnssl_config) */
+  union list patt_list;		/* List of iface configs (struct radv_iface_config) */
+  union list pref_list;		/* Global union list of prefix configs (struct radv_prefix_config) */
+  union list rdnss_list;		/* Global union list of RDNSS configs (struct radv_rdnss_config) */
+  union list dnssl_list;		/* Global union list of DNSSL configs (struct radv_dnssl_config) */
 
   ip_addr trigger_prefix;	/* Prefix of a trigger route, if defined */
   u8 trigger_pxlen;		/* Pxlen of a trigger route, if defined */
@@ -58,16 +58,16 @@ struct radv_config
 struct radv_iface_config
 {
   struct iface_patt i;
-  list pref_list;		/* Local list of prefix configs (struct radv_prefix_config) */
-  list rdnss_list;		/* Local list of RDNSS configs (struct radv_rdnss_config) */
-  list dnssl_list;		/* Local list of DNSSL configs (struct radv_dnssl_config) */
+  union list pref_list;		/* Local union list of prefix configs (struct radv_prefix_config) */
+  union list rdnss_list;		/* Local union list of RDNSS configs (struct radv_rdnss_config) */
+  union list dnssl_list;		/* Local union list of DNSSL configs (struct radv_dnssl_config) */
 
   u32 min_ra_int;		/* Standard options from RFC 4261 */
   u32 max_ra_int;
   u32 min_delay;
 
-  u8 rdnss_local;		/* Global list is not used for RDNSS */
-  u8 dnssl_local;		/* Global list is not used for DNSSL */
+  u8 rdnss_local;		/* Global union list is not used for RDNSS */
+  u8 dnssl_local;		/* Global union list is not used for DNSSL */
 
   u8 managed;			/* Standard options from RFC 4261 */
   u8 other_config;
@@ -82,7 +82,7 @@ struct radv_iface_config
 
 struct radv_prefix_config
 {
-  node n;
+  struct node n;
   ip_addr prefix;
   int pxlen;
 
@@ -97,7 +97,7 @@ struct radv_prefix_config
 
 struct radv_rdnss_config
 {
-  node n;
+  struct node n;
   u32 lifetime;			/* Valid if lifetime_mult is 0 */
   u16 lifetime_mult;		/* Lifetime specified as multiple of max_ra_int */
   ip_addr server;		/* IP address of recursive DNS server */
@@ -105,7 +105,7 @@ struct radv_rdnss_config
 
 struct radv_dnssl_config
 {
-  node n;
+  struct node n;
   u32 lifetime;			/* Valid if lifetime_mult is 0 */
   u16 lifetime_mult;		/* Lifetime specified as multiple of max_ra_int */
   u8 dlen_first;		/* Length of first label in domain */
@@ -117,21 +117,21 @@ struct radv_dnssl_config
 struct proto_radv
 {
   struct proto p;
-  list iface_list;		/* List of active ifaces */
+  union list iface_list;		/* List of active ifaces */
   u8 active;			/* Whether radv is active w.r.t. triggers */
 };
 
 struct radv_iface
 {
-  node n;
+  struct node n;
   struct proto_radv *ra;
   struct radv_iface_config *cf;	/* Related config, must be updated in reconfigure */
   struct iface *iface;
   struct ifa *addr;		/* Link-local address of iface */
 
-  timer *timer;
+  struct timer *timer;
   struct object_lock *lock;
-  sock *sk;
+  struct birdsock *sk;
 
   bird_clock_t last;		/* Time of last sending of RA */
   u16 plen;			/* Length of prepared RA in tbuf, or 0 if not valid */

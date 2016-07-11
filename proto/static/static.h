@@ -14,8 +14,8 @@
 
 struct static_config {
   struct proto_config c;
-  list iface_routes;		/* Routes to search on interface events */
-  list other_routes;		/* Routes hooked to neighbor cache and reject routes */
+  union list iface_routes;		/* Routes to search on interface events */
+  union list other_routes;		/* Routes hooked to struct neighbor cache and reject routes */
   int check_link;			/* Whether iface link state is used */
   struct rtable_config *igp_table;	/* Table used for recursive next hop lookups */
 };
@@ -24,8 +24,8 @@ struct static_config {
 void static_init_config(struct static_config *);
 
 struct static_route {
-  node n;
-  struct static_route *chain;		/* Next for the same neighbor */
+  struct node n;
+  struct static_route *chain;		/* Next for the same struct neighbor */
   ip_addr net;				/* Network we route */
   int masklen;				/* Mask length */
   int dest;				/* Destination type (RTD_*) */

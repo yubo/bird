@@ -1,5 +1,5 @@
 /*
- *	BIRD -- I/O and event loop
+ *	BIRD -- I/O and struct event loop
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -27,7 +27,7 @@
 
 struct birdloop
 {
-  pool *pool;
+  struct pool *pool;
   pthread_t thread;
   pthread_mutex_t mutex;
 
@@ -40,12 +40,12 @@ struct birdloop
   u8 wakeup_masked;
   int wakeup_fds[2];
 
-  BUFFER(timer2 *) timers;
-  list event_list;
-  list sock_list;
+  BUFFER(struct timer2 *) timers;
+  union list event_list;
+  union list sock_list;
   uint sock_num;
 
-  BUFFER(sock *) poll_sk;
+  BUFFER(struct birdsock *) poll_sk;
   BUFFER(struct pollfd) poll_fd;
   u8 poll_changed;
   u8 close_scheduled;
@@ -277,7 +277,7 @@ events_fire(struct birdloop *loop)
 }
 
 void
-ev2_schedule(event *e)
+ev2_schedule(struct event *e)
 {
   struct birdloop *loop = birdloop_current();
 
@@ -302,22 +302,22 @@ ev2_schedule(event *e)
 static inline uint timers_count(struct birdloop *loop)
 { return loop->timers.used - 1; }
 
-static inline timer2 *timers_first(struct birdloop *loop)
+static inline struct timer2 *timers_first(struct birdloop *loop)
 { return (loop->timers.used > 1) ? loop->timers.data[1] : NULL; }
 
 
 static void
-tm2_free(resource *r)
+tm2_free(struct resource *r)
 {
-  timer2 *t = (timer2 *) r;
+  struct timer2 *t = (struct timer2 *) r;
 
   tm2_stop(t);
 }
 
 static void
-tm2_dump(resource *r)
+tm2_dump(struct resource *r)
 {
-  timer2 *t = (timer2 *) r;
+  struct timer2 *t = (struct timer2 *) r;
 
   debug("(code %p, data %p, ", t->hook, t->data);
   if (t->randomize)
@@ -333,23 +333,23 @@ tm2_dump(resource *r)
 
 static struct resclass tm2_class = {
   "Timer",
-  sizeof(timer2),
+  sizeof(struct timer2),
   tm2_free,
   tm2_dump,
   NULL,
   NULL
 };
 
-timer2 *
-tm2_new(pool *p)
+struct timer2 *
+tm2_new(struct pool *p)
 {
-  timer2 *t = ralloc(p, &tm2_class);
+  struct timer2 *t = ralloc(p, &tm2_class);
   t->index = -1;
   return t;
 }
 
 void
-tm2_set(timer2 *t, btime when)
+tm2_set(struct timer2 *t, btime when)
 {
   struct birdloop *loop = birdloop_current();
   uint tc = timers_count(loop);
@@ -359,17 +359,17 @@ tm2_set(timer2 *t, btime when)
     t->index = ++tc;
     t->expires = when;
     BUFFER_PUSH(loop->timers) = t;
-    HEAP_INSERT(loop->timers.data, tc, timer2 *, TIMER_LESS, TIMER_SWAP);
+    HEAP_INSERT(loop->timers.data, tc, struct timer2 *, TIMER_LESS, TIMER_SWAP);
   }
   else if (t->expires < when)
   {
     t->expires = when;
-    HEAP_INCREASE(loop->timers.data, tc, timer2 *, TIMER_LESS, TIMER_SWAP, t->index);
+    HEAP_INCREASE(loop->timers.data, tc, struct timer2 *, TIMER_LESS, TIMER_SWAP, t->index);
   }
   else if (t->expires > when)
   {
     t->expires = when;
-    HEAP_DECREASE(loop->timers.data, tc, timer2 *, TIMER_LESS, TIMER_SWAP, t->index);
+    HEAP_DECREASE(loop->timers.data, tc, struct timer2 *, TIMER_LESS, TIMER_SWAP, t->index);
   }
 
   if (loop->poll_active && (t->index == 1))
@@ -377,13 +377,13 @@ tm2_set(timer2 *t, btime when)
 }
 
 void
-tm2_start(timer2 *t, btime after)
+tm2_start(struct timer2 *t, btime after)
 {
   tm2_set(t, current_time() + MAX(after, 0));
 }
 
 void
-tm2_stop(timer2 *t)
+tm2_stop(struct timer2 *t)
 {
   if (!t->expires)
     return;
@@ -391,7 +391,7 @@ tm2_stop(timer2 *t)
   struct birdloop *loop = birdloop_current();
   uint tc = timers_count(loop);
 
-  HEAP_DELETE(loop->timers.data, tc, timer2 *, TIMER_LESS, TIMER_SWAP, t->index);
+  HEAP_DELETE(loop->timers.data, tc, struct timer2 *, TIMER_LESS, TIMER_SWAP, t->index);
   BUFFER_POP(loop->timers);
 
   t->index = -1;
@@ -409,7 +409,7 @@ static void
 timers_fire(struct birdloop *loop)
 {
   btime base_time;
-  timer2 *t;
+  struct timer2 *t;
 
   times_update(loop);
   base_time = loop->last_time;
@@ -455,7 +455,7 @@ sockets_init(struct birdloop *loop)
 }
 
 static void
-sockets_add(struct birdloop *loop, sock *s)
+sockets_add(struct birdloop *loop, struct birdsock *s)
 {
   add_tail(&loop->sock_list, &s->n);
   loop->sock_num++;
@@ -468,7 +468,7 @@ sockets_add(struct birdloop *loop, sock *s)
 }
 
 void
-sk_start(sock *s)
+sk_start(struct birdsock *s)
 {
   struct birdloop *loop = birdloop_current();
 
@@ -476,7 +476,7 @@ sk_start(sock *s)
 }
 
 static void
-sockets_remove(struct birdloop *loop, sock *s)
+sockets_remove(struct birdloop *loop, struct birdsock *s)
 {
   rem_node(&s->n);
   loop->sock_num--;
@@ -491,7 +491,7 @@ sockets_remove(struct birdloop *loop, sock *s)
 }
 
 void
-sk_stop(sock *s)
+sk_stop(struct birdsock *s)
 {
   struct birdloop *loop = birdloop_current();
 
@@ -508,14 +508,14 @@ sk_stop(sock *s)
   s->fd = -1;
 }
 
-static inline uint sk_want_events(sock *s)
+static inline uint sk_want_events(struct birdsock *s)
 { return (s->rx_hook ? POLLIN : 0) | ((s->ttx != s->tpos) ? POLLOUT : 0); }
 
 /*
-FIXME: this should be called from sock code
+FIXME: this should be called from struct birdsock code
 
 static void
-sockets_update(struct birdloop *loop, sock *s)
+sockets_update(struct birdloop *loop, struct birdsock *s)
 {
   if (s->index >= 0)
     loop->poll_fd.data[s->index].events = sk_want_events(s);
@@ -529,13 +529,13 @@ sockets_prepare(struct birdloop *loop)
   BUFFER_SET(loop->poll_fd, loop->sock_num + 1);
 
   struct pollfd *pfd = loop->poll_fd.data;
-  sock **psk = loop->poll_sk.data;
+  struct birdsock **psk = loop->poll_sk.data;
   int i = 0;
-  node *n;
+  struct node *n;
 
   WALK_LIST(n, loop->sock_list)
   {
-    sock *s = SKIP_BACK(sock, n, n);
+    struct birdsock *s = SKIP_BACK(struct birdsock, n, n);
 
     ASSERT(i < loop->sock_num);
 
@@ -565,7 +565,7 @@ static void
 sockets_close_fds(struct birdloop *loop)
 {
   struct pollfd *pfd = loop->poll_fd.data;
-  sock **psk = loop->poll_sk.data;
+  struct birdsock **psk = loop->poll_sk.data;
   int poll_num = loop->poll_fd.used - 1;
 
   int i;
@@ -576,14 +576,14 @@ sockets_close_fds(struct birdloop *loop)
   loop->close_scheduled = 0;
 }
 
-int sk_read(sock *s, int revents);
-int sk_write(sock *s);
+int sk_read(struct birdsock *s, int revents);
+int sk_write(struct birdsock *s);
 
 static void
 sockets_fire(struct birdloop *loop)
 {
   struct pollfd *pfd = loop->poll_fd.data;
-  sock **psk = loop->poll_sk.data;
+  struct birdsock **psk = loop->poll_sk.data;
   int poll_num = loop->poll_fd.used - 1;
 
   times_update(loop);
@@ -629,7 +629,7 @@ birdloop_new(void)
   if (!init)
     { birdloop_init_current(); init = 1; }
 
-  pool *p = rp_new(NULL, "Birdloop root");
+  struct pool *p = rp_new(NULL, "Birdloop root");
   struct birdloop *loop = mb_allocz(p, sizeof(struct birdloop));
   loop->pool = p;
   pthread_mutex_init(&loop->mutex, NULL);
@@ -710,7 +710,7 @@ static void *
 birdloop_main(void *arg)
 {
   struct birdloop *loop = arg;
-  timer2 *t;
+  struct timer2 *t;
   int rv, timeout;
 
   birdloop_set_current(loop);

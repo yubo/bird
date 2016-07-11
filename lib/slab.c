@@ -32,16 +32,16 @@
 #include "lib/resource.h"
 #include "lib/string.h"
 
-#undef FAKE_SLAB	/* Turn on if you want to debug memory allocations */
+#undef FAKE_SLAB		/* Turn on if you want to debug memory allocations */
 
 #ifdef DEBUGGING
-#define POISON		/* Poison all regions after they are freed */
+#define POISON			/* Poison all regions after they are freed */
 #endif
 
-static void slab_free(resource *r);
-static void slab_dump(resource *r);
-static resource *slab_lookup(resource *r, unsigned long addr);
-static size_t slab_memsize(resource *r);
+static void slab_free(struct resource * r);
+static void slab_dump(struct resource * r);
+static struct resource *slab_lookup(struct resource * r, unsigned long addr);
+static size_t slab_memsize(struct resource * r);
 
 #ifdef FAKE_SLAB
 
@@ -50,88 +50,82 @@ static size_t slab_memsize(resource *r);
  */
 
 struct slab {
-  resource r;
-  uint size;
-  list objs;
+	struct resource r;
+	uint size;
+	union list objs;
 };
 
 static struct resclass sl_class = {
-  "FakeSlab",
-  sizeof(struct slab),
-  slab_free,
-  slab_dump,
-  NULL,
-  slab_memsize
+	"FakeSlab",
+	sizeof(struct slab),
+	slab_free,
+	slab_dump,
+	NULL,
+	slab_memsize
 };
 
 struct sl_obj {
-  node n;
-  uintptr_t data_align[0];
-  byte data[0];
+	struct node n;
+	uintptr_t data_align[0];
+	byte data[0];
 };
 
-slab *
-sl_new(pool *p, uint size)
+struct slab *sl_new(struct pool * p, uint size)
 {
-  slab *s = ralloc(p, &sl_class);
-  s->size = size;
-  init_list(&s->objs);
-  return s;
+	struct slab *s = ralloc(p, &sl_class);
+	s->size = size;
+	init_list(&s->objs);
+	return s;
 }
 
-void *
-sl_alloc(slab *s)
+void *sl_alloc(struct slab * s)
 {
-  struct sl_obj *o = xmalloc(sizeof(struct sl_obj) + s->size);
+	struct sl_obj *o = xmalloc(sizeof(struct sl_obj) + s->size);
 
-  add_tail(&s->objs, &o->n);
-  return o->data;
+	add_tail(&s->objs, &o->n);
+	return o->data;
 }
 
-void
-sl_free(slab *s, void *oo)
+void sl_free(struct slab * s, void *oo)
 {
-  struct sl_obj *o = SKIP_BACK(struct sl_obj, data, oo);
+	struct sl_obj *o = SKIP_BACK(struct sl_obj, data, oo);
 
-  rem_node(&o->n);
-  xfree(o);
+	rem_node(&o->n);
+	xfree(o);
 }
 
-static void
-slab_free(resource *r)
+static void slab_free(struct resource * r)
 {
-  slab *s = (slab *) r;
-  struct sl_obj *o, *p;
+	struct slab *s = (struct slab *) r;
+	struct sl_obj *o, *p;
 
-  for(o = HEAD(s->objs); p = (struct sl_obj *) o->n.next; o = p)
-    xfree(o);
+	for (o = HEAD(s->objs); p = (struct sl_obj *)o->n.next; o = p)
+		xfree(o);
 }
 
-static void
-slab_dump(resource *r)
+static void slab_dump(struct resource * r)
 {
-  slab *s = (slab *) r;
-  int cnt = 0;
-  struct sl_obj *o;
+	struct slab *s = (struct slab *) r;
+	int cnt = 0;
+	struct sl_obj *o;
 
-  WALK_LIST(o, s->objs)
-    cnt++;
-  debug("(%d objects per %d bytes)\n", cnt, s->size);
+	WALK_LIST(o, s->objs)
+	    cnt++;
+	debug("(%d objects per %d bytes)\n", cnt, s->size);
 }
 
-static size_t
-slab_memsize(resource *r)
+static size_t slab_memsize(struct resource * r)
 {
-  slab *s = (slab *) r;
-  size_t cnt = 0;
-  struct sl_obj *o;
+	struct slab *s = (struct slab *) r;
+	size_t cnt = 0;
+	struct sl_obj *o;
 
-  WALK_LIST(o, s->objs)
-    cnt++;
+	WALK_LIST(o, s->objs)
+	    cnt++;
 
-  return ALLOC_OVERHEAD + sizeof(struct slab) + cnt * (ALLOC_OVERHEAD + s->size);
+	return ALLOC_OVERHEAD + sizeof(struct slab) + cnt * (ALLOC_OVERHEAD +
+							     s->size);
 }
-
 
 #else
 
@@ -143,89 +137,86 @@ slab_memsize(resource *r)
 #define MAX_EMPTY_HEADS 1
 
 struct slab {
-  resource r;
-  uint obj_size, head_size, objs_per_slab, num_empty_heads, data_size;
-  list empty_heads, partial_heads, full_heads;
+	struct resource r;
+	uint obj_size, head_size, objs_per_slab, num_empty_heads, data_size;
+	union list empty_heads, partial_heads, full_heads;
 };
 
 static struct resclass sl_class = {
-  "Slab",
-  sizeof(struct slab),
-  slab_free,
-  slab_dump,
-  slab_lookup,
-  slab_memsize
+	"Slab",
+	sizeof(struct slab),
+	slab_free,
+	slab_dump,
+	slab_lookup,
+	slab_memsize
 };
 
 struct sl_head {
-  node n;
-  struct sl_obj *first_free;
-  int num_full;
+	struct node n;
+	struct sl_obj *first_free;
+	int num_full;
 };
 
 struct sl_obj {
-  struct sl_head *slab;
-  union {
-    struct sl_obj *next;
-    byte data[0];
-  } u;
+	struct sl_head *slab;
+	union {
+		struct sl_obj *next;
+		byte data[0];
+	} u;
 };
 
-struct sl_alignment {			/* Magic structure for testing of alignment */
-  byte data;
-  int x[0];
+struct sl_alignment {		/* Magic structure for testing of alignment */
+	byte data;
+	int x[0];
 };
 
 /**
  * sl_new - create a new Slab
- * @p: resource pool
+ * @p: struct resource pool
  * @size: block size
  *
- * This function creates a new Slab resource from which
+ * This function creates a new Slab struct resource from which
  * objects of size @size can be allocated.
  */
-slab *
-sl_new(pool *p, uint size)
+struct slab *sl_new(struct pool * p, uint size)
 {
-  slab *s = ralloc(p, &sl_class);
-  uint align = sizeof(struct sl_alignment);
-  if (align < sizeof(int))
-    align = sizeof(int);
-  s->data_size = size;
-  size += OFFSETOF(struct sl_obj, u.data);
-  if (size < sizeof(struct sl_obj))
-    size = sizeof(struct sl_obj);
-  size = (size + align - 1) / align * align;
-  s->obj_size = size;
-  s->head_size = (sizeof(struct sl_head) + align - 1) / align * align;
-  s->objs_per_slab = (SLAB_SIZE - s->head_size) / size;
-  if (!s->objs_per_slab)
-    bug("Slab: object too large");
-  s->num_empty_heads = 0;
-  init_list(&s->empty_heads);
-  init_list(&s->partial_heads);
-  init_list(&s->full_heads);
-  return s;
+	struct slab *s = ralloc(p, &sl_class);
+	uint align = sizeof(struct sl_alignment);
+	if (align < sizeof(int))
+		align = sizeof(int);
+	s->data_size = size;
+	size += OFFSETOF(struct sl_obj, u.data);
+	if (size < sizeof(struct sl_obj))
+		size = sizeof(struct sl_obj);
+	size = (size + align - 1) / align * align;
+	s->obj_size = size;
+	s->head_size = (sizeof(struct sl_head) + align - 1) / align * align;
+	s->objs_per_slab = (SLAB_SIZE - s->head_size) / size;
+	if (!s->objs_per_slab)
+		bug("Slab: object too large");
+	s->num_empty_heads = 0;
+	init_list(&s->empty_heads);
+	init_list(&s->partial_heads);
+	init_list(&s->full_heads);
+	return s;
 }
 
-static struct sl_head *
-sl_new_head(slab *s)
+static struct sl_head *sl_new_head(struct slab * s)
 {
-  struct sl_head *h = xmalloc(SLAB_SIZE);
-  struct sl_obj *o = (struct sl_obj *)((byte *)h+s->head_size);
-  struct sl_obj *no;
-  uint n = s->objs_per_slab;
+	struct sl_head *h = xmalloc(SLAB_SIZE);
+	struct sl_obj *o = (struct sl_obj *)((byte *) h + s->head_size);
+	struct sl_obj *no;
+	uint n = s->objs_per_slab;
 
-  h->first_free = o;
-  h->num_full = 0;
-  while (n--)
-    {
-      o->slab = h;
-      no = (struct sl_obj *)((char *) o+s->obj_size);
-      o->u.next = n ? no : NULL;
-      o = no;
-    }
-  return h;
+	h->first_free = o;
+	h->num_full = 0;
+	while (n--) {
+		o->slab = h;
+		no = (struct sl_obj *)((char *)o + s->obj_size);
+		o->u.next = n ? no : NULL;
+		o = no;
+	}
+	return h;
 }
 
 /**
@@ -235,44 +226,42 @@ sl_new_head(slab *s)
  * sl_alloc() allocates space for a single object from the
  * Slab and returns a pointer to the object.
  */
-void *
-sl_alloc(slab *s)
+void *sl_alloc(struct slab * s)
 {
-  struct sl_head *h;
-  struct sl_obj *o;
+	struct sl_head *h;
+	struct sl_obj *o;
 
 redo:
-  h = HEAD(s->partial_heads);
-  if (!h->n.next)
-    goto no_partial;
+	h = HEAD(s->partial_heads);
+	if (!h->n.next)
+		goto no_partial;
 okay:
-  o = h->first_free;
-  if (!o)
-    goto full_partial;
-  h->first_free = o->u.next;
-  h->num_full++;
+	o = h->first_free;
+	if (!o)
+		goto full_partial;
+	h->first_free = o->u.next;
+	h->num_full++;
 #ifdef POISON
-  memset(o->u.data, 0xcd, s->data_size);
+	memset(o->u.data, 0xcd, s->data_size);
 #endif
-  return o->u.data;
+	return o->u.data;
 
 full_partial:
-  rem_node(&h->n);
-  add_tail(&s->full_heads, &h->n);
-  goto redo;
+	rem_node(&h->n);
+	add_tail(&s->full_heads, &h->n);
+	goto redo;
 
 no_partial:
-  h = HEAD(s->empty_heads);
-  if (h->n.next)
-    {
-      rem_node(&h->n);
-      add_head(&s->partial_heads, &h->n);
-      s->num_empty_heads--;
-      goto okay;
-    }
-  h = sl_new_head(s);
-  add_head(&s->partial_heads, &h->n);
-  goto okay;
+	h = HEAD(s->empty_heads);
+	if (h->n.next) {
+		rem_node(&h->n);
+		add_head(&s->partial_heads, &h->n);
+		s->num_empty_heads--;
+		goto okay;
+	}
+	h = sl_new_head(s);
+	add_head(&s->partial_heads, &h->n);
+	goto okay;
 }
 
 /**
@@ -283,95 +272,88 @@ no_partial:
  * This function frees memory associated with the object @oo
  * and returns it back to the Slab @s.
  */
-void
-sl_free(slab *s, void *oo)
+void sl_free(struct slab * s, void *oo)
 {
-  struct sl_obj *o = SKIP_BACK(struct sl_obj, u.data, oo);
-  struct sl_head *h = o->slab;
+	struct sl_obj *o = SKIP_BACK(struct sl_obj, u.data, oo);
+	struct sl_head *h = o->slab;
 
 #ifdef POISON
-  memset(oo, 0xdb, s->data_size);
+	memset(oo, 0xdb, s->data_size);
 #endif
-  o->u.next = h->first_free;
-  h->first_free = o;
-  if (!--h->num_full)
-    {
-      rem_node(&h->n);
-      if (s->num_empty_heads >= MAX_EMPTY_HEADS)
-	xfree(h);
-      else
-	{
-	  add_head(&s->empty_heads, &h->n);
-	  s->num_empty_heads++;
+	o->u.next = h->first_free;
+	h->first_free = o;
+	if (!--h->num_full) {
+		rem_node(&h->n);
+		if (s->num_empty_heads >= MAX_EMPTY_HEADS)
+			xfree(h);
+		else {
+			add_head(&s->empty_heads, &h->n);
+			s->num_empty_heads++;
+		}
+	} else if (!o->u.next) {
+		rem_node(&h->n);
+		add_head(&s->partial_heads, &h->n);
 	}
-    }
-  else if (!o->u.next)
-    {
-      rem_node(&h->n);
-      add_head(&s->partial_heads, &h->n);
-    }
 }
 
-static void
-slab_free(resource *r)
+static void slab_free(struct resource * r)
 {
-  slab *s = (slab *) r;
-  struct sl_head *h, *g;
+	struct slab *s = (struct slab *) r;
+	struct sl_head *h, *g;
 
-  WALK_LIST_DELSAFE(h, g, s->empty_heads)
-    xfree(h);
-  WALK_LIST_DELSAFE(h, g, s->partial_heads)
-    xfree(h);
-  WALK_LIST_DELSAFE(h, g, s->full_heads)
-    xfree(h);
+	WALK_LIST_DELSAFE(h, g, s->empty_heads)
+	    xfree(h);
+	WALK_LIST_DELSAFE(h, g, s->partial_heads)
+	    xfree(h);
+	WALK_LIST_DELSAFE(h, g, s->full_heads)
+	    xfree(h);
 }
 
-static void
-slab_dump(resource *r)
+static void slab_dump(struct resource * r)
 {
-  slab *s = (slab *) r;
-  int ec=0, pc=0, fc=0;
-  struct sl_head *h;
+	struct slab *s = (struct slab *) r;
+	int ec = 0, pc = 0, fc = 0;
+	struct sl_head *h;
 
-  WALK_LIST(h, s->empty_heads)
-    ec++;
-  WALK_LIST(h, s->partial_heads)
-    pc++;
-  WALK_LIST(h, s->full_heads)
-    fc++;
-  debug("(%de+%dp+%df blocks per %d objs per %d bytes)\n", ec, pc, fc, s->objs_per_slab, s->obj_size);
+	WALK_LIST(h, s->empty_heads)
+	    ec++;
+	WALK_LIST(h, s->partial_heads)
+	    pc++;
+	WALK_LIST(h, s->full_heads)
+	    fc++;
+	debug("(%de+%dp+%df blocks per %d objs per %d bytes)\n", ec, pc, fc,
+	      s->objs_per_slab, s->obj_size);
 }
 
-static size_t
-slab_memsize(resource *r)
+static size_t slab_memsize(struct resource * r)
 {
-  slab *s = (slab *) r;
-  size_t heads = 0;
-  struct sl_head *h;
+	struct slab *s = (struct slab *) r;
+	size_t heads = 0;
+	struct sl_head *h;
 
-  WALK_LIST(h, s->empty_heads)
-    heads++;
-  WALK_LIST(h, s->partial_heads)
-    heads++;
-  WALK_LIST(h, s->full_heads)
-    heads++;
+	WALK_LIST(h, s->empty_heads)
+	    heads++;
+	WALK_LIST(h, s->partial_heads)
+	    heads++;
+	WALK_LIST(h, s->full_heads)
+	    heads++;
 
-  return ALLOC_OVERHEAD + sizeof(struct slab) + heads * (ALLOC_OVERHEAD + SLAB_SIZE);
+	return ALLOC_OVERHEAD + sizeof(struct slab) + heads * (ALLOC_OVERHEAD +
+							       SLAB_SIZE);
 }
 
-static resource *
-slab_lookup(resource *r, unsigned long a)
+static struct resource *slab_lookup(struct resource * r, unsigned long a)
 {
-  slab *s = (slab *) r;
-  struct sl_head *h;
+	struct slab *s = (struct slab *) r;
+	struct sl_head *h;
 
-  WALK_LIST(h, s->partial_heads)
-    if ((unsigned long) h < a && (unsigned long) h + SLAB_SIZE < a)
-      return r;
-  WALK_LIST(h, s->full_heads)
-    if ((unsigned long) h < a && (unsigned long) h + SLAB_SIZE < a)
-      return r;
-  return NULL;
+	WALK_LIST(h, s->partial_heads)
+	    if ((unsigned long)h < a && (unsigned long)h + SLAB_SIZE < a)
+		return r;
+	WALK_LIST(h, s->full_heads)
+	    if ((unsigned long)h < a && (unsigned long)h + SLAB_SIZE < a)
+		return r;
+	return NULL;
 }
 
 #endif

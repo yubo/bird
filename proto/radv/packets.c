@@ -101,7 +101,7 @@ radv_prefix_match(struct radv_iface *ifa, struct ifa *a)
 }
 
 static int
-radv_prepare_rdnss(struct radv_iface *ifa, list *rdnss_list, char **buf, char *bufend)
+radv_prepare_rdnss(struct radv_iface *ifa, union list *rdnss_list, char **buf, char *bufend)
 {
   struct radv_rdnss_config *rcf = HEAD(*rdnss_list);
 
@@ -152,7 +152,7 @@ radv_prepare_rdnss(struct radv_iface *ifa, list *rdnss_list, char **buf, char *b
 int
 radv_process_domain(struct radv_dnssl_config *cf)
 {
-  /* Format of domain in search list is <size> <label> <size> <label> ... 0 */
+  /* Format of domain in search union list is <size> <label> <size> <label> ... 0 */
 
   char *dom = cf->domain;
   char *dom_end = dom; /* Just to  */
@@ -183,7 +183,7 @@ radv_process_domain(struct radv_dnssl_config *cf)
 }
 
 static int
-radv_prepare_dnssl(struct radv_iface *ifa, list *dnssl_list, char **buf, char *bufend)
+radv_prepare_dnssl(struct radv_iface *ifa, union list *dnssl_list, char **buf, char *bufend)
 {
   struct radv_dnssl_config *dcf = HEAD(*dnssl_list);
 
@@ -348,7 +348,7 @@ radv_send_ra(struct radv_iface *ifa, int shutdown)
 
 
 static int
-radv_rx_hook(sock *sk, int size)
+radv_rx_hook(struct birdsock *sk, int size)
 {
   struct radv_iface *ifa = sk->data;
   struct proto_radv *ra = ifa->ra;
@@ -391,14 +391,14 @@ radv_rx_hook(sock *sk, int size)
 }
 
 static void
-radv_tx_hook(sock *sk)
+radv_tx_hook(struct birdsock *sk)
 {
   struct radv_iface *ifa = sk->data;
   log(L_WARN "%s: TX hook called", ifa->ra->p.name);
 }
 
 static void
-radv_err_hook(sock *sk, int err)
+radv_err_hook(struct birdsock *sk, int err)
 {
   struct radv_iface *ifa = sk->data;
   log(L_ERR "%s: Socket error on %s: %M", ifa->ra->p.name, ifa->iface->name, err);
@@ -407,7 +407,7 @@ radv_err_hook(sock *sk, int err)
 int
 radv_sk_open(struct radv_iface *ifa)
 {
-  sock *sk = sk_new(ifa->ra->p.pool);
+  struct birdsock *sk = sk_new(ifa->ra->p.pool);
   sk->type = SK_IP;
   sk->dport = ICMPV6_PROTO;
   sk->saddr = ifa->addr->ip;

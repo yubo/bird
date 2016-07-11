@@ -116,10 +116,10 @@ static char * number(char * str, long num, int base, int size, int precision,
  * @buf: destination buffer
  * @size: size of the buffer
  * @fmt: format string
- * @args: a list of arguments to be formatted
+ * @args: a union list of arguments to be formatted
  *
  * This functions acts like ordinary sprintf() except that it checks
- * available space to avoid buffer overflows and it allows some more
+ * available space to avoid struct buffer overflows and it allows some more
  * format specifiers: |%I| for formatting of IP addresses (any non-zero
  * width is automatically replaced by standard IP address width which
  * depends on whether we use IPv4 or IPv6; |%#I| gives hexadecimal format),
@@ -130,7 +130,7 @@ static char * number(char * str, long num, int base, int size, int precision,
  * point numbers.
  *
  * Result: number of characters of the output string or -1 if
- * the buffer space was insufficient.
+ * the struct buffer space was insufficient.
  */
 int bvsnprintf(char *buf, int size, const char *fmt, va_list args)
 {
@@ -387,11 +387,11 @@ int bvsnprintf(char *buf, int size, const char *fmt, va_list args)
  * bvsprintf - BIRD's vsprintf()
  * @buf: buffer
  * @fmt: format string
- * @args: a list of arguments to be formatted
+ * @args: a union list of arguments to be formatted
  *
  * This function is equivalent to bvsnprintf() with an infinite
- * buffer size. Please use carefully only when you are absolutely
- * sure the buffer won't overflow.
+ * struct buffer size. Please use carefully only when you are absolutely
+ * sure the struct buffer won't overflow.
  */
 int bvsprintf(char *buf, const char *fmt, va_list args)
 {
@@ -404,9 +404,9 @@ int bvsprintf(char *buf, const char *fmt, va_list args)
  * @fmt: format string
  *
  * This function is equivalent to bvsnprintf() with an infinite
- * buffer size and variable arguments instead of a &va_list.
+ * struct buffer size and variable arguments instead of a &va_list.
  * Please use carefully only when you are absolutely
- * sure the buffer won't overflow.
+ * sure the struct buffer won't overflow.
  */
 int bsprintf(char * buf, const char *fmt, ...)
 {
@@ -422,7 +422,7 @@ int bsprintf(char * buf, const char *fmt, ...)
 /**
  * bsnprintf - BIRD's snprintf()
  * @buf: buffer
- * @size: buffer size
+ * @size: struct buffer size
  * @fmt: format string
  *
  * This function is equivalent to bsnprintf() with variable arguments instead of a &va_list.
@@ -439,7 +439,7 @@ int bsnprintf(char * buf, int size, const char *fmt, ...)
 }
 
 int
-buffer_vprint(buffer *buf, const char *fmt, va_list args)
+buffer_vprint(struct buffer *buf, const char *fmt, va_list args)
 {
   int i = bvsnprintf((char *) buf->pos, buf->end - buf->pos, fmt, args);
   buf->pos = (i >= 0) ? (buf->pos + i) : buf->end;
@@ -447,7 +447,7 @@ buffer_vprint(buffer *buf, const char *fmt, va_list args)
 }
 
 int
-buffer_print(buffer *buf, const char *fmt, ...)
+buffer_print(struct buffer *buf, const char *fmt, ...)
 {
   va_list args;
   int i;
@@ -461,7 +461,7 @@ buffer_print(buffer *buf, const char *fmt, ...)
 }
 
 void
-buffer_puts(buffer *buf, const char *str)
+buffer_puts(struct buffer *buf, const char *str)
 {
   byte *bp = buf->pos;
   byte *be = buf->end;

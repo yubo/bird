@@ -31,7 +31,7 @@ dev_ifa_notify(struct proto *p, unsigned c, struct ifa *ad)
 
   if (!EMPTY_LIST(P->iface_list) &&
       !iface_patt_find(&P->iface_list, ad->iface, ad->iface->addr))
-    /* Empty list is automagically treated as "*" */
+    /* Empty union list is automagically treated as "*" */
     return;
 
   if (ad->flags & IA_SECONDARY)
@@ -58,9 +58,9 @@ dev_ifa_notify(struct proto *p, unsigned c, struct ifa *ad)
     }
   else if (c & IF_CHANGE_UP)
     {
-      rta *a;
+      struct rta *a;
       net *n;
-      rte *e;
+      struct rte *e;
 
       DBG("dev_if_notify: %s:%I going up\n", ad->iface->name, ad->ip);
 
@@ -70,7 +70,7 @@ dev_ifa_notify(struct proto *p, unsigned c, struct ifa *ad)
       /* Use iface ID as local source ID */
       struct rte_src *src = rt_get_source(p, ad->iface->index);
 
-      rta a0 = {
+      struct rta a0 = {
 	.src = src,
 	.source = RTS_DEVICE,
 	.scope = SCOPE_UNIVERSE,

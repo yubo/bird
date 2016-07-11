@@ -18,9 +18,9 @@ int bvsprintf(char *str, const char *fmt, va_list args);
 int bsnprintf(char *str, int size, const char *fmt, ...);
 int bvsnprintf(char *str, int size, const char *fmt, va_list args);
 
-int buffer_vprint(buffer *buf, const char *fmt, va_list args);
-int buffer_print(buffer *buf, const char *fmt, ...);
-void buffer_puts(buffer *buf, const char *str);
+int buffer_vprint(struct buffer *buf, const char *fmt, va_list args);
+int buffer_print(struct buffer *buf, const char *fmt, ...);
+void buffer_puts(struct buffer *buf, const char *str);
 
 int patmatch(const byte *pat, const byte *str);
 

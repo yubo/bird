@@ -59,7 +59,7 @@ adata_empty(struct linpool *pool, int l)
 }
 
 static void
-pm_format(struct f_path_mask *p, buffer *buf)
+pm_format(struct f_path_mask *p, struct buffer *buf)
 {
   buffer_puts(buf, "[= ");
 
@@ -443,7 +443,7 @@ val_in_range(struct f_val v1, struct f_val v2)
  * val_format - format filter value
  */
 void
-val_format(struct f_val v, buffer *buf)
+val_format(struct f_val v, struct buffer *buf)
 {
   char buf2[1024];
   switch (v.type)
@@ -481,7 +481,7 @@ static inline void f_rte_cow(void)
 }
 
 /*
- * rta_cow - prepare rta for modification by filter
+ * rta_cow - prepare struct rta for modification by filter
  */
 static void
 f_rta_cow(void)
@@ -489,15 +489,15 @@ f_rta_cow(void)
   if (!rta_is_cached((*f_rte)->attrs))
     return;
 
-  /* Prepare to modify rte */
+  /* Prepare to modify struct rte */
   f_rte_cow();
 
-  /* Store old rta to free it later, it stores reference from rte_cow() */
+  /* Store old struct rta to free it later, it stores reference from rte_cow() */
   f_old_rta = (*f_rte)->attrs;
 
   /*
-   * Get shallow copy of rta. Fields eattrs and nexthops of rta are shared
-   * with f_old_rta (they will be copied when the cached rta will be obtained
+   * Get shallow copy of rta. Fields eattrs and nexthops of struct rta are shared
+   * with f_old_rta (they will be copied when the cached struct rta will be obtained
    * at the end of f_run()), also the lock of hostentry is inherited (we
    * suppose hostentry is not changed by filters).
    */
@@ -797,7 +797,7 @@ interpret(struct f_inst *what)
       bug( "unknown return type: Can't happen");
     }
     break;
-  case 'a':	/* rta access */
+  case 'a':	/* struct rta access */
     {
       ACCESS_RTE;
       struct rta *rta = (*f_rte)->attrs;
@@ -841,7 +841,7 @@ interpret(struct f_inst *what)
       case SA_GW:
 	{
 	  ip_addr ip = v1.val.px.ip;
-	  neighbor *n = neigh_find(rta->src->proto, &ip, 0);
+	  struct neighbor *n = neigh_find(rta->src->proto, &ip, 0);
 	  if (!n || (n->scope == SCOPE_HOST))
 	    runtime( "Invalid gw address" );
 
@@ -877,7 +877,7 @@ interpret(struct f_inst *what)
   case P('e','a'):	/* Access to extended attributes */
     ACCESS_RTE;
     {
-      eattr *e = NULL;
+      struct eattr *e = NULL;
       u16 code = what->a2.i;
 
       if (!(f_flags & FF_FORCE_TMPATTR))
@@ -953,7 +953,7 @@ interpret(struct f_inst *what)
     ACCESS_RTE;
     ONEARG;
     {
-      struct ea_list *l = lp_alloc(f_pool, sizeof(struct ea_list) + sizeof(eattr));
+      struct ea_list *l = lp_alloc(f_pool, sizeof(struct ea_list) + sizeof(struct eattr));
       u16 code = what->a2.i;
 
       l->next = NULL;
@@ -1006,7 +1006,7 @@ interpret(struct f_inst *what)
 	  runtime( "Setting bit in bitfield attribute to non-bool value" );
 	{
 	  /* First, we have to find the old value */
-	  eattr *e = NULL;
+	  struct eattr *e = NULL;
 	  if (!(f_flags & FF_FORCE_TMPATTR))
 	    e = ea_find((*f_rte)->attrs->eattrs, code);
 	  if (!e)
@@ -1177,7 +1177,7 @@ interpret(struct f_inst *what)
     res.val.ad = as_path_prepend(f_pool, v1.val.ad, v2.val.i);
     break;
 
-  case P('C','a'):	/* (Extended) Community list add or delete */
+  case P('C','a'):	/* (Extended) Community union list add or delete */
     TWOARGS;
     if (v1.type == T_PATH)
     {
@@ -1208,7 +1208,7 @@ interpret(struct f_inst *what)
     }
     else if (v1.type == T_CLIST)
     {
-      /* Community (or cluster) list */
+      /* Community (or cluster) union list */
       struct f_val dummy;
       int arg_set = 0;
       uint n = 0;
@@ -1258,7 +1258,7 @@ interpret(struct f_inst *what)
     }
     else if (v1.type == T_ECLIST)
     {
-      /* Extended community list */
+      /* Extended community union list */
       int arg_set = 0;
 
       /* v2.val is either EC or EC-set */
@@ -1320,7 +1320,7 @@ interpret(struct f_inst *what)
 
       /* We ignore temporary attributes, probably not a problem here */
       /* 0x02 is a value of BA_AS_PATH, we don't want to include BGP headers */
-      eattr *e = ea_find((*f_rte)->attrs->eattrs, EA_CODE(EAP_BGP, 0x02));
+      struct eattr *e = ea_find((*f_rte)->attrs->eattrs, EA_CODE(EAP_BGP, 0x02));
 
       if (!e || e->type != EAF_TYPE_AS_PATH)
 	runtime("Missing AS_PATH attribute");
@@ -1490,16 +1490,16 @@ i_same(struct f_inst *f1, struct f_inst *f2)
  * @rte is originally rw, it may be directly modified (and it is never
  * copied).
  *
- * The returned rte may reuse the (possibly cached, cloned) rta, or
- * (if rta was modificied) contains a modified uncached rta, which
+ * The returned struct rte may reuse the (possibly cached, cloned) rta, or
+ * (if struct rta was modificied) contains a modified uncached rta, which
  * uses parts allocated from @tmp_pool and parts shared from original
  * rta. There is one exception - if @rte is rw but contains a cached
- * rta and that is modified, rta in returned rte is also cached.
+ * struct rta and that is modified, struct rta in returned struct rte is also cached.
  *
  * Ownership of cached rtas is consistent with rte, i.e.
- * if a new rte is returned, it has its own clone of cached rta
- * (and cached rta of read-only source rte is intact), if rte is
- * modified in place, old cached rta is possibly freed.
+ * if a new struct rte is returned, it has its own clone of cached rta
+ * (and cached struct rta of read-only source struct rte is intact), if struct rte is
+ * modified in place, old cached struct rta is possibly freed.
  */
 int
 f_run(struct filter *filter, struct rte **rte, struct ea_list **tmp_attrs, struct linpool *tmp_pool, int flags)
@@ -1525,15 +1525,15 @@ f_run(struct filter *filter, struct rte **rte, struct ea_list **tmp_attrs, struc
 
   if (f_old_rta) {
     /*
-     * Cached rta was modified and f_rte contains now an uncached one,
-     * sharing some part with the cached one. The cached rta should
-     * be freed (if rte was originally COW, f_old_rta is a clone
+     * Cached struct rta was modified and f_rte contains now an uncached one,
+     * sharing some part with the cached one. The cached struct rta should
+     * be freed (if struct rte was originally COW, f_old_rta is a clone
      * obtained during rte_cow()).
      *
      * This also implements the exception mentioned in f_run()
-     * description. The reason for this is that rta reuses parts of
+     * description. The reason for this is that struct rta reuses parts of
      * f_old_rta, and these may be freed during rta_free(f_old_rta).
-     * This is not the problem if rte was COW, because original rte
+     * This is not the problem if struct rte was COW, because original rte
      * also holds the same rta.
      */
     if (!rte_cow)
@@ -1569,7 +1569,7 @@ f_eval_rte(struct f_inst *expr, struct rte **rte, struct linpool *tmp_pool)
   /* Note that in this function we assume that rte->attrs is private / uncached */
   struct f_val res = interpret(expr);
 
-  /* Hack to include EAF_TEMP attributes to the main list */
+  /* Hack to include EAF_TEMP attributes to the main union list */
   (*rte)->attrs->eattrs = ea_append(tmp_attrs, (*rte)->attrs->eattrs);
 
   return res;

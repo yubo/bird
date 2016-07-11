@@ -12,9 +12,9 @@
 #include "lib/slists.h"
 
 static inline void
-s_merge(snode *from, snode *to)
+s_merge(struct snode *from, struct snode *to)
 {
-  siterator *f, *g;
+  struct siterator *f, *g;
 
   if (!(f = from->readers))
     return;
@@ -22,7 +22,7 @@ s_merge(snode *from, snode *to)
     {
       /* Fast path */
       to->readers = f;
-      f->prev = (siterator *) to;
+      f->prev = (struct siterator *) to;
     fixup:
       while (f && f->node)
 	{
@@ -39,24 +39,24 @@ s_merge(snode *from, snode *to)
   goto fixup;
 }
 
-snode *
-s_get(siterator *i)
+struct snode *
+s_get(struct siterator *i)
 {
-  siterator *f, *g;
-  snode *n;
+  struct siterator *f, *g;
+  struct snode *n;
 
   if (!(n = i->node))
     {
       /*
-       * No node found. We have to walk the iterator list backwards
+       * No struct node found. We have to walk the iterator union list backwards
        * to find where are we linked.
        */
       f = i;
       while (!f->null)
 	f = f->prev;
-      n = (snode *) f;
+      n = (struct snode *) f;
     }
-  f = i->prev;				/* Maybe the snode itself */
+  f = i->prev;				/* Maybe the struct snode itself */
   g = i->next;
   f->next = g;
   if (g)
@@ -68,25 +68,25 @@ s_get(siterator *i)
 }
 
 void
-s_put(siterator *i, snode *n)
+s_put(struct siterator *i, struct snode *n)
 {
-  siterator *f;
+  struct siterator *f;
 
   i->node = n;
   if (f = n->readers)
     f->prev = i;
   i->next = f;
   n->readers = i;
-  i->prev = (siterator *) n;
+  i->prev = (struct siterator *) n;
   i->null = NULL;
 }
 
 void
-s_add_tail(slist *l, snode *n)
+s_add_tail(struct slist *l, struct snode *n)
 {
-  snode *z = l->tail;
+  struct snode *z = l->tail;
 
-  n->next = (snode *) &l->null;
+  n->next = (struct snode *) &l->null;
   n->prev = z;
   z->next = n;
   l->tail = n;
@@ -94,21 +94,21 @@ s_add_tail(slist *l, snode *n)
 }
 
 void
-s_add_head(slist *l, snode *n)
+s_add_head(struct slist *l, struct snode *n)
 {
-  snode *z = l->head;
+  struct snode *z = l->head;
 
   n->next = z;
-  n->prev = (snode *) &l->head;
+  n->prev = (struct snode *) &l->head;
   z->prev = n;
   l->head = n;
   n->readers = NULL;
 }
 
 void
-s_insert_node(snode *n, snode *after)
+s_insert_node(struct snode *n, struct snode *after)
 {
-  snode *z = after->next;
+  struct snode *z = after->next;
 
   n->next = z;
   n->prev = after;
@@ -118,10 +118,10 @@ s_insert_node(snode *n, snode *after)
 }
 
 void
-s_rem_node(snode *n)
+s_rem_node(struct snode *n)
 {
-  snode *z = n->prev;
-  snode *x = n->next;
+  struct snode *z = n->prev;
+  struct snode *x = n->next;
 
   z->next = x;
   x->prev = z;
@@ -129,26 +129,26 @@ s_rem_node(snode *n)
 }
 
 void
-s_init_list(slist *l)
+s_init_list(struct slist *l)
 {
-  l->head = (snode *) &l->null;
+  l->head = (struct snode *) &l->null;
   l->null = NULL;
-  l->tail = (snode *) &l->head;
+  l->tail = (struct snode *) &l->head;
   l->tail_readers = NULL;
 }
 
 void
-s_add_tail_list(slist *to, slist *l)
+s_add_tail_list(struct slist *to, struct slist *l)
 {
-  snode *p = to->tail;
-  snode *q = l->head;
+  struct snode *p = to->tail;
+  struct snode *q = l->head;
 
   p->next = q;
   q->prev = p;
   q = l->tail;
-  q->next = (snode *) &to->null;
+  q->next = (struct snode *) &to->null;
   to->tail = q;
-  s_merge((snode *) &l->null, (snode *) &to->null);
+  s_merge((struct snode *) &l->null, (struct snode *) &to->null);
 }
 
 #ifdef TEST
@@ -156,16 +156,16 @@ s_add_tail_list(slist *to, slist *l)
 #include "lib/resource.h"
 #include <stdio.h>
 
-void dump(char *c, slist *a)
+void dump(char *c, struct slist *a)
 {
-  snode *x;
+  struct snode *x;
 
   puts(c);
   for(x=SHEAD(*a); x; x=x->next)
     {
-      siterator *i, *j;
+      struct siterator *i, *j;
       printf("%p", x);
-      j = (siterator *) x;
+      j = (struct siterator *) x;
       for(i=x->readers; i; i=i->next)
 	{
 	  if (i->prev != j)
@@ -180,9 +180,9 @@ void dump(char *c, slist *a)
 
 int main(void)
 {
-  slist a, b;
-  snode *x, *y;
-  siterator i, j;
+  struct slist a, b;
+  struct snode *x, *y;
+  struct siterator i, j;
 
   s_init_list(&a);
   s_init_list(&b);

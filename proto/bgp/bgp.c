@@ -41,7 +41,7 @@
  * attributes. If we have any packet to send (due to either new routes or the connection
  * tracking code wanting to send a Open, Keepalive or Notification message), we call
  * bgp_schedule_packet() which sets the corresponding bit in a @packet_to_send
- * bit field in &bgp_conn and as soon as the transmit socket buffer becomes empty,
+ * bit field in &bgp_conn and as soon as the transmit socket struct buffer becomes empty,
  * we call bgp_fire_tx(). It inspects state of all the packet type bits and calls
  * the corresponding bgp_create_xx() functions, eventually rescheduling the same packet
  * type if we have more data of the same type to send.
@@ -53,7 +53,7 @@
  * Unknown transitive attributes are attached to the route as %EAF_TYPE_OPAQUE byte streams.
  *
  * BGP protocol implements graceful restart in both restarting (local restart)
- * and receiving (neighbor restart) roles. The first is handled mostly by the
+ * and receiving (struct neighbor restart) roles. The first is handled mostly by the
  * graceful restart code in the nest, BGP protocol just handles capabilities,
  * sets @gr_wait and locks graceful restart until end-of-RIB mark is received.
  * The second is implemented by internal restart of the BGP state to %BS_IDLE
@@ -79,14 +79,14 @@
 #include "bgp.h"
 
 
-struct linpool *bgp_linpool;		/* Global temporary pool */
-static sock *bgp_listen_sk;		/* Global listening socket */
+struct linpool *bgp_linpool;		/* Global temporary struct pool */
+static struct birdsock *bgp_listen_sk;		/* Global listening socket */
 static int bgp_counter;			/* Number of protocol instances using the listening socket */
 
 static void bgp_close(struct bgp_proto *p, int apply_md5);
 static void bgp_connect(struct bgp_proto *p);
 static void bgp_active(struct bgp_proto *p);
-static sock *bgp_setup_listen_sk(ip_addr addr, unsigned port, u32 flags);
+static struct birdsock *bgp_setup_listen_sk(ip_addr addr, unsigned port, u32 flags);
 static void bgp_update_bfd(struct bgp_proto *p, int use_bfd);
 
 
@@ -96,7 +96,7 @@ static void bgp_update_bfd(struct bgp_proto *p, int use_bfd);
  *
  * This function allocates and configures shared BGP resources.
  * Should be called as the last step during initialization
- * (when lock is acquired and neighbor is ready).
+ * (when lock is acquired and struct neighbor is ready).
  * When error, state changed to PS_DOWN, -1 is returned and caller
  * should return immediately.
  */
@@ -150,7 +150,7 @@ bgp_startup(struct bgp_proto *p)
 }
 
 static void
-bgp_startup_timeout(timer *t)
+bgp_startup_timeout(struct timer *t)
 {
   bgp_startup(t->data);
 }
@@ -215,7 +215,7 @@ bgp_close(struct bgp_proto *p, int apply_md5)
  * it for all BGP timers.
  */
 void
-bgp_start_timer(timer *t, int value)
+bgp_start_timer(struct timer *t, int value)
 {
   if (value)
     {
@@ -400,7 +400,7 @@ bgp_conn_enter_established_state(struct bgp_conn *conn)
   if (p->gr_active && (!conn->peer_gr_able || !(conn->peer_gr_aflags & BGP_GRF_FORWARDING)))
     bgp_graceful_restart_done(p);
 
-  /* GR capability implies that neighbor will send End-of-RIB */
+  /* GR capability implies that struct neighbor will send End-of-RIB */
   if (conn->peer_gr_aware)
     p->load_state = BFS_LOADING;
 
@@ -455,7 +455,7 @@ bgp_conn_enter_idle_state(struct bgp_conn *conn)
  * bgp_handle_graceful_restart - handle detected BGP graceful restart
  * @p: BGP instance
  *
- * This function is called when a BGP graceful restart of the neighbor is
+ * This function is called when a BGP graceful restart of the struct neighbor is
  * detected (when the TCP connection fails or when a new TCP connection
  * appears). The function activates processing of the restart - starts routing
  * table refresh cycle and activates BGP restart timer. The protocol state goes
@@ -484,8 +484,8 @@ bgp_handle_graceful_restart(struct bgp_proto *p)
  * @p: BGP instance
  *
  * This function is called when the active BGP graceful restart of the neighbor
- * should be finished - either successfully (the neighbor sends all paths and
- * reports end-of-RIB on the new session) or unsuccessfully (the neighbor does
+ * should be finished - either successfully (the struct neighbor sends all paths and
+ * reports end-of-RIB on the new session) or unsuccessfully (the struct neighbor does
  * not support BGP graceful restart on the new session). The function ends
  * routing table refresh cycle and stops BGP restart timer.
  */
@@ -508,7 +508,7 @@ bgp_graceful_restart_done(struct bgp_proto *p)
  */
 
 static void
-bgp_graceful_restart_timeout(timer *t)
+bgp_graceful_restart_timeout(struct timer *t)
 {
   struct bgp_proto *p = t->data;
 
@@ -585,7 +585,7 @@ bgp_send_open(struct bgp_conn *conn)
 }
 
 static void
-bgp_connected(sock *sk)
+bgp_connected(struct birdsock *sk)
 {
   struct bgp_conn *conn = sk->data;
   struct bgp_proto *p = conn->bgp;
@@ -595,7 +595,7 @@ bgp_connected(sock *sk)
 }
 
 static void
-bgp_connect_timeout(timer *t)
+bgp_connect_timeout(struct timer *t)
 {
   struct bgp_conn *conn = t->data;
   struct bgp_proto *p = conn->bgp;
@@ -611,7 +611,7 @@ bgp_connect_timeout(timer *t)
 }
 
 static void
-bgp_sock_err(sock *sk, int err)
+bgp_sock_err(struct birdsock *sk, int err)
 {
   struct bgp_conn *conn = sk->data;
   struct bgp_proto *p = conn->bgp;
@@ -639,7 +639,7 @@ bgp_sock_err(sock *sk, int err)
 }
 
 static void
-bgp_hold_timeout(timer *t)
+bgp_hold_timeout(struct timer *t)
 {
   struct bgp_conn *conn = t->data;
   struct bgp_proto *p = conn->bgp;
@@ -664,7 +664,7 @@ bgp_hold_timeout(timer *t)
 }
 
 static void
-bgp_keepalive_timeout(timer *t)
+bgp_keepalive_timeout(struct timer *t)
 {
   struct bgp_conn *conn = t->data;
 
@@ -679,7 +679,7 @@ bgp_keepalive_timeout(timer *t)
 static void
 bgp_setup_conn(struct bgp_proto *p, struct bgp_conn *conn)
 {
-  timer *t;
+  struct timer *t;
 
   conn->sk = NULL;
   conn->bgp = p;
@@ -700,7 +700,7 @@ bgp_setup_conn(struct bgp_proto *p, struct bgp_conn *conn)
 }
 
 static void
-bgp_setup_sk(struct bgp_conn *conn, sock *s)
+bgp_setup_sk(struct bgp_conn *conn, struct birdsock *s)
 {
   s->data = conn;
   s->err_hook = bgp_sock_err;
@@ -731,7 +731,7 @@ bgp_active(struct bgp_proto *p)
 static void
 bgp_connect(struct bgp_proto *p)	/* Enter Connect state and start establishing connection */
 {
-  sock *s;
+  struct birdsock *s;
   struct bgp_conn *conn = &p->outgoing_conn;
   int hops = p->cf->multihop ? : 1;
 
@@ -778,7 +778,7 @@ bgp_connect(struct bgp_proto *p)	/* Enter Connect state and start establishing c
  *
  */
 static struct bgp_proto *
-bgp_find_proto(sock *sk)
+bgp_find_proto(struct birdsock *sk)
 {
   struct proto_config *pc;
 
@@ -807,7 +807,7 @@ bgp_find_proto(sock *sk)
  * closes the new connection by sending a Notification message.
  */
 static int
-bgp_incoming_connection(sock *sk, int dummy UNUSED)
+bgp_incoming_connection(struct birdsock *sk, int dummy UNUSED)
 {
   struct bgp_proto *p;
   int acc, hops;
@@ -883,7 +883,7 @@ err:
 }
 
 static void
-bgp_listen_sock_err(sock *sk UNUSED, int err)
+bgp_listen_sock_err(struct birdsock *sk UNUSED, int err)
 {
   if (err == ECONNABORTED)
     log(L_WARN "BGP: Incoming connection aborted");
@@ -891,10 +891,10 @@ bgp_listen_sock_err(sock *sk UNUSED, int err)
     log(L_ERR "BGP: Error on listening socket: %M", err);
 }
 
-static sock *
+static struct birdsock *
 bgp_setup_listen_sk(ip_addr addr, unsigned port, u32 flags)
 {
-  sock *s = sk_new(&root_pool);
+  struct birdsock *s = sk_new(&root_pool);
   DBG("BGP: Creating listening socket\n");
   s->type = SK_TCP_PASSIVE;
   s->ttl = 255;
@@ -949,7 +949,7 @@ bgp_start_neighbor(struct bgp_proto *p)
 }
 
 static void
-bgp_neigh_notify(neighbor *n)
+bgp_neigh_notify(struct neighbor *n)
 {
   struct bgp_proto *p = (struct bgp_proto *) n->proto;
   int ps = p->p.proto_state;
@@ -1102,12 +1102,12 @@ bgp_start_locked(struct object_lock *lock)
 
   if (cf->multihop)
     {
-      /* Multi-hop sessions do not use neighbor entries */
+      /* Multi-hop sessions do not use struct neighbor entries */
       bgp_initiate(p);
       return;
     }
 
-  neighbor *n = neigh_find2(&p->p, &cf->remote_ip, cf->iface, NEF_STICKY);
+  struct neighbor *n = neigh_find2(&p->p, &cf->remote_ip, cf->iface, NEF_STICKY);
   if (!n)
     {
       log(L_ERR "%s: Invalid remote address %I%J", p->p.name, cf->remote_ip, cf->iface);
@@ -1249,7 +1249,7 @@ bgp_cleanup(struct proto *P)
   rt_unlock_table(p->igp_table);
 }
 
-static rtable *
+static struct rtable *
 get_igp_table(struct bgp_config *cf)
 {
   return cf->igp_table ? cf->igp_table->table : cf->c.table->table;
@@ -1322,7 +1322,7 @@ bgp_check_config(struct bgp_config *c)
     cf_error("Remote AS number must be set");
 
   // if (ipa_is_link_local(c->remote_ip) && !c->iface)
-  //   cf_error("Link-local neighbor address requires specified interface");
+  //   cf_error("Link-local struct neighbor address requires specified interface");
 
   if (!ipa_is_link_local(c->remote_ip) != !c->iface)
     cf_error("Link-local address and interface scope must be used together");
@@ -1331,10 +1331,10 @@ bgp_check_config(struct bgp_config *c)
     cf_error("Neighbor AS number out of range (AS4 not available)");
 
   if (!internal && c->rr_client)
-    cf_error("Only internal neighbor can be RR client");
+    cf_error("Only internal struct neighbor can be RR client");
 
   if (internal && c->rs_client)
-    cf_error("Only external neighbor can be RS client");
+    cf_error("Only external struct neighbor can be RS client");
 
   if (c->multihop && (c->gw_mode == GW_DIRECT))
     cf_error("Multihop BGP cannot use direct gateway mode");

@@ -16,17 +16,17 @@
 /* Configuration structure */
 
 struct config {
-  pool *pool;				/* Pool the configuration is stored in */
-  linpool *mem;				/* Linear pool containing configuration data */
-  list protos;				/* Configured protocol instances (struct proto_config) */
-  list tables;				/* Configured routing tables (struct rtable_config) */
-  list roa_tables;			/* Configured ROA tables (struct roa_table_config) */
-  list logfiles;			/* Configured log fils (sysdep) */
+  struct pool *pool;				/* Pool the configuration is stored in */
+  struct linpool *mem;				/* Linear struct pool containing configuration data */
+  union list protos;				/* Configured protocol instances (struct proto_config) */
+  union list tables;				/* Configured routing tables (struct rtable_config) */
+  union list roa_tables;			/* Configured ROA tables (struct roa_table_config) */
+  union list logfiles;			/* Configured log fils (sysdep) */
 
   int mrtdump_file;			/* Configured MRTDump file (sysdep, fd in unix) */
   char *syslog_name;			/* Name used for syslog (NULL -> no syslog) */
   struct rtable_config *master_rtc;	/* Configuration of master routing table */
-  struct iface_patt *router_id_from;	/* Configured list of router ID iface patterns */
+  struct iface_patt *router_id_from;	/* Configured union list of router ID iface patterns */
 
   u32 router_id;			/* Our Router ID */
   ip_addr listen_bgp_addr;		/* Listening BGP socket should use this address */
@@ -41,7 +41,7 @@ struct config {
   u32 gr_wait;				/* Graceful restart wait timeout */
 
   int cli_debug;			/* Tracing of CLI connections and commands */
-  int latency_debug;			/* I/O loop tracks duration of each event */
+  int latency_debug;			/* I/O loop tracks duration of each struct event */
   u32 latency_limit;			/* Events with longer duration are logged (us) */
   u32 watchdog_warning;			/* I/O loop watchdog limit for warning (us) */
   u32 watchdog_timeout;			/* Watchdog timeout (in seconds, 0 = disabled) */
@@ -90,13 +90,13 @@ void order_shutdown(void);
 
 /* Pools */
 
-extern linpool *cfg_mem;
+extern struct linpool *cfg_mem;
 
 #define cfg_alloc(size) lp_alloc(cfg_mem, size)
 #define cfg_allocu(size) lp_allocu(cfg_mem, size)
 #define cfg_allocz(size) lp_allocz(cfg_mem, size)
 char *cfg_strdup(char *c);
-void cfg_copy_list(list *dest, list *src, unsigned node_size);
+void cfg_copy_list(union list *dest, union list *src, unsigned node_size);
 
 /* Lexer */
 

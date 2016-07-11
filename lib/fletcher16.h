@@ -51,7 +51,7 @@ fletcher16_init(struct fletcher16_context *ctx)
  * @buf: data buffer
  * @len: data length
  *
- * fletcher16_update() reads data from the buffer @buf and updates passing sums
+ * fletcher16_update() reads data from the struct buffer @buf and updates passing sums
  * in the context @ctx. It may be used multiple times for multiple blocks of
  * checksummed data.
  */

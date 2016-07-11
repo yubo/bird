@@ -57,12 +57,12 @@
  */
 
 struct rfile {
-  resource r;
+  struct resource r;
   FILE *f;
 };
 
 static void
-rf_free(resource *r)
+rf_free(struct resource *r)
 {
   struct rfile *a = (struct rfile *) r;
 
@@ -70,7 +70,7 @@ rf_free(resource *r)
 }
 
 static void
-rf_dump(resource *r)
+rf_dump(struct resource *r)
 {
   struct rfile *a = (struct rfile *) r;
 
@@ -87,7 +87,7 @@ static struct resclass rf_class = {
 };
 
 void *
-tracked_fopen(pool *p, char *name, char *mode)
+tracked_fopen(struct pool *p, char *name, char *mode)
 {
   FILE *f = fopen(name, mode);
 
@@ -104,7 +104,7 @@ tracked_fopen(pool *p, char *name, char *mode)
  *
  * Timers are resources which represent a wish of a module to call
  * a function at the specified time. The platform dependent code
- * doesn't guarantee exact timing, only that a timer function
+ * doesn't guarantee exact timing, only that a struct timer function
  * won't be called before the requested time.
  *
  * In BIRD, time is represented by values of the &bird_clock_t type
@@ -113,7 +113,7 @@ tracked_fopen(pool *p, char *name, char *mode)
  * from variable @now with reasonable accuracy and is monotonic. There is also
  * a current 'absolute' time in variable @now_real reported by OS.
  *
- * Each timer is described by a &timer structure containing a pointer
+ * Each struct timer is described by a &timer structure containing a pointer
  * to the handler function (@hook), data private to this function (@data),
  * time the function should be called at (@expires, 0 for inactive timers),
  * for the other fields see |timer.h|.
@@ -121,7 +121,7 @@ tracked_fopen(pool *p, char *name, char *mode)
 
 #define NEAR_TIMER_LIMIT 4
 
-static list near_timers, far_timers;
+static union list near_timers, far_timers;
 static bird_clock_t first_far_timer = TIME_INFINITY;
 
 /* now must be different from 0, because 0 is a special value in timer->expires */
@@ -153,7 +153,7 @@ update_times_gettime(void)
 
   if (ts.tv_sec != now) {
     if (ts.tv_sec < now)
-      log(L_ERR "Monotonic timer is broken");
+      log(L_ERR "Monotonic struct timer is broken");
 
     now = ts.tv_sec;
     now_real = time(NULL);
@@ -177,22 +177,22 @@ init_times(void)
  struct timespec ts;
  clock_monotonic_available = (clock_gettime(CLOCK_MONOTONIC, &ts) == 0);
  if (!clock_monotonic_available)
-   log(L_WARN "Monotonic timer is missing");
+   log(L_WARN "Monotonic struct timer is missing");
 }
 
 
 static void
-tm_free(resource *r)
+tm_free(struct resource *r)
 {
-  timer *t = (timer *) r;
+  struct timer *t = (struct timer *) r;
 
   tm_stop(t);
 }
 
 static void
-tm_dump(resource *r)
+tm_dump(struct resource *r)
 {
-  timer *t = (timer *) r;
+  struct timer *t = (struct timer *) r;
 
   debug("(code %p, data %p, ", t->hook, t->data);
   if (t->randomize)
@@ -207,7 +207,7 @@ tm_dump(resource *r)
 
 static struct resclass tm_class = {
   "Timer",
-  sizeof(timer),
+  sizeof(struct timer),
   tm_free,
   tm_dump,
   NULL,
@@ -218,21 +218,21 @@ static struct resclass tm_class = {
  * tm_new - create a timer
  * @p: pool
  *
- * This function creates a new timer resource and returns
+ * This function creates a new struct timer struct resource and returns
  * a pointer to it. To use the timer, you need to fill in
  * the structure fields and call tm_start() to start timing.
  */
-timer *
-tm_new(pool *p)
+struct timer *
+tm_new(struct pool *p)
 {
-  timer *t = ralloc(p, &tm_class);
+  struct timer *t = ralloc(p, &tm_class);
   return t;
 }
 
 static inline void
-tm_insert_near(timer *t)
+tm_insert_near(struct timer *t)
 {
-  node *n = HEAD(near_timers);
+  struct node *n = HEAD(near_timers);
 
   while (n->next && (SKIP_BACK(timer, n, n)->expires < t->expires))
     n = n->next;
@@ -242,10 +242,10 @@ tm_insert_near(timer *t)
 /**
  * tm_start - start a timer
  * @t: timer
- * @after: number of seconds the timer should be run after
+ * @after: number of seconds the struct timer should be run after
  *
- * This function schedules the hook function of the timer to
- * be called after @after seconds. If the timer has been already
+ * This function schedules the hook function of the struct timer to
+ * be called after @after seconds. If the struct timer has been already
  * started, it's @expire time is replaced by the new value.
  *
  * You can have set the @randomize field of @t, the timeout
@@ -254,10 +254,10 @@ tm_insert_near(timer *t)
  *
  * You can call tm_start() from the handler function of the timer
  * to request another run of the timer. Also, you can set the @recurrent
- * field to have the timer re-added automatically with the same timeout.
+ * field to have the struct timer re-added automatically with the same timeout.
  */
 void
-tm_start(timer *t, unsigned after)
+tm_start(struct timer *t, unsigned after)
 {
   bird_clock_t when;
 
@@ -283,11 +283,11 @@ tm_start(timer *t, unsigned after)
  * tm_stop - stop a timer
  * @t: timer
  *
- * This function stops a timer. If the timer is already stopped,
+ * This function stops a timer. If the struct timer is already stopped,
  * nothing happens.
  */
 void
-tm_stop(timer *t)
+tm_stop(struct timer *t)
 {
   if (t->expires)
     {
@@ -297,10 +297,10 @@ tm_stop(timer *t)
 }
 
 static void
-tm_dump_them(char *name, list *l)
+tm_dump_them(char *name, union list *l)
 {
-  node *n;
-  timer *t;
+  struct node *n;
+  struct timer *t;
 
   debug("%s timers:\n", name);
   WALK_LIST(n, *l)
@@ -326,7 +326,7 @@ tm_first_shot(void)
 
   if (!EMPTY_LIST(near_timers))
     {
-      timer *t = SKIP_BACK(timer, n, HEAD(near_timers));
+      struct timer *t = SKIP_BACK(timer, n, HEAD(near_timers));
       if (t->expires < x)
 	x = t->expires;
     }
@@ -338,8 +338,8 @@ void io_log_event(void *hook, void *data);
 static void
 tm_shot(void)
 {
-  timer *t;
-  node *n, *m;
+  struct timer *t;
+  struct node *n, *m;
 
   if (first_far_timer <= now)
     {
@@ -447,7 +447,7 @@ tm_format_reltime(char *x, struct tm *tm, bird_clock_t delta)
 
 /**
  * tm_format_datetime - convert date and time to textual representation
- * @x: destination buffer of size %TM_DATETIME_BUFFER_SIZE
+ * @x: destination struct buffer of size %TM_DATETIME_BUFFER_SIZE
  * @fmt_spec: specification of resulting textual representation of the time
  * @t: time
  *
@@ -484,7 +484,7 @@ tm_format_datetime(char *x, struct timeformat *fmt_spec, bird_clock_t t)
  * contains a lot of fields defining the exact type of the socket, the local and
  * remote addresses and ports, pointers to socket buffers and finally pointers to
  * hook functions to be called when new data have arrived to the receive buffer
- * (@rx_hook), when the contents of the transmit buffer have been transmitted
+ * (@rx_hook), when the contents of the transmit struct buffer have been transmitted
  * (@tx_hook) and when an error or connection close occurs (@err_hook).
  *
  * Freeing of sockets from inside socket hooks is perfectly safe.
@@ -598,7 +598,7 @@ sockaddr_read(sockaddr *sa, int af, ip_addr *a, struct iface **ifa, uint *port)
   { .ipv6mr_multiaddr = ipa_to_in6(maddr), .ipv6mr_interface = ifa->index }
 
 static inline int
-sk_setup_multicast6(sock *s)
+sk_setup_multicast6(struct birdsock *s)
 {
   int index = s->iface->index;
   int ttl = s->ttl;
@@ -617,7 +617,7 @@ sk_setup_multicast6(sock *s)
 }
 
 static inline int
-sk_join_group6(sock *s, ip_addr maddr)
+sk_join_group6(struct birdsock *s, ip_addr maddr)
 {
   struct ipv6_mreq mr = INIT_MREQ6(maddr, s->iface);
 
@@ -628,7 +628,7 @@ sk_join_group6(sock *s, ip_addr maddr)
 }
 
 static inline int
-sk_leave_group6(sock *s, ip_addr maddr)
+sk_leave_group6(struct birdsock *s, ip_addr maddr)
 {
   struct ipv6_mreq mr = INIT_MREQ6(maddr, s->iface);
 
@@ -666,7 +666,7 @@ sk_leave_group6(sock *s, ip_addr maddr)
 #define CMSG6_SPACE_TTL CMSG_SPACE(sizeof(int))
 
 static inline int
-sk_request_cmsg6_pktinfo(sock *s)
+sk_request_cmsg6_pktinfo(struct birdsock *s)
 {
   int y = 1;
 
@@ -677,7 +677,7 @@ sk_request_cmsg6_pktinfo(sock *s)
 }
 
 static inline int
-sk_request_cmsg6_ttl(sock *s)
+sk_request_cmsg6_ttl(struct birdsock *s)
 {
   int y = 1;
 
@@ -688,7 +688,7 @@ sk_request_cmsg6_ttl(sock *s)
 }
 
 static inline void
-sk_process_cmsg6_pktinfo(sock *s, struct cmsghdr *cm)
+sk_process_cmsg6_pktinfo(struct birdsock *s, struct cmsghdr *cm)
 {
   if (cm->cmsg_type == IPV6_PKTINFO)
   {
@@ -699,14 +699,14 @@ sk_process_cmsg6_pktinfo(sock *s, struct cmsghdr *cm)
 }
 
 static inline void
-sk_process_cmsg6_ttl(sock *s, struct cmsghdr *cm)
+sk_process_cmsg6_ttl(struct birdsock *s, struct cmsghdr *cm)
 {
   if (cm->cmsg_type == IPV6_HOPLIMIT)
     s->rcv_ttl = * (int *) CMSG_DATA(cm);
 }
 
 static inline void
-sk_prepare_cmsgs6(sock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
+sk_prepare_cmsgs6(struct birdsock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
 {
   struct cmsghdr *cm;
   struct in6_pktinfo *pi;
@@ -734,7 +734,7 @@ sk_prepare_cmsgs6(sock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
  */
 
 static inline int
-sk_set_ttl4(sock *s, int ttl)
+sk_set_ttl4(struct birdsock *s, int ttl)
 {
   if (setsockopt(s->fd, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
     ERR("IP_TTL");
@@ -743,7 +743,7 @@ sk_set_ttl4(sock *s, int ttl)
 }
 
 static inline int
-sk_set_ttl6(sock *s, int ttl)
+sk_set_ttl6(struct birdsock *s, int ttl)
 {
   if (setsockopt(s->fd, SOL_IPV6, IPV6_UNICAST_HOPS, &ttl, sizeof(ttl)) < 0)
     ERR("IPV6_UNICAST_HOPS");
@@ -752,7 +752,7 @@ sk_set_ttl6(sock *s, int ttl)
 }
 
 static inline int
-sk_set_tos4(sock *s, int tos)
+sk_set_tos4(struct birdsock *s, int tos)
 {
   if (setsockopt(s->fd, SOL_IP, IP_TOS, &tos, sizeof(tos)) < 0)
     ERR("IP_TOS");
@@ -761,7 +761,7 @@ sk_set_tos4(sock *s, int tos)
 }
 
 static inline int
-sk_set_tos6(sock *s, int tos)
+sk_set_tos6(struct birdsock *s, int tos)
 {
   if (setsockopt(s->fd, SOL_IPV6, IPV6_TCLASS, &tos, sizeof(tos)) < 0)
     ERR("IPV6_TCLASS");
@@ -770,7 +770,7 @@ sk_set_tos6(sock *s, int tos)
 }
 
 static inline int
-sk_set_high_port(sock *s)
+sk_set_high_port(struct birdsock *s)
 {
   /* Port range setting is optional, ignore it if not supported */
 
@@ -810,7 +810,7 @@ sk_skip_ip_header(byte *pkt, int *len)
 }
 
 byte *
-sk_rx_buffer(sock *s, int *len)
+sk_rx_buffer(struct birdsock *s, int *len)
 {
   if (sk_is_ipv4(s) && (s->type == SK_IP))
     return sk_skip_ip_header(s->rbuf, len);
@@ -834,7 +834,7 @@ sk_rx_buffer(sock *s, int *len)
  */
 
 int
-sk_setup_multicast(sock *s)
+sk_setup_multicast(struct birdsock *s)
 {
   ASSERT(s->iface);
 
@@ -856,7 +856,7 @@ sk_setup_multicast(sock *s)
  */
 
 int
-sk_join_group(sock *s, ip_addr maddr)
+sk_join_group(struct birdsock *s, ip_addr maddr)
 {
   if (sk_is_ipv4(s))
     return sk_join_group4(s, maddr);
@@ -876,7 +876,7 @@ sk_join_group(sock *s, ip_addr maddr)
  */
 
 int
-sk_leave_group(sock *s, ip_addr maddr)
+sk_leave_group(struct birdsock *s, ip_addr maddr)
 {
   if (sk_is_ipv4(s))
     return sk_leave_group4(s, maddr);
@@ -896,7 +896,7 @@ sk_leave_group(sock *s, ip_addr maddr)
  */
 
 int
-sk_setup_broadcast(sock *s)
+sk_setup_broadcast(struct birdsock *s)
 {
   int y = 1;
 
@@ -918,7 +918,7 @@ sk_setup_broadcast(sock *s)
  */
 
 int
-sk_set_ttl(sock *s, int ttl)
+sk_set_ttl(struct birdsock *s, int ttl)
 {
   s->ttl = ttl;
 
@@ -940,7 +940,7 @@ sk_set_ttl(sock *s, int ttl)
  */
 
 int
-sk_set_min_ttl(sock *s, int ttl)
+sk_set_min_ttl(struct birdsock *s, int ttl)
 {
   if (sk_is_ipv4(s))
     return sk_set_min_ttl4(s, ttl);
@@ -977,7 +977,7 @@ sk_set_min_ttl(sock *s, int ttl)
  */
 
 int
-sk_set_md5_auth(sock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd, int setkey)
+sk_set_md5_auth(struct birdsock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd, int setkey)
 { DUMMY; }
 #endif
 
@@ -995,7 +995,7 @@ sk_set_md5_auth(sock *s, ip_addr local, ip_addr remote, struct iface *ifa, char 
  */
 
 int
-sk_set_ipv6_checksum(sock *s, int offset)
+sk_set_ipv6_checksum(struct birdsock *s, int offset)
 {
   if (setsockopt(s->fd, SOL_IPV6, IPV6_CHECKSUM, &offset, sizeof(offset)) < 0)
     ERR("IPV6_CHECKSUM");
@@ -1004,7 +1004,7 @@ sk_set_ipv6_checksum(sock *s, int offset)
 }
 
 int
-sk_set_icmp6_filter(sock *s, int p1, int p2)
+sk_set_icmp6_filter(struct birdsock *s, int p1, int p2)
 {
   /* a bit of lame interface, but it is here only for Radv */
   struct icmp6_filter f;
@@ -1020,7 +1020,7 @@ sk_set_icmp6_filter(sock *s, int p1, int p2)
 }
 
 void
-sk_log_error(sock *s, const char *p)
+sk_log_error(struct birdsock *s, const char *p)
 {
   log(L_ERR "%s: Socket error: %s%#m", p, s->err);
 }
@@ -1030,21 +1030,21 @@ sk_log_error(sock *s, const char *p)
  *	Actual struct birdsock code
  */
 
-static list sock_list;
+static union list sock_list;
 static struct birdsock *current_sock;
 static struct birdsock *stored_sock;
 
-static inline sock *
-sk_next(sock *s)
+static inline struct birdsock *
+sk_next(struct birdsock *s)
 {
   if (!s->n.next->next)
     return NULL;
   else
-    return SKIP_BACK(sock, n, s->n.next);
+    return SKIP_BACK(struct birdsock, n, s->n.next);
 }
 
 static void
-sk_alloc_bufs(sock *s)
+sk_alloc_bufs(struct birdsock *s)
 {
   if (!s->rbuf && s->rbsize)
     s->rbuf = s->rbuf_alloc = xmalloc(s->rbsize);
@@ -1055,7 +1055,7 @@ sk_alloc_bufs(sock *s)
 }
 
 static void
-sk_free_bufs(sock *s)
+sk_free_bufs(struct birdsock *s)
 {
   if (s->rbuf_alloc)
   {
@@ -1070,9 +1070,9 @@ sk_free_bufs(sock *s)
 }
 
 static void
-sk_free(resource *r)
+sk_free(struct resource *r)
 {
-  sock *s = (sock *) r;
+  struct birdsock *s = (struct birdsock *) r;
 
   sk_free_bufs(s);
   if (s->fd >= 0)
@@ -1092,7 +1092,7 @@ sk_free(resource *r)
 }
 
 void
-sk_set_rbsize(sock *s, uint val)
+sk_set_rbsize(struct birdsock *s, uint val)
 {
   ASSERT(s->rbuf_alloc == s->rbuf);
 
@@ -1106,7 +1106,7 @@ sk_set_rbsize(sock *s, uint val)
 }
 
 void
-sk_set_tbsize(sock *s, uint val)
+sk_set_tbsize(struct birdsock *s, uint val)
 {
   ASSERT(s->tbuf_alloc == s->tbuf);
 
@@ -1122,23 +1122,23 @@ sk_set_tbsize(sock *s, uint val)
 }
 
 void
-sk_set_tbuf(sock *s, void *tbuf)
+sk_set_tbuf(struct birdsock *s, void *tbuf)
 {
   s->tbuf = tbuf ?: s->tbuf_alloc;
   s->ttx = s->tpos = s->tbuf;
 }
 
 void
-sk_reallocate(sock *s)
+sk_reallocate(struct birdsock *s)
 {
   sk_free_bufs(s);
   sk_alloc_bufs(s);
 }
 
 static void
-sk_dump(resource *r)
+sk_dump(struct resource *r)
 {
-  sock *s = (sock *) r;
+  struct birdsock *s = (struct birdsock *) r;
   static char *sk_type_names[] = { "TCP<", "TCP>", "TCP", "UDP", NULL, "IP", NULL, "MAGIC", "UNIX<", "UNIX", "DEL!" };
 
   debug("(%s, ud=%p, sa=%I, sp=%d, da=%I, dp=%d, tos=%d, ttl=%d, if=%s)\n",
@@ -1155,7 +1155,7 @@ sk_dump(resource *r)
 
 static struct resclass sk_class = {
   "Socket",
-  sizeof(sock),
+  sizeof(struct birdsock),
   sk_free,
   sk_dump,
   NULL,
@@ -1173,10 +1173,10 @@ static struct resclass sk_class = {
  * The real function name is sock_new(), sk_new() is a macro wrapper
  * to avoid collision with OpenSSL.
  */
-sock *
-sock_new(pool *p)
+struct birdsock *
+sock_new(struct pool *p)
 {
-  sock *s = ralloc(p, &sk_class);
+  struct birdsock *s = ralloc(p, &sk_class);
   s->pool = p;
   // s->saddr = s->daddr = IPA_NONE;
   s->tos = s->priority = s->ttl = -1;
@@ -1185,7 +1185,7 @@ sock_new(pool *p)
 }
 
 static int
-sk_setup(sock *s)
+sk_setup(struct birdsock *s)
 {
   int y = 1;
   int fd = s->fd;
@@ -1282,13 +1282,13 @@ sk_setup(sock *s)
 }
 
 static void
-sk_insert(sock *s)
+sk_insert(struct birdsock *s)
 {
   add_tail(&sock_list, &s->n);
 }
 
 static void
-sk_tcp_connected(sock *s)
+sk_tcp_connected(struct birdsock *s)
 {
   sockaddr sa;
   int sa_len = sizeof(sa);
@@ -1303,7 +1303,7 @@ sk_tcp_connected(sock *s)
 }
 
 static int
-sk_passive_connected(sock *s, int type)
+sk_passive_connected(struct birdsock *s, int type)
 {
   sockaddr loc_sa, rem_sa;
   int loc_sa_len = sizeof(loc_sa);
@@ -1317,7 +1317,7 @@ sk_passive_connected(sock *s, int type)
     return 0;
   }
 
-  sock *t = sk_new(s->pool);
+  struct birdsock *t = sk_new(s->pool);
   t->type = type;
   t->fd = fd;
   t->af = s->af;
@@ -1358,14 +1358,14 @@ sk_passive_connected(sock *s, int type)
  * sk_open - open a socket
  * @s: socket
  *
- * This function takes a socket resource created by sk_new() and
+ * This function takes a socket struct resource created by sk_new() and
  * initialized by the user and binds a corresponding network connection
  * to it.
  *
  * Result: 0 for success, -1 for an error.
  */
 int
-sk_open(sock *s)
+sk_open(struct birdsock *s)
 {
   int af = BIRD_AF;
   int fd = -1;
@@ -1406,7 +1406,7 @@ sk_open(sock *s)
     break;
 
   default:
-    bug("sk_open() called for invalid sock type %d", s->type);
+    bug("sk_open() called for invalid struct birdsock type %d", s->type);
   }
 
   if (fd < 0)
@@ -1484,7 +1484,7 @@ err:
 }
 
 int
-sk_open_unix(sock *s, char *name)
+sk_open_unix(struct birdsock *s, char *name)
 {
   struct sockaddr_un sa;
   int fd;
@@ -1519,7 +1519,7 @@ sk_open_unix(sock *s, char *name)
 #define CMSG_TX_SPACE MAX(CMSG4_SPACE_PKTINFO,CMSG6_SPACE_PKTINFO)
 
 static void
-sk_prepare_cmsgs(sock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
+sk_prepare_cmsgs(struct birdsock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
 {
   if (sk_is_ipv4(s))
     sk_prepare_cmsgs4(s, msg, cbuf, cbuflen);
@@ -1528,7 +1528,7 @@ sk_prepare_cmsgs(sock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
 }
 
 static void
-sk_process_cmsgs(sock *s, struct msghdr *msg)
+sk_process_cmsgs(struct birdsock *s, struct msghdr *msg)
 {
   struct cmsghdr *cm;
 
@@ -1554,7 +1554,7 @@ sk_process_cmsgs(sock *s, struct msghdr *msg)
 
 
 static inline int
-sk_sendmsg(sock *s)
+sk_sendmsg(struct birdsock *s)
 {
   struct iovec iov = {s->tbuf, s->tpos - s->tbuf};
   byte cmsg_buf[CMSG_TX_SPACE];
@@ -1588,7 +1588,7 @@ sk_sendmsg(sock *s)
 }
 
 static inline int
-sk_recvmsg(sock *s)
+sk_recvmsg(struct birdsock *s)
 {
   struct iovec iov = {s->rbuf, s->rbsize};
   byte cmsg_buf[CMSG_RX_SPACE];
@@ -1625,10 +1625,10 @@ sk_recvmsg(sock *s)
 }
 
 
-static inline void reset_tx_buffer(sock *s) { s->ttx = s->tpos = s->tbuf; }
+static inline void reset_tx_buffer(struct birdsock *s) { s->ttx = s->tpos = s->tbuf; }
 
 static int
-sk_maybe_write(sock *s)
+sk_maybe_write(struct birdsock *s)
 {
   int e;
 
@@ -1687,7 +1687,7 @@ sk_maybe_write(sock *s)
 }
 
 int
-sk_rx_ready(sock *s)
+sk_rx_ready(struct birdsock *s)
 {
   int rv;
   struct pollfd pfd = { .fd = s->fd };
@@ -1708,14 +1708,14 @@ sk_rx_ready(sock *s)
  * @len: number of bytes to send
  *
  * This function sends @len bytes of data prepared in the
- * transmit buffer of the socket @s to the network connection.
+ * transmit struct buffer of the socket @s to the network connection.
  * If the packet can be sent immediately, it does so and returns
  * 1, else it queues the packet for later processing, returns 0
  * and calls the @tx_hook of the socket when the tranmission
  * takes place.
  */
 int
-sk_send(sock *s, unsigned len)
+sk_send(struct birdsock *s, unsigned len)
 {
   s->ttx = s->tbuf;
   s->tpos = s->tbuf + len;
@@ -1734,7 +1734,7 @@ sk_send(sock *s, unsigned len)
  * Raw IP sockets should use 0 for @port.
  */
 int
-sk_send_to(sock *s, unsigned len, ip_addr addr, unsigned port)
+sk_send_to(struct birdsock *s, unsigned len, ip_addr addr, unsigned port)
 {
   s->daddr = addr;
   if (port)
@@ -1747,7 +1747,7 @@ sk_send_to(sock *s, unsigned len, ip_addr addr, unsigned port)
 
 /*
 int
-sk_send_full(sock *s, unsigned len, struct iface *ifa,
+sk_send_full(struct birdsock *s, unsigned len, struct iface *ifa,
 	     ip_addr saddr, ip_addr daddr, unsigned dport)
 {
   s->iface = ifa;
@@ -1760,10 +1760,10 @@ sk_send_full(sock *s, unsigned len, struct iface *ifa,
 }
 */
 
- /* sk_read() and sk_write() are called from BFD's event loop */
+ /* sk_read() and sk_write() are called from BFD's struct event loop */
 
 int
-sk_read(sock *s, int revents)
+sk_read(struct birdsock *s, int revents)
 {
   switch (s->type)
   {
@@ -1826,7 +1826,7 @@ sk_read(sock *s, int revents)
 }
 
 int
-sk_write(sock *s)
+sk_write(struct birdsock *s)
 {
   switch (s->type)
   {
@@ -1854,7 +1854,7 @@ sk_write(sock *s)
 }
 
 void
-sk_err(sock *s, int revents)
+sk_err(struct birdsock *s, int revents)
 {
   int se = 0, sse = sizeof(se);
   if (revents & POLLERR)
@@ -1870,13 +1870,13 @@ sk_err(sock *s, int revents)
 void
 sk_dump_all(void)
 {
-  node *n;
-  sock *s;
+  struct node *n;
+  struct birdsock *s;
 
   debug("Open sockets:\n");
   WALK_LIST(n, sock_list)
   {
-    s = SKIP_BACK(sock, n, n);
+    s = SKIP_BACK(struct birdsock, n, n);
     debug("%p ", s);
     sk_dump(&s->r);
   }
@@ -1885,7 +1885,7 @@ sk_dump_all(void)
 
 
 /*
- *	Internal event log and watchdog
+ *	Internal struct event log and watchdog
  */
 
 #define EVENT_LOG_LENGTH 32
@@ -1915,7 +1915,7 @@ io_update_time(void)
 
   /*
    * This is third time-tracking procedure (after update_times() above and
-   * times_update() in BFD), dedicated to internal event log and latency
+   * times_update() in BFD), dedicated to internal struct event log and latency
    * tracking. Hopefully, we consolidate these sometimes.
    */
 
@@ -1938,12 +1938,12 @@ io_update_time(void)
 }
 
 /**
- * io_log_event - mark approaching event into event log
- * @hook: event hook address
- * @data: event data address
+ * io_log_event - mark approaching struct event into struct event log
+ * @hook: struct event hook address
+ * @data: struct event data address
  *
- * Store info (hook, data, timestamp) about the following internal event into
- * a circular event log (@event_log). When latency tracking is enabled, the log
+ * Store info (hook, data, timestamp) about the following internal struct event into
+ * a circular struct event log (@event_log). When latency tracking is enabled, the log
  * entry is kept open (in @event_open) so the duration can be filled later.
  */
 void
@@ -2070,8 +2070,8 @@ io_loop(void)
   int poll_tout;
   time_t tout;
   int nfds, events, pout;
-  sock *s;
-  node *n;
+  struct birdsock *s;
+  struct node *n;
   int fdmax = 256;
   struct pollfd *pfd = xmalloc(fdmax * sizeof(struct pollfd));
 
@@ -2095,7 +2095,7 @@ io_loop(void)
       WALK_LIST(n, sock_list)
 	{
 	  pfd[nfds] = (struct pollfd) { .fd = -1 }; /* everything other set to 0 by this */
-	  s = SKIP_BACK(sock, n, n);
+	  s = SKIP_BACK(struct birdsock, n, n);
 	  if (s->rx_hook)
 	    {
 	      pfd[nfds].fd = s->fd;
@@ -2123,7 +2123,7 @@ io_loop(void)
 
       /*
        * Yes, this is racy. But even if the signal comes before this test
-       * and entering poll(), it gets caught on the next timer tick.
+       * and entering poll(), it gets caught on the next struct timer tick.
        */
 
       if (async_config_flag)
@@ -2162,11 +2162,11 @@ io_loop(void)
       if (pout)
 	{
 	  /* guaranteed to be non-empty */
-	  current_sock = SKIP_BACK(sock, n, HEAD(sock_list));
+	  current_sock = SKIP_BACK(struct birdsock, n, HEAD(sock_list));
 
 	  while (current_sock)
 	    {
-	      sock *s = current_sock;
+	      struct birdsock *s = current_sock;
 	      if (s->index == -1)
 		{
 		  current_sock = sk_next(s);
@@ -2212,11 +2212,11 @@ io_loop(void)
 	  int count = 0;
 	  current_sock = stored_sock;
 	  if (current_sock == NULL)
-	    current_sock = SKIP_BACK(sock, n, HEAD(sock_list));
+	    current_sock = SKIP_BACK(struct birdsock, n, HEAD(sock_list));
 
 	  while (current_sock && count < MAX_RX_STEPS)
 	    {
-	      sock *s = current_sock;
+	      struct birdsock *s = current_sock;
 	      if (s->index == -1)
 		{
 		  current_sock = sk_next(s);

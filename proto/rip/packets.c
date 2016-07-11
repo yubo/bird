@@ -38,16 +38,16 @@ struct rip_block_v2
 {
   u16 family;
   u16 tag;
-  ip4_addr network;
-  ip4_addr netmask;
-  ip4_addr next_hop;
+  struct ip4_addr network;
+  struct ip4_addr netmask;
+  struct ip4_addr next_hop;
   u32 metric;
 };
 
 /* RTE block for RIPng */
 struct rip_block_ng
 {
-  ip6_addr prefix;
+  struct ip6_addr prefix;
   u16 tag;
   u8 pxlen;
   u8 metric;
@@ -503,7 +503,7 @@ break_loop:
 }
 
 /**
- * rip_send_table - RIP interface timer hook
+ * rip_send_table - RIP interface struct timer hook
  * @p: RIP instance
  * @ifa: RIP interface
  * @addr: destination IP address
@@ -535,7 +535,7 @@ rip_send_table(struct rip_proto *p, struct rip_iface *ifa, ip_addr addr, bird_cl
 }
 
 static void
-rip_tx_hook(sock *sk)
+rip_tx_hook(struct birdsock *sk)
 {
   struct rip_iface *ifa = sk->data;
   struct rip_proto *p = ifa->rip;
@@ -548,7 +548,7 @@ rip_tx_hook(sock *sk)
 }
 
 static void
-rip_err_hook(sock *sk, int err)
+rip_err_hook(struct birdsock *sk, int err)
 {
   struct rip_iface *ifa = sk->data;
   struct rip_proto *p = ifa->rip;
@@ -597,7 +597,7 @@ rip_receive_response(struct rip_proto *p, struct rip_iface *ifa, struct rip_pack
 
     if (ipa_nonzero(rte.next_hop))
     {
-      neighbor *nbr = neigh_find2(&p->p, &rte.next_hop, ifa->iface, 0);
+      struct neighbor *nbr = neigh_find2(&p->p, &rte.next_hop, ifa->iface, 0);
       if (!nbr || (nbr->scope <= 0))
 	rte.next_hop = IPA_NONE;
     }
@@ -630,7 +630,7 @@ rip_receive_response(struct rip_proto *p, struct rip_iface *ifa, struct rip_pack
 }
 
 static int
-rip_rx_hook(sock *sk, int len)
+rip_rx_hook(struct birdsock *sk, int len)
 {
   struct rip_iface *ifa = sk->data;
   struct rip_proto *p = ifa->rip;
@@ -711,7 +711,7 @@ rip_open_socket(struct rip_iface *ifa)
 {
   struct rip_proto *p = ifa->rip;
 
-  sock *sk = sk_new(p->p.pool);
+  struct birdsock *sk = sk_new(p->p.pool);
   sk->type = SK_UDP;
   sk->sport = ifa->cf->port;
   sk->dport = ifa->cf->port;

@@ -13,73 +13,69 @@
 
 /* Resource */
 
-typedef struct resource {
-  node n;				/* Inside resource pool */
-  struct resclass *class;		/* Resource class */
-} resource;
+struct resource {
+	struct node n;			/* Inside struct resource struct pool */
+	struct resclass *class;	/* Resource class */
+};
 
 /* Resource class */
 
 struct resclass {
-  char *name;				/* Resource class name */
-  unsigned size;			/* Standard size of single resource */
-  void (*free)(resource *);		/* Freeing function */
-  void (*dump)(resource *);		/* Dump to debug output */
-  resource *(*lookup)(resource *, unsigned long);	/* Look up address (only for debugging) */
-  size_t (*memsize)(resource *);	/* Return size of memory used by the resource, may be NULL */
+	char *name;		/* Resource class name */
+	unsigned size;		/* Standard size of single struct resource */
+	void (*free) (struct resource *);	/* Freeing function */
+	void (*dump) (struct resource *);	/* Dump to debug output */
+	struct resource *(*lookup) (struct resource *, unsigned long);	/* Look up address (only for debugging) */
+	 size_t(*memsize) (struct resource *);	/* Return size of memory used by the resource, may be NULL */
 };
 
 /* Estimate of system allocator overhead per item, for memory consumtion stats */
 #define ALLOC_OVERHEAD		8
 
-/* Generic resource manipulation */
+/* Generic struct resource manipulation */
 
-typedef struct pool pool;
 
 void resource_init(void);
-pool *rp_new(pool *, char *);		/* Create new pool */
-void rfree(void *);			/* Free single resource */
-void rdump(void *);			/* Dump to debug output */
-size_t rmemsize(void *res);		/* Return size of memory used by the resource */
-void rlookup(unsigned long);		/* Look up address (only for debugging) */
-void rmove(void *, pool *);		/* Move to a different pool */
+struct pool *rp_new(struct pool *, char *);	/* Create new struct pool */
+void rfree(void *);		/* Free single struct resource */
+void rdump(void *);		/* Dump to debug output */
+size_t rmemsize(void *res);	/* Return size of memory used by the struct resource */
+void rlookup(unsigned long);	/* Look up address (only for debugging) */
+void rmove(void *, struct pool *);	/* Move to a different struct pool */
 
-void *ralloc(pool *, struct resclass *);
+void *ralloc(struct pool *, struct resclass *);
 
-extern pool root_pool;
+extern struct pool root_pool;
 
 /* Normal memory blocks */
 
-void *mb_alloc(pool *, unsigned size);
-void *mb_allocz(pool *, unsigned size);
+void *mb_alloc(struct pool *, unsigned size);
+void *mb_allocz(struct pool *, unsigned size);
 void *mb_realloc(void *m, unsigned size);
 void mb_free(void *);
 
 /* Memory pools with linear allocation */
 
-typedef struct linpool linpool;
 
-linpool *lp_new(pool *, unsigned blk);
-void *lp_alloc(linpool *, unsigned size);	/* Aligned */
-void *lp_allocu(linpool *, unsigned size);	/* Unaligned */
-void *lp_allocz(linpool *, unsigned size);	/* With clear */
-void lp_flush(linpool *);			/* Free everything, but leave linpool */
+struct linpool *lp_new(struct pool *, unsigned blk);
+void *lp_alloc(struct linpool *, unsigned size);	/* Aligned */
+void *lp_allocu(struct linpool *, unsigned size);	/* Unaligned */
+void *lp_allocz(struct linpool *, unsigned size);	/* With clear */
+void lp_flush(struct linpool *);	/* Free everything, but leave struct linpool */
 
 /* Slabs */
 
-typedef struct slab slab;
-
-slab *sl_new(pool *, unsigned size);
-void *sl_alloc(slab *);
-void sl_free(slab *, void *);
+struct slab *sl_new(struct pool *, unsigned size);
+void *sl_alloc(struct slab *);
+void sl_free(struct slab *, void *);
 
 /*
  * Low-level memory allocation functions, please don't use
- * outside resource manager and possibly sysdep code.
+ * outside struct resource manager and possibly sysdep code.
  */
 
-void buffer_realloc(void **buf, unsigned *size, unsigned need, unsigned item_size);
-
+void buffer_realloc(void **buf, unsigned *size, unsigned need,
+		    unsigned item_size);
 
 #ifdef HAVE_LIBDMALLOC
 /*
@@ -106,4 +102,3 @@ void *xrealloc(void *, unsigned);
 #endif
 
 #endif
-

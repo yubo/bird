@@ -34,7 +34,7 @@ struct symbol;
  */
 
 struct protocol {
-  node n;
+  struct node n;
   char *name;
   char *template;			/* Template for automatic generation of names */
   int name_counter;			/* Counter for automatic name generation */
@@ -83,7 +83,7 @@ extern struct protocol
  */
 
 struct proto_config {
-  node n;
+  struct node n;
   struct config *global;		/* Global configuration data */
   struct protocol *protocol;		/* Protocol */
   struct proto *proto;			/* Instance we've created */
@@ -133,13 +133,13 @@ struct proto_stats {
 };
 
 struct proto {
-  node n;				/* Node in *_proto_list */
-  node glob_node;			/* Node in global proto_list */
+  struct node n;				/* Node in *_proto_list */
+  struct node glob_node;			/* Node in global proto_list */
   struct protocol *proto;		/* Protocol */
   struct proto_config *cf;		/* Configuration data */
   struct proto_config *cf_new;		/* Configuration we want to switch to after shutdown (NULL=delete) */
-  pool *pool;				/* Pool containing local objects */
-  struct event *attn;			/* "Pay attention" event */
+  struct pool *pool;				/* Pool containing local objects */
+  struct event *attn;			/* "Pay attention" struct event */
 
   char *name;				/* Name of this instance (== cf->name) */
   u32 debug;				/* Debugging flags */
@@ -170,7 +170,7 @@ struct proto {
    *	   if_notify	Notify protocol about interface state changes.
    *	   ifa_notify	Notify protocol about interface address changes.
    *	   rt_notify	Notify protocol about routing table updates.
-   *	   neigh_notify	Notify protocol about neighbor cache events.
+   *	   neigh_notify	Notify protocol about struct neighbor cache events.
    *	   make_tmp_attrs  Construct ea_list from private attrs stored in rte.
    *	   store_tmp_attrs Store private attrs back to the rte.
    *	   import_control  Called as the first step of the route importing process.
@@ -202,8 +202,8 @@ struct proto {
    *	   rte_better	Compare two rte's and decide which one is better (1=first, 0=second).
    *       rte_same	Compare two rte's and decide whether they are identical (1=yes, 0=no).
    *       rte_mergable	Compare two rte's and decide whether they could be merged (1=yes, 0=no).
-   *	   rte_insert	Called whenever a rte is inserted to a routing table.
-   *	   rte_remove	Called whenever a rte is removed from the routing table.
+   *	   rte_insert	Called whenever a struct rte is inserted to a routing table.
+   *	   rte_remove	Called whenever a struct rte is removed from the routing table.
    */
 
   int (*rte_recalculate)(struct rtable *, struct network *, struct rte *, struct rte *, struct rte *);
@@ -285,7 +285,7 @@ proto_get_router_id(struct proto_config *pc)
   return pc->router_id ? pc->router_id : pc->global->router_id;
 }
 
-extern list active_proto_list;
+extern union list active_proto_list;
 
 /*
  *  Each protocol instance runs two different state machines:
@@ -444,7 +444,7 @@ proto_reset_limit(struct proto_limit *l)
  */
 
 struct announce_hook {
-  node n;
+  struct node n;
   struct rtable *table;
   struct proto *proto;
   struct filter *in_filter;		/* Input filter */

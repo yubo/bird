@@ -289,7 +289,7 @@ bgp_create_open(struct bgp_conn *conn, byte *buf)
   if (cap_len > 0)
     {
       buf[9]  = cap_len + 2;	/* Optional params len */
-      buf[10] = 2;		/* Option: Capability list */
+      buf[10] = 2;		/* Option: Capability union list */
       buf[11] = cap_len;	/* Option length */
       return cap;
     }
@@ -386,7 +386,7 @@ bgp_create_update(struct bgp_conn *conn, byte *buf)
 
 	  if (a_size < 0)
 	    {
-	      log(L_ERR "%s: Attribute list too long, skipping corresponding routes", p->p.name);
+	      log(L_ERR "%s: Attribute union list too long, skipping corresponding routes", p->p.name);
 	      bgp_flush_prefixes(p, buck);
 	      rem_node(&buck->send_node);
 	      bgp_free_bucket(p, buck);
@@ -429,7 +429,7 @@ bgp_create_end_mark(struct bgp_conn *conn, byte *buf)
 static inline int
 same_iface(struct bgp_proto *p, ip_addr *ip)
 {
-  neighbor *n = neigh_find(&p->p, ip, 0);
+  struct neighbor *n = neigh_find(&p->p, ip, 0);
   return n && p->neigh && n->iface == p->neigh->iface;
 }
 
@@ -442,8 +442,8 @@ bgp_create_update(struct bgp_conn *conn, byte *buf)
   int remains = bgp_max_packet_length(p) - BGP_HEADER_LENGTH - 4;
   byte *w, *w_stored, *tmp, *tstart;
   ip_addr *ipp, ip, ip_ll;
-  ea_list *ea;
-  eattr *nh;
+  struct ea_list *ea;
+  struct eattr *nh;
 
   put_u16(buf, 0);
   w = buf+4;
@@ -481,7 +481,7 @@ bgp_create_update(struct bgp_conn *conn, byte *buf)
 	  size = bgp_encode_attrs(p, w, buck->eattrs, 2048);
 	  if (size < 0)
 	    {
-	      log(L_ERR "%s: Attribute list too long, skipping corresponding routes", p->p.name);
+	      log(L_ERR "%s: Attribute union list too long, skipping corresponding routes", p->p.name);
 	      bgp_flush_prefixes(p, buck);
 	      rem_node(&buck->send_node);
 	      bgp_free_bucket(p, buck);
@@ -515,7 +515,7 @@ bgp_create_update(struct bgp_conn *conn, byte *buf)
 	       * accept such routes.
 	       *
 	       * There are two cases, either we have global IP, or
-	       * IPA_NONE if the neighbor is link-local. For IPA_NONE,
+	       * IPA_NONE if the struct neighbor is link-local. For IPA_NONE,
 	       * we suppose it is on the same iface, see bgp_update_attrs().
 	       */
 
@@ -681,7 +681,7 @@ bgp_fire_tx(struct bgp_conn *conn)
 {
   struct bgp_proto *p = conn->bgp;
   uint s = conn->packets_to_send;
-  sock *sk = conn->sk;
+  struct birdsock *sk = conn->sk;
   byte *buf, *pkt, *end;
   int type;
 
@@ -795,7 +795,7 @@ bgp_kick_tx(void *vconn)
 }
 
 void
-bgp_tx(sock *sk)
+bgp_tx(struct birdsock *sk)
 {
   struct bgp_conn *conn = sk->data;
 
@@ -1041,7 +1041,7 @@ bgp_rx_open(struct bgp_conn *conn, byte *pkt, int len)
   if (p->add_path_tx)
     p->p.accept_ra_types = RA_ANY;
 
-  DBG("BGP: Hold timer set to %d, keepalive to %d, AS to %d, ID to %x, AS4 session to %d\n", conn->hold_time, conn->keepalive_time, p->remote_as, p->remote_id, p->as4_session);
+  DBG("BGP: Hold struct timer set to %d, keepalive to %d, AS to %d, ID to %x, AS4 session to %d\n", conn->hold_time, conn->keepalive_time, p->remote_as, p->remote_id, p->as4_session);
 
   bgp_schedule_packet(conn, PKT_KEEPALIVE);
   bgp_start_timer(conn->hold_timer, conn->hold_time);
@@ -1091,7 +1091,7 @@ bgp_rx_end_mark(struct bgp_proto *p)
 static inline void
 bgp_rte_update(struct bgp_proto *p, ip_addr prefix, int pxlen,
 	       u32 path_id, u32 *last_id, struct rte_src **src,
-	       rta *a0, rta **a)
+	       struct rta *a0, struct rta **a)
 {
   if (path_id != *last_id)
     {
@@ -1111,13 +1111,13 @@ bgp_rte_update(struct bgp_proto *p, ip_addr prefix, int pxlen,
       a0->src = *src;
 
       /* Workaround for rta_lookup() breaking eattrs */
-      ea_list *ea = a0->eattrs;
+      struct ea_list *ea = a0->eattrs;
       *a = rta_lookup(a0);
       a0->eattrs = ea;
     }
 
   net *n = net_get(p->p.table, prefix, pxlen);
-  rte *e = rte_get_temp(rta_clone(*a));
+  struct rte *e = rte_get_temp(rta_clone(*a));
   e->net = n;
   e->pflags = 0;
   e->u.bgp.suppressed = 0;
@@ -1139,7 +1139,7 @@ bgp_rte_withdraw(struct bgp_proto *p, ip_addr prefix, int pxlen,
 }
 
 static inline int
-bgp_set_next_hop(struct bgp_proto *p, rta *a)
+bgp_set_next_hop(struct bgp_proto *p, struct rta *a)
 {
   struct eattr *nh = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_NEXT_HOP));
   ip_addr *nexthop = (ip_addr *) nh->u.ptr->data;
@@ -1156,7 +1156,7 @@ bgp_set_next_hop(struct bgp_proto *p, rta *a)
 
   if (p->cf->gw_mode == GW_DIRECT)
     {
-      neighbor *ng = NULL;
+      struct neighbor *ng = NULL;
 
       if (ipa_nonzero(*nexthop))
 	ng = neigh_find(&p->p, nexthop, 0);
@@ -1197,7 +1197,7 @@ bgp_do_rx_update(struct bgp_conn *conn,
 {
   struct bgp_proto *p = conn->bgp;
   struct rte_src *src = p->p.main_source;
-  rta *a0, *a = NULL;
+  struct rta *a0, *a = NULL;
   ip_addr prefix;
   int pxlen, err = 0;
   u32 path_id = 0;
@@ -1273,7 +1273,7 @@ bgp_do_rx_update(struct bgp_conn *conn,
   if (af == BGP_AF_IPV6)
 
 static void
-bgp_attach_next_hop(rta *a0, byte *x)
+bgp_attach_next_hop(struct rta *a0, byte *x)
 {
   ip_addr *nh = (ip_addr *) bgp_attach_attr_wa(&a0->eattrs, bgp_linpool, BA_NEXT_HOP, NEXT_HOP_LENGTH);
   memcpy(nh, x+1, 16);
@@ -1301,7 +1301,7 @@ bgp_do_rx_update(struct bgp_conn *conn,
   byte *start, *x;
   int len, len0;
   unsigned af, sub;
-  rta *a0, *a = NULL;
+  struct rta *a0, *a = NULL;
   ip_addr prefix;
   int pxlen, err = 0;
   u32 path_id = 0;
@@ -1450,7 +1450,7 @@ static struct {
   { 3, 9, "Optional attribute error" },
   { 3, 10, "Invalid network field" },
   { 3, 11, "Malformed AS_PATH" },
-  { 4, 0, "Hold timer expired" },
+  { 4, 0, "Hold struct timer expired" },
   { 5, 0, "Finite state machine error" }, /* Subcodes are according to [RFC6608] */
   { 5, 1, "Unexpected message in OpenSent state" },
   { 5, 2, "Unexpected message in OpenConfirm state" },
@@ -1681,7 +1681,7 @@ bgp_rx_packet(struct bgp_conn *conn, byte *pkt, unsigned len)
  * bgp_rx_packet().
  */
 int
-bgp_rx(sock *sk, int size)
+bgp_rx(struct birdsock *sk, int size)
 {
   struct bgp_conn *conn = sk->data;
   struct bgp_proto *p = conn->bgp;

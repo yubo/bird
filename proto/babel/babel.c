@@ -203,7 +203,7 @@ babel_expire_route(struct babel_route *r)
   struct babel_proto *p = r->e->proto;
   struct babel_entry *e = r->e;
 
-  TRACE(D_EVENTS, "Route expiry timer for %I/%d router-id %lR fired",
+  TRACE(D_EVENTS, "Route expiry struct timer for %I/%d router-id %lR fired",
 	e->n.prefix, e->n.pxlen, r->router_id);
 
   if (r->metric < BABEL_INFINITY)
@@ -313,9 +313,9 @@ static void
 babel_flush_neighbor(struct babel_neighbor *nbr)
 {
   struct babel_proto *p = nbr->ifa->proto;
-  node *n;
+  struct node *n;
 
-  TRACE(D_EVENTS, "Flushing neighbor %I", nbr->addr);
+  TRACE(D_EVENTS, "Flushing struct neighbor %I", nbr->addr);
 
   WALK_LIST_FIRST(n, nbr->routes)
   {
@@ -477,7 +477,7 @@ babel_announce_rte(struct babel_proto *p, struct babel_entry *e)
   if (r)
   {
     net *n = net_get(p->p.table, e->n.prefix, e->n.pxlen);
-    rta A = {
+    struct rta A = {
       .src = p->p.main_source,
       .source = RTS_BABEL,
       .scope = SCOPE_UNIVERSE,
@@ -491,8 +491,8 @@ babel_announce_rte(struct babel_proto *p, struct babel_entry *e)
     if (r->metric < BABEL_INFINITY)
       A.gw = r->next_hop;
 
-    rta *a = rta_lookup(&A);
-    rte *rte = rte_get_temp(a);
+    struct rta *a = rta_lookup(&A);
+    struct rte *rte = rte_get_temp(a);
     rte->u.babel.metric = r->metric;
     rte->u.babel.router_id = r->router_id;
     rte->net = n;
@@ -872,14 +872,14 @@ babel_update_hello_history(struct babel_neighbor *n, u16 seqno, u16 interval)
   }
   else if (delta <= 16)
   {
-    /* Sending node decreased interval; fast-forward */
+    /* Sending struct node decreased interval; fast-forward */
     n->hello_map <<= delta;
     n->hello_cnt = MIN(n->hello_cnt + delta, 16);
   }
   else if (delta >= 0xfff0)
   {
     u8 diff = (0xffff - delta);
-    /* Sending node increased interval; undo history */
+    /* Sending struct node increased interval; undo history */
     n->hello_map >>= diff;
     n->hello_cnt = (diff < n->hello_cnt) ? n->hello_cnt - diff : 0;
   }
@@ -1052,7 +1052,7 @@ babel_handle_update(union babel_msg *m, struct babel_iface *ifa)
   n = babel_find_neighbor(ifa, msg->sender);
   if (!n)
   {
-    DBG("Babel: Haven't heard from neighbor %I; ignoring update.\n", msg->sender);
+    DBG("Babel: Haven't heard from struct neighbor %I; ignoring update.\n", msg->sender);
     return;
   }
 
@@ -1065,7 +1065,7 @@ babel_handle_update(union babel_msg *m, struct babel_iface *ifa)
   /*
    * RFC section 3.5.4:
    *
-   * When a Babel node receives an update (id, prefix, seqno, metric) from a
+   * When a Babel struct node receives an update (id, prefix, seqno, metric) from a
    * neighbour neigh with a link cost value equal to cost, it checks whether it
    * already has a routing table entry indexed by (neigh, id, prefix).
    *
@@ -1091,7 +1091,7 @@ babel_handle_update(union babel_msg *m, struct babel_iface *ifa)
    * o otherwise (i.e., if either the update is feasible or the entry is not
    *   currently installed), then the entry's sequence number, advertised
    *   metric, metric, and router-id are updated and, unless the advertised
-   *   metric is infinite, the route's expiry timer is reset to a small multiple
+   *   metric is infinite, the route's expiry struct timer is reset to a small multiple
    *   of the Interval value included in the update.
    */
 
@@ -1235,10 +1235,10 @@ babel_handle_seqno_request(union babel_msg *m, struct babel_iface *ifa)
  */
 
 /**
- * babel_iface_timer - Babel interface timer handler
+ * babel_iface_timer - Babel interface struct timer handler
  * @t: Timer
  *
- * This function is called by the per-interface timer and triggers sending of
+ * This function is called by the per-interface struct timer and triggers sending of
  * periodic Hello's and both triggered and periodic updates. Periodic Hello's
  * and updates are simply handled by setting the next_{hello,regular} variables
  * on the interface, and triggering an update (and resetting the variable)
@@ -1256,7 +1256,7 @@ babel_handle_seqno_request(union babel_msg *m, struct babel_iface *ifa)
  * selecting which routes to send in the update will make sure this is included.
  */
 static void
-babel_iface_timer(timer *t)
+babel_iface_timer(struct timer *t)
 {
   struct babel_iface *ifa = t->data;
   struct babel_proto *p = ifa->proto;
@@ -1323,7 +1323,7 @@ babel_iface_stop(struct babel_iface *ifa)
   struct babel_proto *p = ifa->proto;
   struct babel_neighbor *nbr;
   struct babel_route *r;
-  node *n;
+  struct node *n;
 
   TRACE(D_EVENTS, "Stopping interface %s", ifa->ifname);
 
@@ -1419,7 +1419,7 @@ babel_add_iface(struct babel_proto *p, struct iface *new, struct babel_iface_con
 
   TRACE(D_EVENTS, "Adding interface %s", new->name);
 
-  pool *pool = rp_new(p->p.pool, new->name);
+  struct pool *pool = rp_new(p->p.pool, new->name);
 
   ifa = mb_allocz(pool, sizeof(struct babel_iface));
   ifa->proto = p;
@@ -1659,13 +1659,13 @@ babel_dump(struct proto *P)
 }
 
 static void
-babel_get_route_info(rte *rte, byte *buf, ea_list *attrs)
+babel_get_route_info(struct rte *rte, byte *buf, struct ea_list *attrs)
 {
   buf += bsprintf(buf, " (%d/%d) [%lR]", rte->pref, rte->u.babel.metric, rte->u.babel.router_id);
 }
 
 static int
-babel_get_attr(eattr *a, byte *buf, int buflen UNUSED)
+babel_get_attr(struct eattr *a, byte *buf, int buflen UNUSED)
 {
   switch (a->id)
   {
@@ -1713,7 +1713,7 @@ babel_show_interfaces(struct proto *P, char *iff)
     WALK_LIST(nbr, ifa->neigh_list)
 	nbrs++;
 
-    int timer = MIN(ifa->next_regular, ifa->next_hello) - now;
+    int struct timer = MIN(ifa->next_regular, ifa->next_hello) - now;
     cli_msg(-1023, "%-10s %-6s %7u %6u %6u",
 	    ifa->iface->name, (ifa->up ? "Up" : "Down"), ifa->cf->rxcost, nbrs, MAX(timer, 0));
   }
@@ -1751,7 +1751,7 @@ babel_show_neighbors(struct proto *P, char *iff)
       WALK_LIST(r, n->routes)
         rts++;
 
-      int timer = n->hello_expiry - now;
+      int struct timer = n->hello_expiry - now;
       cli_msg(-1024, "%-25I %-10s %6u %6u %10u",
 	      n->addr, ifa->iface->name, n->txcost, rts, MAX(timer, 0));
     }
@@ -1820,15 +1820,15 @@ babel_show_entries(struct proto *P)
  */
 
 /**
- * babel_timer - global timer hook
+ * babel_timer - global struct timer hook
  * @t: Timer
  *
- * This function is called by the global protocol instance timer and handles
+ * This function is called by the global protocol instance struct timer and handles
  * expiration of routes and neighbours as well as pruning of the seqno request
  * cache.
  */
 static void
-babel_timer(timer *t)
+babel_timer(struct timer *t)
 {
   struct babel_proto *p = t->data;
 
@@ -1846,9 +1846,9 @@ babel_kick_timer(struct babel_proto *p)
 
 
 static struct ea_list *
-babel_prepare_attrs(struct linpool *pool, ea_list *next, uint metric, u64 router_id)
+babel_prepare_attrs(struct linpool *pool, struct ea_list *next, uint metric, u64 router_id)
 {
-  struct ea_list *l = lp_alloc(pool, sizeof(struct ea_list) + 2*sizeof(eattr));
+  struct ea_list *l = lp_alloc(pool, sizeof(struct ea_list) + 2*sizeof(struct eattr));
   struct adata *rid = lp_alloc(pool, sizeof(struct adata) + sizeof(u64));
   rid->length = sizeof(u64);
   memcpy(&rid->data, &router_id, sizeof(u64));

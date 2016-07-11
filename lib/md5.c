@@ -35,7 +35,7 @@ void byteReverse(byte *buf, uint longs)
 static void md5_transform(u32 buf[4], u32 const in[16]);
 
 /*
- * Start MD5 accumulation.  Set bit count to 0 and buffer to mysterious
+ * Start MD5 accumulation.  Set bit count to 0 and struct buffer to mysterious
  * initialization constants.
  */
 void
@@ -51,7 +51,7 @@ md5_init(struct md5_context *ctx)
 }
 
 /*
- * Update context to reflect the concatenation of another buffer full
+ * Update context to reflect the concatenation of another struct buffer full
  * of bytes.
  */
 void

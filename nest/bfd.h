@@ -13,8 +13,8 @@
 struct bfd_session;
 
 struct bfd_request {
-  resource r;
-  node n;
+  struct resource r;
+  struct node n;
 
   ip_addr addr;
   ip_addr local;
@@ -40,13 +40,13 @@ struct bfd_request {
 
 #ifdef CONFIG_BFD
 
-struct bfd_request * bfd_request_session(pool *p, ip_addr addr, ip_addr local, struct iface *iface, void (*hook)(struct bfd_request *), void *data);
+struct bfd_request * bfd_request_session(struct pool *p, ip_addr addr, ip_addr local, struct iface *iface, void (*hook)(struct bfd_request *), void *data);
 
 static inline void cf_check_bfd(int use) { }
 
 #else
 
-static inline struct bfd_request * bfd_request_session(pool *p, ip_addr addr, ip_addr local, struct iface *iface, void (*hook)(struct bfd_request *), void *data) { return NULL; }
+static inline struct bfd_request * bfd_request_session(struct pool *p, ip_addr addr, ip_addr local, struct iface *iface, void (*hook)(struct bfd_request *), void *data) { return NULL; }
 
 static inline void cf_check_bfd(int use) { if (use) cf_error("BFD not available"); }
 

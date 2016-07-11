@@ -72,7 +72,7 @@ struct attr_desc {
   int type;
   int allow_in_ebgp;
   int (*validate)(struct bgp_proto *p, byte *attr, int len);
-  void (*format)(eattr *ea, byte *buf, int buflen);
+  void (*format)(struct eattr *ea, byte *buf, int buflen);
 };
 
 #define IGNORE -1
@@ -87,7 +87,7 @@ bgp_check_origin(struct bgp_proto *p UNUSED, byte *a, int len UNUSED)
 }
 
 static void
-bgp_format_origin(eattr *a, byte *buf, int buflen UNUSED)
+bgp_format_origin(struct eattr *a, byte *buf, int buflen UNUSED)
 {
   static char *bgp_origin_names[] = { "IGP", "EGP", "Incomplete" };
 
@@ -208,7 +208,7 @@ bgp_check_next_hop(struct bgp_proto *p UNUSED, byte *a, int len)
 }
 
 static void
-bgp_format_next_hop(eattr *a, byte *buf, int buflen UNUSED)
+bgp_format_next_hop(struct eattr *a, byte *buf, int buflen UNUSED)
 {
   ip_addr *ipp = (ip_addr *) a->u.ptr->data;
 #ifdef IPV6
@@ -232,7 +232,7 @@ bgp_check_aggregator(struct bgp_proto *p, byte *a UNUSED, int len)
 }
 
 static void
-bgp_format_aggregator(eattr *a, byte *buf, int buflen UNUSED)
+bgp_format_aggregator(struct eattr *a, byte *buf, int buflen UNUSED)
 {
   struct adata *ad =  a->u.ptr;
   byte *data = ad->data;
@@ -257,7 +257,7 @@ bgp_check_cluster_list(struct bgp_proto *p UNUSED, byte *a UNUSED, int len)
 }
 
 static void
-bgp_format_cluster_list(eattr *a, byte *buf, int buflen)
+bgp_format_cluster_list(struct eattr *a, byte *buf, int buflen)
 {
   /* Truncates cluster lists larger than buflen, probably not a problem */
   int_set_format(a->u.ptr, 0, -1, buf, buflen);
@@ -343,7 +343,7 @@ bgp_alloc_adata(struct linpool *pool, unsigned len)
 }
 
 static void
-bgp_set_attr(eattr *e, unsigned attr, uintptr_t val)
+bgp_set_attr(struct eattr *e, unsigned attr, uintptr_t val)
 {
   ASSERT(ATTR_KNOWN(attr));
   e->id = EA_CODE(EAP_BGP, attr);
@@ -356,7 +356,7 @@ bgp_set_attr(eattr *e, unsigned attr, uintptr_t val)
 }
 
 static byte *
-bgp_set_attr_wa(eattr *e, struct linpool *pool, unsigned attr, unsigned len)
+bgp_set_attr_wa(struct eattr *e, struct linpool *pool, unsigned attr, unsigned len)
 {
   struct adata *ad = bgp_alloc_adata(pool, len);
   bgp_set_attr(e, attr, (uintptr_t) ad);
@@ -364,9 +364,9 @@ bgp_set_attr_wa(eattr *e, struct linpool *pool, unsigned attr, unsigned len)
 }
 
 void
-bgp_attach_attr(ea_list **to, struct linpool *pool, unsigned attr, uintptr_t val)
+bgp_attach_attr(struct ea_list **to, struct linpool *pool, unsigned attr, uintptr_t val)
 {
-  ea_list *a = lp_alloc(pool, sizeof(ea_list) + sizeof(eattr));
+  struct ea_list *a = lp_alloc(pool, sizeof(struct ea_list) + sizeof(struct eattr));
   a->next = *to;
   *to = a;
   a->flags = EALF_SORTED;
@@ -375,7 +375,7 @@ bgp_attach_attr(ea_list **to, struct linpool *pool, unsigned attr, uintptr_t val
 }
 
 byte *
-bgp_attach_attr_wa(ea_list **to, struct linpool *pool, unsigned attr, unsigned len)
+bgp_attach_attr_wa(struct ea_list **to, struct linpool *pool, unsigned attr, unsigned len)
 {
   struct adata *ad = bgp_alloc_adata(pool, len);
   bgp_attach_attr(to, pool, attr, (uintptr_t) ad);
@@ -438,7 +438,7 @@ aggregator_convert_to_new(struct adata *aggr, byte *dst)
 }
 
 static int
-bgp_get_attr_len(eattr *a)
+bgp_get_attr_len(struct eattr *a)
 {
   int len;
   if (ATTR_KNOWN(EA_ID(a->id)))
@@ -467,16 +467,16 @@ bgp_get_attr_len(eattr *a)
  * bgp_encode_attrs - encode BGP attributes
  * @p: BGP instance
  * @w: buffer
- * @attrs: a list of extended attributes
+ * @attrs: a union list of extended attributes
  * @remains: remaining space in the buffer
  *
- * The bgp_encode_attrs() function takes a list of extended attributes
+ * The bgp_encode_attrs() function takes a union list of extended attributes
  * and converts it to its BGP representation (a part of an Update message).
  *
  * Result: Length of the attribute block generated or -1 if not enough space.
  */
 uint
-bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
+bgp_encode_attrs(struct bgp_proto *p, byte *w, struct ea_list *attrs, int remains)
 {
   uint i, code, type, flags;
   byte *start = w;
@@ -484,7 +484,7 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
 
   for(i=0; i<attrs->count; i++)
     {
-      eattr *a = &attrs->attrs[i];
+      struct eattr *a = &attrs->attrs[i];
       ASSERT(EA_PROTO(a->id) == EAP_BGP);
       code = EA_ID(a->id);
 
@@ -505,7 +505,7 @@ bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains)
 	  if (remains < (len + 4))
 	    goto err_no_buffer;
 
-	  /* Using temporary buffer because don't know a length of created attr
+	  /* Using temporary struct buffer because don't know a length of created attr
 	   * and therefore a length of a header. Perhaps i should better always
 	   * use BAF_EXT_LEN. */
 	  
@@ -714,10 +714,10 @@ bgp_rehash_buckets(struct bgp_proto *p)
 }
 
 static struct bgp_bucket *
-bgp_new_bucket(struct bgp_proto *p, ea_list *new, unsigned hash)
+bgp_new_bucket(struct bgp_proto *p, struct ea_list *new, unsigned hash)
 {
   struct bgp_bucket *b;
-  unsigned ea_size = sizeof(ea_list) + new->count * sizeof(eattr);
+  unsigned ea_size = sizeof(struct ea_list) + new->count * sizeof(struct eattr);
   unsigned ea_size_aligned = BIRD_ALIGN(ea_size, CPU_STRUCT_ALIGN);
   unsigned size = sizeof(struct bgp_bucket) + ea_size_aligned;
   unsigned i;
@@ -727,7 +727,7 @@ bgp_new_bucket(struct bgp_proto *p, ea_list *new, unsigned hash)
   /* Gather total size of non-inline attributes */
   for (i=0; i<new->count; i++)
     {
-      eattr *a = &new->attrs[i];
+      struct eattr *a = &new->attrs[i];
       if (!(a->type & EAF_EMBEDDED))
 	size += BIRD_ALIGN(sizeof(struct adata) + a->u.ptr->length, CPU_STRUCT_ALIGN);
     }
@@ -748,7 +748,7 @@ bgp_new_bucket(struct bgp_proto *p, ea_list *new, unsigned hash)
   /* Copy values of non-inline attributes */
   for (i=0; i<new->count; i++)
     {
-      eattr *a = &b->eattrs->attrs[i];
+      struct eattr *a = &b->eattrs->attrs[i];
       if (!(a->type & EAF_EMBEDDED))
 	{
 	  struct adata *oa = a->u.ptr;
@@ -768,15 +768,15 @@ bgp_new_bucket(struct bgp_proto *p, ea_list *new, unsigned hash)
 }
 
 static struct bgp_bucket *
-bgp_get_bucket(struct bgp_proto *p, net *n, ea_list *attrs, int originate)
+bgp_get_bucket(struct bgp_proto *p, net *n, struct ea_list *attrs, int originate)
 {
-  ea_list *new;
+  struct ea_list *new;
   unsigned i, cnt, hash, code;
-  eattr *a, *d;
+  struct eattr *a, *d;
   u32 seen = 0;
   struct bgp_bucket *b;
 
-  /* Merge the attribute list */
+  /* Merge the attribute union list */
   new = alloca(ea_scan(attrs));
   ea_merge(attrs, new);
   ea_sort(new);
@@ -925,12 +925,12 @@ bgp_free_prefix(struct bgp_proto *p, struct bgp_prefix *bp)
 
 
 void
-bgp_rt_notify(struct proto *P, rtable *tbl UNUSED, net *n, rte *new, rte *old UNUSED, ea_list *attrs)
+bgp_rt_notify(struct proto *P, struct rtable *tbl UNUSED, net *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs)
 {
   struct bgp_proto *p = (struct bgp_proto *) P;
   struct bgp_bucket *buck;
   struct bgp_prefix *px;
-  rte *key;
+  struct rte *key;
   u32 path_id;
 
   DBG("BGP: Got route %I/%d %s\n", n->n.prefix, n->n.pxlen, new ? "up" : "down");
@@ -939,7 +939,7 @@ bgp_rt_notify(struct proto *P, rtable *tbl UNUSED, net *n, rte *new, rte *old UN
     {
       key = new;
       buck = bgp_get_bucket(p, n, attrs, new->attrs->source != RTS_BGP);
-      if (!buck)			/* Inconsistent attribute list */
+      if (!buck)			/* Inconsistent attribute union list */
 	return;
     }
   else
@@ -963,10 +963,10 @@ bgp_rt_notify(struct proto *P, rtable *tbl UNUSED, net *n, rte *new, rte *old UN
 }
 
 static int
-bgp_create_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *pool)
+bgp_create_attrs(struct bgp_proto *p, struct rte *e, struct ea_list **attrs, struct linpool *pool)
 {
-  ea_list *ea = lp_alloc(pool, sizeof(ea_list) + 4*sizeof(eattr));
-  rta *rta = e->attrs;
+  struct ea_list *ea = lp_alloc(pool, sizeof(struct ea_list) + 4*sizeof(struct eattr));
+  struct rta *rta = e->attrs;
   byte *z;
 
   ea->next = *attrs;
@@ -1007,46 +1007,46 @@ bgp_create_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
 
 
 static inline int
-bgp_as_path_loopy(struct bgp_proto *p, rta *a)
+bgp_as_path_loopy(struct bgp_proto *p, struct rta *a)
 {
   int num = p->cf->allow_local_as + 1;
-  eattr *e = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
+  struct eattr *e = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
   return (e && (num > 0) && as_path_contains(e->u.ptr, p->local_as, num));
 }
 
 static inline int
-bgp_originator_id_loopy(struct bgp_proto *p, rta *a)
+bgp_originator_id_loopy(struct bgp_proto *p, struct rta *a)
 {
-  eattr *e = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_ORIGINATOR_ID));
+  struct eattr *e = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_ORIGINATOR_ID));
   return (e && (e->u.data == p->local_id));
 }
 
 static inline int
-bgp_cluster_list_loopy(struct bgp_proto *p, rta *a)
+bgp_cluster_list_loopy(struct bgp_proto *p, struct rta *a)
 {
-  eattr *e = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_CLUSTER_LIST));
+  struct eattr *e = ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_CLUSTER_LIST));
   return (e && p->rr_client && int_set_contains(e->u.ptr, p->rr_cluster_id));
 }
 
 
 static inline void
-bgp_path_prepend(rte *e, ea_list **attrs, struct linpool *pool, u32 as)
+bgp_path_prepend(struct rte *e, struct ea_list **attrs, struct linpool *pool, u32 as)
 {
-  eattr *a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
+  struct eattr *a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
   bgp_attach_attr(attrs, pool, BA_AS_PATH, (uintptr_t) as_path_prepend(pool, a->u.ptr, as));
 }
 
 static inline void
-bgp_cluster_list_prepend(rte *e, ea_list **attrs, struct linpool *pool, u32 cid)
+bgp_cluster_list_prepend(struct rte *e, struct ea_list **attrs, struct linpool *pool, u32 cid)
 {
-  eattr *a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_CLUSTER_LIST));
+  struct eattr *a = ea_find(e->attrs->eattrs, EA_CODE(EAP_BGP, BA_CLUSTER_LIST));
   bgp_attach_attr(attrs, pool, BA_CLUSTER_LIST, (uintptr_t) int_set_add(pool, a ? a->u.ptr : NULL, cid));
 }
 
 static int
-bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *pool, int rr)
+bgp_update_attrs(struct bgp_proto *p, struct rte *e, struct ea_list **attrs, struct linpool *pool, int rr)
 {
-  eattr *a;
+  struct eattr *a;
 
   if (!p->is_internal && !p->rs_client)
     {
@@ -1103,9 +1103,9 @@ bgp_update_attrs(struct bgp_proto *p, rte *e, ea_list **attrs, struct linpool *p
 }
 
 static int
-bgp_community_filter(struct bgp_proto *p, rte *e)
+bgp_community_filter(struct bgp_proto *p, struct rte *e)
 {
-  eattr *a;
+  struct eattr *a;
   struct adata *d;
 
   /* Check if we aren't forbidden to export the route by communities */
@@ -1131,9 +1131,9 @@ bgp_community_filter(struct bgp_proto *p, rte *e)
 }
 
 int
-bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *pool)
+bgp_import_control(struct proto *P, struct rte **new, struct ea_list **attrs, struct linpool *pool)
 {
-  rte *e = *new;
+  struct rte *e = *new;
   struct bgp_proto *p = (struct bgp_proto *) P;
   struct bgp_proto *new_bgp = (e->attrs->src->proto->proto == &proto_bgp) ?
     (struct bgp_proto *) e->attrs->src->proto : NULL;
@@ -1142,7 +1142,7 @@ bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *
     return -1;
   if (new_bgp)
     {
-      /* We should check here for cluster list loop, because the receiving BGP instance
+      /* We should check here for cluster union list loop, because the receiving BGP instance
 	 might have different cluster ID  */
       if (bgp_cluster_list_loopy(p, e->attrs))
 	return -1;
@@ -1167,9 +1167,9 @@ bgp_import_control(struct proto *P, rte **new, ea_list **attrs, struct linpool *
 }
 
 static inline u32
-bgp_get_neighbor(rte *r)
+bgp_get_neighbor(struct rte *r)
 {
-  eattr *e = ea_find(r->attrs->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
+  struct eattr *e = ea_find(r->attrs->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
   u32 as;
 
   if (e && as_path_get_first(e->u.ptr, &as))
@@ -1179,18 +1179,18 @@ bgp_get_neighbor(rte *r)
 }
 
 static inline int
-rte_resolvable(rte *rt)
+rte_resolvable(struct rte *rt)
 {
   int rd = rt->attrs->dest;  
   return (rd == RTD_ROUTER) || (rd == RTD_DEVICE) || (rd == RTD_MULTIPATH);
 }
 
 int
-bgp_rte_better(rte *new, rte *old)
+bgp_rte_better(struct rte *new, struct rte *old)
 {
   struct bgp_proto *new_bgp = (struct bgp_proto *) new->attrs->src->proto;
   struct bgp_proto *old_bgp = (struct bgp_proto *) old->attrs->src->proto;
-  eattr *x, *y;
+  struct eattr *x, *y;
   u32 n, o;
 
   /* Skip suppressed routes (see bgp_rte_recalculate()) */
@@ -1299,7 +1299,7 @@ bgp_rte_better(rte *new, rte *old)
   if (n > o)
     return 0;
 
-  /* RFC 4456 9. b) Compare cluster list lengths */
+  /* RFC 4456 9. b) Compare cluster union list lengths */
   x = ea_find(new->attrs->eattrs, EA_CODE(EAP_BGP, BA_CLUSTER_LIST));
   y = ea_find(old->attrs->eattrs, EA_CODE(EAP_BGP, BA_CLUSTER_LIST));
   n = x ? int_set_get_size(x->u.ptr) : 0;
@@ -1315,11 +1315,11 @@ bgp_rte_better(rte *new, rte *old)
 
 
 int
-bgp_rte_mergable(rte *pri, rte *sec)
+bgp_rte_mergable(struct rte *pri, struct rte *sec)
 {
   struct bgp_proto *pri_bgp = (struct bgp_proto *) pri->attrs->src->proto;
   struct bgp_proto *sec_bgp = (struct bgp_proto *) sec->attrs->src->proto;
-  eattr *x, *y;
+  struct eattr *x, *y;
   u32 p, s;
 
   /* Skip suppressed routes (see bgp_rte_recalculate()) */
@@ -1391,23 +1391,23 @@ bgp_rte_mergable(rte *pri, rte *sec)
 
 
 static inline int
-same_group(rte *r, u32 lpref, u32 lasn)
+same_group(struct rte *r, u32 lpref, u32 lasn)
 {
   return (r->pref == lpref) && (bgp_get_neighbor(r) == lasn);
 }
 
 static inline int
-use_deterministic_med(rte *r)
+use_deterministic_med(struct rte *r)
 {
   struct proto *P = r->attrs->src->proto;
   return (P->proto == &proto_bgp) && ((struct bgp_proto *) P)->cf->deterministic_med;
 }
 
 int
-bgp_rte_recalculate(rtable *table, net *net, rte *new, rte *old, rte *old_best)
+bgp_rte_recalculate(struct rtable *table, net *net, struct rte *new, struct rte *old, struct rte *old_best)
 {
-  rte *r, *s;
-  rte *key = new ? new : old;
+  struct rte *r, *s;
+  struct rte *key = new ? new : old;
   u32 lpref = key->pref;
   u32 lasn = bgp_get_neighbor(key);
   int old_is_group_best = 0;
@@ -1439,7 +1439,7 @@ bgp_rte_recalculate(rtable *table, net *net, rte *new, rte *old, rte *old_best)
    *
    * We can assume that at least one of new, old is non-NULL and both
    * are from the same protocol with enabled deterministic_med. We
-   * group routes by both neighbor AS (lasn) and preference (lpref),
+   * group routes by both struct neighbor AS (lasn) and preference (lpref),
    * because bgp_rte_better() does not handle preference itself.
    */
 
@@ -1486,7 +1486,7 @@ bgp_rte_recalculate(rtable *table, net *net, rte *new, rte *old, rte *old_best)
     }
 
   /* The default case - find a new best-in-group route */
-  r = new; /* new may not be in the list */
+  r = new; /* new may not be in the union list */
   for (s=net->routes; rte_is_valid(s); s=s->next)
     if (use_deterministic_med(s) && same_group(s, lpref, lasn))
       {
@@ -1570,12 +1570,12 @@ as4_aggregator_valid(struct adata *aggr)
 
 /* Reconstruct 4B AS_PATH and AGGREGATOR according to RFC 4893 4.2.3 */
 static void
-bgp_reconstruct_4b_atts(struct bgp_proto *p, rta *a, struct linpool *pool)
+bgp_reconstruct_4b_atts(struct bgp_proto *p, struct rta *a, struct linpool *pool)
 {
-  eattr *p2 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
-  eattr *p4 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS4_PATH));
-  eattr *a2 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AGGREGATOR));
-  eattr *a4 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS4_AGGREGATOR));
+  struct eattr *p2 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS_PATH));
+  struct eattr *p4 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS4_PATH));
+  struct eattr *a2 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AGGREGATOR));
+  struct eattr *a4 =ea_find(a->eattrs, EA_CODE(EAP_BGP, BA_AS4_AGGREGATOR));
   int a4_removed = 0;
 
   if (a4 && !as4_aggregator_valid(a4->u.ptr))
@@ -1636,13 +1636,13 @@ bgp_reconstruct_4b_atts(struct bgp_proto *p, rta *a, struct linpool *pool)
 }
 
 static void
-bgp_remove_as4_attrs(struct bgp_proto *p, rta *a)
+bgp_remove_as4_attrs(struct bgp_proto *p, struct rta *a)
 {
   unsigned id1 = EA_CODE(EAP_BGP, BA_AS4_PATH);
   unsigned id2 = EA_CODE(EAP_BGP, BA_AS4_AGGREGATOR);
-  ea_list **el = &(a->eattrs);
+  struct ea_list **el = &(a->eattrs);
 
-  /* We know that ea_lists constructed in bgp_decode attrs have one attribute per ea_list struct */
+  /* We know that ea_lists constructed in bgp_decode attrs have one attribute per struct ea_list struct */
   while (*el != NULL)
     {
       unsigned fid = (*el)->attrs[0].id;
@@ -1663,27 +1663,27 @@ bgp_remove_as4_attrs(struct bgp_proto *p, rta *a)
  * @conn: connection
  * @attr: start of attribute block
  * @len: length of attribute block
- * @pool: linear pool to make all the allocations in
+ * @pool: linear struct pool to make all the allocations in
  * @mandatory: 1 iff presence of mandatory attributes has to be checked
  *
  * This function takes a BGP attribute block (a part of an Update message), checks
- * its consistency and converts it to a list of BIRD route attributes represented
+ * its consistency and converts it to a union list of BIRD route attributes represented
  * by a &rta.
  */
 struct rta *
 bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *pool, int mandatory)
 {
   struct bgp_proto *bgp = conn->bgp;
-  rta *a = lp_alloc(pool, sizeof(struct rta));
+  struct rta *a = lp_alloc(pool, sizeof(struct rta));
   uint flags, code, l, i, type;
   int errcode;
   byte *z, *attr_start;
   byte seen[256/8];
-  ea_list *ea;
+  struct ea_list *ea;
   struct adata *ad;
   int withdraw = 0;
 
-  bzero(a, sizeof(rta));
+  bzero(a, sizeof(struct rta));
   a->source = RTS_BGP;
   a->scope = SCOPE_UNIVERSE;
   a->cast = RTC_UNICAST;
@@ -1767,7 +1767,7 @@ bgp_decode_attrs(struct bgp_conn *conn, byte *attr, uint len, struct linpool *po
       //   { errcode = 4; goto err; }
 
       seen[code/8] |= (1 << (code%8));
-      ea = lp_alloc(pool, sizeof(ea_list) + sizeof(eattr));
+      ea = lp_alloc(pool, sizeof(struct ea_list) + sizeof(struct eattr));
       ea->next = a->eattrs;
       a->eattrs = ea;
       ea->flags = 0;
@@ -1867,7 +1867,7 @@ err:
 }
 
 int
-bgp_get_attr(eattr *a, byte *buf, int buflen)
+bgp_get_attr(struct eattr *a, byte *buf, int buflen)
 {
   uint i = EA_ID(a->id);
   struct attr_desc *d;
@@ -1903,10 +1903,10 @@ bgp_init_bucket_table(struct bgp_proto *p)
 }
 
 void
-bgp_get_route_info(rte *e, byte *buf, ea_list *attrs)
+bgp_get_route_info(struct rte *e, byte *buf, struct ea_list *attrs)
 {
-  eattr *p = ea_find(attrs, EA_CODE(EAP_BGP, BA_AS_PATH));
-  eattr *o = ea_find(attrs, EA_CODE(EAP_BGP, BA_ORIGIN));
+  struct eattr *p = ea_find(attrs, EA_CODE(EAP_BGP, BA_AS_PATH));
+  struct eattr *o = ea_find(attrs, EA_CODE(EAP_BGP, BA_ORIGIN));
   u32 origas;
 
   buf += bsprintf(buf, " (%d", e->pref);

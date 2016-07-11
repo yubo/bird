@@ -17,32 +17,32 @@
  * handling RIP packet processing, RX, TX and protocol sockets.
  *
  * Each instance of RIP is described by a structure &rip_proto, which contains
- * an internal RIP routing table, a list of protocol interfaces and the main
- * timer responsible for RIP routing table cleanup.
+ * an internal RIP routing table, a union list of protocol interfaces and the main
+ * struct timer responsible for RIP routing table cleanup.
  *
  * RIP internal routing table contains incoming and outgoing routes. For each
  * network (represented by structure &rip_entry) there is one outgoing route
- * stored directly in &rip_entry and an one-way linked list of incoming routes
- * (structures &rip_rte). The list contains incoming routes from different RIP
+ * stored directly in &rip_entry and an one-way linked union list of incoming routes
+ * (structures &rip_rte). The union list contains incoming routes from different RIP
  * neighbors, but only routes with the lowest metric are stored (i.e., all
  * stored incoming routes have the same metric).
  *
  * Note that RIP itself does not select outgoing route, that is done by the core
  * routing table. When a new incoming route is received, it is propagated to the
- * RIP table by rip_update_rte() and possibly stored in the list of incoming
+ * RIP table by rip_update_rte() and possibly stored in the union list of incoming
  * routes. Then the change may be propagated to the core by rip_announce_rte().
  * The core selects the best route and propagate it to RIP by rip_rt_notify(),
  * which updates outgoing route part of &rip_entry and possibly triggers route
  * propagation by rip_trigger_update().
  *
  * RIP interfaces are represented by structures &rip_iface. A RIP interface
- * contains a per-interface socket, a list of associated neighbors, interface
+ * contains a per-interface socket, a union list of associated neighbors, interface
  * configuration, and state information related to scheduled interface events
  * and running update sessions. RIP interfaces are added and removed based on
  * core interface notifications.
  *
  * There are two RIP interface events - regular updates and triggered updates.
- * Both are managed from the RIP interface timer (rip_iface_timer()). Regular
+ * Both are managed from the RIP interface struct timer (rip_iface_timer()). Regular
  * updates are called at fixed interval and propagate the whole routing table,
  * while triggered updates are scheduled by rip_trigger_update() due to some
  * routing table change and propagate only the routes modified since the time
@@ -53,16 +53,16 @@
  * fib iterator) is stored directly in &rip_iface structure.
  *
  * RIP neighbors are represented by structures &rip_neighbor. Compared to
- * neighbor handling in other routing protocols, RIP does not have explicit
- * neighbor discovery and adjacency maintenance, which makes the &rip_neighbor
+ * struct neighbor handling in other routing protocols, RIP does not have explicit
+ * struct neighbor discovery and adjacency maintenance, which makes the &rip_neighbor
  * related code a bit peculiar. RIP neighbors are interlinked with core neighbor
- * structures (&neighbor) and use core neighbor notifications to ensure that RIP
+ * structures (&neighbor) and use core struct neighbor notifications to ensure that RIP
  * neighbors are timely removed. RIP neighbors are added based on received route
- * notifications and removed based on core neighbor and RIP interface events.
+ * notifications and removed based on core struct neighbor and RIP interface events.
  *
  * RIP neighbors are linked by RIP routes and use counter to track the number of
  * associated routes, but when these RIP routes timeout, associated RIP neighbor
- * is still alive (with zero counter). When RIP neighbor is removed but still
+ * is still alive (with zero counter). When RIP struct neighbor is removed but still
  * has some associated routes, it is not freed, just changed to detached state
  * (core neighbors and RIP ifaces are unlinked), then during the main timer
  * cleanup phase the associated routes are removed and the &rip_neighbor
@@ -84,7 +84,7 @@ static inline void rip_unlock_neighbor(struct rip_neighbor *n);
 static inline int rip_iface_link_up(struct rip_iface *ifa);
 static inline void rip_kick_timer(struct rip_proto *p);
 static inline void rip_iface_kick_timer(struct rip_iface *ifa);
-static void rip_iface_timer(timer *timer);
+static void rip_iface_timer(struct timer *timer);
 static void rip_trigger_update(struct rip_proto *p);
 
 
@@ -137,7 +137,7 @@ static inline int rip_valid_rte(struct rip_rte *rt)
  * @p: RIP instance
  * @en: related network
  *
- * The function takes a list of incoming routes from @en, prepare appropriate
+ * The function takes a union list of incoming routes from @en, prepare appropriate
  * &rte for the core and propagate it by rte_update().
  */
 static void
@@ -145,7 +145,7 @@ rip_announce_rte(struct rip_proto *p, struct rip_entry *en)
 {
   struct rip_rte *rt = en->routes;
 
-  /* Find first valid rte */
+  /* Find first valid struct rte */
   while (rt && !rip_valid_rte(rt))
     rt = rt->next;
 
@@ -154,7 +154,7 @@ rip_announce_rte(struct rip_proto *p, struct rip_entry *en)
     /* Update */
     net *n = net_get(p->p.table, en->n.prefix, en->n.pxlen);
 
-    rta a0 = {
+    struct rta a0 = {
       .src = p->p.main_source,
       .source = RTS_RIP,
       .scope = SCOPE_UNIVERSE,
@@ -165,7 +165,7 @@ rip_announce_rte(struct rip_proto *p, struct rip_entry *en)
     u16 rt_tag = rt->tag;
     struct rip_rte *rt2 = rt->next;
 
-    /* Find second valid rte */
+    /* Find second valid struct rte */
     while (rt2 && !rip_valid_rte(rt2))
       rt2 = rt2->next;
 
@@ -206,8 +206,8 @@ rip_announce_rte(struct rip_proto *p, struct rip_entry *en)
       a0.from = rt->from->nbr->addr;
     }
 
-    rta *a = rta_lookup(&a0);
-    rte *e = rte_get_temp(a);
+    struct rta *a = rta_lookup(&a0);
+    struct rte *e = rte_get_temp(a);
 
     e->u.rip.from = a0.iface;
     e->u.rip.metric = rt_metric;
@@ -267,7 +267,7 @@ rip_update_rte(struct rip_proto *p, ip_addr *prefix, int pxlen, struct rip_rte *
       break;
     }
 
-  /* If the new route is optimal, add it to the list */
+  /* If the new route is optimal, add it to the union list */
   if (!en->routes || new->metric == en->routes->metric)
   {
     rt = rip_add_rte(p, rp, new);
@@ -400,7 +400,7 @@ rip_rt_notify(struct proto *P, struct rtable *table UNUSED, struct network *net,
 struct rip_neighbor *
 rip_get_neighbor(struct rip_proto *p, ip_addr *a, struct rip_iface *ifa)
 {
-  neighbor *nbr = neigh_find2(&p->p, a, ifa->iface, 0);
+  struct neighbor *nbr = neigh_find2(&p->p, a, ifa->iface, 0);
 
   if (!nbr || (nbr->scope == SCOPE_HOST) || !rip_iface_link_up(ifa))
     return NULL;
@@ -408,7 +408,7 @@ rip_get_neighbor(struct rip_proto *p, ip_addr *a, struct rip_iface *ifa)
   if (nbr->data)
     return nbr->data;
 
-  TRACE(D_EVENTS, "New neighbor %I on %s", *a, ifa->iface->name);
+  TRACE(D_EVENTS, "New struct neighbor %I on %s", *a, ifa->iface->name);
 
   struct rip_neighbor *n = mb_allocz(p->p.pool, sizeof(struct rip_neighbor));
   n->ifa = ifa;
@@ -424,9 +424,9 @@ rip_get_neighbor(struct rip_proto *p, ip_addr *a, struct rip_iface *ifa)
 static void
 rip_remove_neighbor(struct rip_proto *p, struct rip_neighbor *n)
 {
-  neighbor *nbr = n->nbr;
+  struct neighbor *nbr = n->nbr;
 
-  TRACE(D_EVENTS, "Removing neighbor %I on %s", nbr->addr, nbr->iface->name);
+  TRACE(D_EVENTS, "Removing struct neighbor %I on %s", nbr->addr, nbr->iface->name);
 
   rem_node(NODE n);
   n->ifa = NULL;
@@ -794,14 +794,14 @@ rip_if_notify(struct proto *P, unsigned flags, struct iface *iface)
 
 
 /*
- *	RIP timer events
+ *	RIP struct timer events
  */
 
 /**
- * rip_timer - RIP main timer hook
+ * rip_timer - RIP main struct timer hook
  * @t: timer
  *
- * The RIP main timer is responsible for routing table maintenance. Invalid or
+ * The RIP main struct timer is responsible for routing table maintenance. Invalid or
  * expired routes (&rip_rte) are removed and garbage collection of stale routing
  * table entries (&rip_entry) is done. Changes are propagated to core tables,
  * route reload is also done here. Note that garbage collection uses a maximal
@@ -810,16 +810,16 @@ rip_if_notify(struct proto *P, unsigned flags, struct iface *iface)
  *
  * Keeping incoming routes and the selected outgoing route are two independent
  * functions, therefore after garbage collection some entries now considered
- * invalid (RIP_ENTRY_DUMMY) still may have non-empty list of incoming routes,
+ * invalid (RIP_ENTRY_DUMMY) still may have non-empty union list of incoming routes,
  * while some valid entries (representing an outgoing route) may have that list
  * empty.
  *
- * The main timer is not scheduled periodically but it uses the time of the
- * current next event and the minimal interval of any possible event to compute
+ * The main struct timer is not scheduled periodically but it uses the time of the
+ * current next struct event and the minimal interval of any possible struct event to compute
  * the time of the next run.
  */
 static void
-rip_timer(timer *t)
+rip_timer(struct timer *t)
 {
   struct rip_proto *p = t->data;
   struct rip_config *cf = (void *) (p->p.cf);
@@ -829,7 +829,7 @@ rip_timer(timer *t)
   bird_clock_t next = now + MIN(cf->min_timeout_time, cf->max_garbage_time);
   bird_clock_t expires = 0;
 
-  TRACE(D_EVENTS, "Main timer fired");
+  TRACE(D_EVENTS, "Main struct timer fired");
 
   FIB_ITERATE_INIT(&fit, &p->rtable);
 
@@ -894,7 +894,7 @@ rip_timer(timer *t)
 
   p->rt_reload = 0;
 
-  /* Handling neighbor expiration */
+  /* Handling struct neighbor expiration */
   WALK_LIST(ifa, p->iface_list)
     WALK_LIST_DELSAFE(n, nn, ifa->neigh_list)
       if (n->last_seen)
@@ -918,7 +918,7 @@ rip_kick_timer(struct rip_proto *p)
 }
 
 /**
- * rip_iface_timer - RIP interface timer hook
+ * rip_iface_timer - RIP interface struct timer hook
  * @t: timer
  *
  * RIP interface timers are responsible for scheduling both regular and
@@ -928,7 +928,7 @@ rip_kick_timer(struct rip_proto *p)
  * is still running.
  */
 static void
-rip_iface_timer(timer *t)
+rip_iface_timer(struct timer *t)
 {
   struct rip_iface *ifa = t->data;
   struct rip_proto *p = ifa->rip;
@@ -937,7 +937,7 @@ rip_iface_timer(timer *t)
   if (ifa->cf->passive)
     return;
 
-  TRACE(D_EVENTS, "Interface timer fired for %s", ifa->iface->name);
+  TRACE(D_EVENTS, "Interface struct timer fired for %s", ifa->iface->name);
 
   if (ifa->tx_active)
   {
@@ -950,7 +950,7 @@ rip_iface_timer(timer *t)
 
   if (now >= ifa->next_regular)
   {
-    /* Send regular update, set timer for next period (or following one if necessay) */
+    /* Send regular update, set struct timer for next period (or following one if necessay) */
     TRACE(D_EVENTS, "Sending regular updates for %s", ifa->iface->name);
     rip_send_table(p, ifa, ifa->addr, 0);
     ifa->next_regular += period * (1 + ((now - ifa->next_regular) / period));
@@ -1008,9 +1008,9 @@ rip_trigger_update(struct rip_proto *p)
  */
 
 static struct ea_list *
-rip_prepare_attrs(struct linpool *pool, ea_list *next, u8 metric, u16 tag)
+rip_prepare_attrs(struct linpool *pool, struct ea_list *next, u8 metric, u16 tag)
 {
-  struct ea_list *l = lp_alloc(pool, sizeof(struct ea_list) + 2 * sizeof(eattr));
+  struct ea_list *l = lp_alloc(pool, sizeof(struct ea_list) + 2 * sizeof(struct eattr));
 
   l->next = next;
   l->flags = EALF_SORTED;
@@ -1147,7 +1147,7 @@ rip_reconfigure(struct proto *P, struct proto_config *c)
 }
 
 static void
-rip_get_route_info(rte *rte, byte *buf, ea_list *attrs)
+rip_get_route_info(struct rte *rte, byte *buf, struct ea_list *attrs)
 {
   buf += bsprintf(buf, " (%d/%d)", rte->pref, rte->u.rip.metric);
 
@@ -1156,7 +1156,7 @@ rip_get_route_info(rte *rte, byte *buf, ea_list *attrs)
 }
 
 static int
-rip_get_attr(eattr *a, byte *buf, int buflen UNUSED)
+rip_get_attr(struct eattr *a, byte *buf, int buflen UNUSED)
 {
   switch (a->id)
   {

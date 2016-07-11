@@ -78,13 +78,13 @@ struct f_inst *f_generate_roa_check(struct symbol *sym, struct f_inst *prefix, s
 struct f_tree *build_tree(struct f_tree *);
 struct f_tree *find_tree(struct f_tree *t, struct f_val val);
 int same_tree(struct f_tree *t1, struct f_tree *t2);
-void tree_format(struct f_tree *t, buffer *buf);
+void tree_format(struct f_tree *t, struct buffer *buf);
 
-struct f_trie *f_new_trie(linpool *lp, uint node_size);
+struct f_trie *f_new_trie(struct linpool *lp, uint node_size);
 void *trie_add_prefix(struct f_trie *t, ip_addr px, int plen, int l, int h);
 int trie_match_prefix(struct f_trie *t, ip_addr px, int plen);
 int trie_same(struct f_trie *t1, struct f_trie *t2);
-void trie_format(struct f_trie *t, buffer *buf);
+void trie_format(struct f_trie *t, struct buffer *buf);
 
 void fprefix_get_bounds(struct f_prefix *px, int *l, int *h);
 
@@ -120,7 +120,7 @@ int i_same(struct f_inst *f1, struct f_inst *f2);
 int val_compare(struct f_val v1, struct f_val v2);
 int val_same(struct f_val v1, struct f_val v2);
 
-void val_format(struct f_val v, buffer *buf);
+void val_format(struct f_val v, struct buffer *buf);
 
 
 #define F_NOP 0
@@ -167,8 +167,8 @@ void val_format(struct f_val v, buffer *buf);
 #define T_STRING 0x22
 #define T_PATH_MASK 0x23	/* mask for BGP path */
 #define T_PATH 0x24		/* BGP path */
-#define T_CLIST 0x25		/* Community list */
-#define T_ECLIST 0x26		/* Extended community list */
+#define T_CLIST 0x25		/* Community union list */
+#define T_ECLIST 0x26		/* Extended community union list */
 #define T_EC 0x27		/* Extended community value, u64 */
 
 #define T_RETURN 0x40
@@ -203,10 +203,10 @@ struct f_trie_node
 
 struct f_trie
 {
-  linpool *lp;
+  struct linpool *lp;
   int zero;
   uint node_size;
-  struct f_trie_node root[0];		/* Root trie node follows */
+  struct f_trie_node root[0];		/* Root trie struct node follows */
 };
 
 #define NEW_F_VAL struct f_val * val; val = cfg_alloc(sizeof(struct f_val));

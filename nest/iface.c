@@ -14,7 +14,7 @@
  *
  * Each interface is represented by an &iface structure which carries
  * interface capability flags (%IF_MULTIACCESS, %IF_BROADCAST etc.),
- * MTU, interface name and index and finally a linked list of network
+ * MTU, interface name and index and finally a linked union list of network
  * prefixes assigned to the interface, each one represented by
  * struct &ifa.
  *
@@ -33,9 +33,9 @@
 #include "lib/string.h"
 #include "conf/conf.h"
 
-static pool *if_pool;
+static struct pool *if_pool;
 
-list iface_list;
+union list iface_list;
 
 /**
  * ifa_dump - dump interface address
@@ -689,7 +689,7 @@ iface_patt_match(struct iface_patt *ifp, struct iface *i, struct ifa *a)
 }
 
 struct iface_patt *
-iface_patt_find(list *l, struct iface *i, struct ifa *a)
+iface_patt_find(union list *l, struct iface *i, struct ifa *a)
 {
   struct iface_patt *p;
 
@@ -723,7 +723,7 @@ iface_plists_equal(struct iface_patt *pa, struct iface_patt *pb)
 }
 
 int
-iface_patts_equal(list *a, list *b, int (*comp)(struct iface_patt *, struct iface_patt *))
+iface_patts_equal(union list *a, union list *b, int (*comp)(struct iface_patt *, struct iface_patt *))
 {
   struct iface_patt *x, *y;
 

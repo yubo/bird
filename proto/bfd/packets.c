@@ -62,7 +62,7 @@ bfd_format_flags(u8 flags, char *buf)
 void
 bfd_send_ctl(struct bfd_proto *p, struct bfd_session *s, int final)
 {
-  sock *sk = s->ifa->sk;
+  struct birdsock *sk = s->ifa->sk;
   struct bfd_ctl_packet *pkt;
   char fb[8];
 
@@ -97,7 +97,7 @@ bfd_send_ctl(struct bfd_proto *p, struct bfd_session *s, int final)
 #define DROP(DSC,VAL) do { err_dsc = DSC; err_val = VAL; goto drop; } while(0)
 
 static int
-bfd_rx_hook(sock *sk, int len)
+bfd_rx_hook(struct birdsock *sk, int len)
 {
   struct bfd_proto *p =  sk->data;
   struct bfd_ctl_packet *pkt = (struct bfd_ctl_packet *) sk->rbuf;
@@ -179,16 +179,16 @@ bfd_rx_hook(sock *sk, int len)
 }
 
 static void
-bfd_err_hook(sock *sk, int err)
+bfd_err_hook(struct birdsock *sk, int err)
 {
   struct bfd_proto *p = sk->data;
   log(L_ERR "%s: Socket error: %m", p->p.name, err);
 }
 
-sock *
+struct birdsock *
 bfd_open_rx_sk(struct bfd_proto *p, int multihop)
 {
-  sock *sk = sk_new(p->tpool);
+  struct birdsock *sk = sk_new(p->tpool);
   sk->type = SK_UDP;
   sk->sport = !multihop ? BFD_CONTROL_PORT : BFD_MULTI_CTL_PORT;
   sk->data = p;
@@ -218,10 +218,10 @@ bfd_open_rx_sk(struct bfd_proto *p, int multihop)
   return NULL;
 }
 
-sock *
+struct birdsock *
 bfd_open_tx_sk(struct bfd_proto *p, ip_addr local, struct iface *ifa)
 {
-  sock *sk = sk_new(p->tpool);
+  struct birdsock *sk = sk_new(p->tpool);
   sk->type = SK_UDP;
   sk->saddr = local;
   sk->dport = ifa ? BFD_CONTROL_PORT : BFD_MULTI_CTL_PORT;

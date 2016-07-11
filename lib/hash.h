@@ -92,7 +92,7 @@
 #define REHASH_HI_BOUND(a,b,c,d,e,f)	f
 
 #define HASH_DEFINE_REHASH_FN(id,type)					\
-  static void id##_REHASH(void *v, pool *p, int step)			\
+  static void id##_REHASH(void *v, struct pool *p, int step)			\
   { HASH_REHASH(* (HASH(type) *) v, id, p, step); }
 
 

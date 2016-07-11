@@ -35,7 +35,6 @@
 #define DELTA(a,b) (((a)>=(b))?(a)-(b):(b)-(a))
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(*(a)))
 
-
 /* Bitfield macros */
 
 /* b is u32 array (or ptr), l is size of it in bits (multiple of 32), p is 0..(l-1) */
@@ -55,13 +54,11 @@
 #define IP_VERSION 6
 #endif
 
-
 /* Macros for gcc attributes */
 
 #define NORET __attribute__((noreturn))
 #define UNUSED __attribute__((unused))
 #define PACKED __attribute__((packed))
-
 
 /* Microsecond time */
 
@@ -80,15 +77,14 @@ typedef s64 btime;
 #define US	US_
 #endif
 
-
 /* Rate limiting */
 
 struct tbf {
-  bird_clock_t timestamp;		/* Last update */
-  u16 count;				/* Available tokens */
-  u16 burst;				/* Max number of tokens */
-  u16 rate;				/* Rate of replenishment */
-  u16 mark;				/* Whether last op was limited */
+	bird_clock_t timestamp;	/* Last update */
+	u16 count;		/* Available tokens */
+	u16 burst;		/* Max number of tokens */
+	u16 rate;		/* Rate of replenishment */
+	u16 mark;		/* Whether last op was limited */
 };
 
 /* Default TBF values for rate limiting log messages */
@@ -96,30 +92,27 @@ struct tbf {
 
 void tbf_update(struct tbf *f);
 
-static inline int
-tbf_limit(struct tbf *f)
+static inline int tbf_limit(struct tbf *f)
 {
-  tbf_update(f);
+	tbf_update(f);
 
-  if (!f->count)
-  {
-    f->mark = 1;
-    return 1;
-  }
+	if (!f->count) {
+		f->mark = 1;
+		return 1;
+	}
 
-  f->count--;
-  f->mark = 0;
-  return 0;
+	f->count--;
+	f->mark = 0;
+	return 0;
 }
-
 
 /* Logging and dying */
 
-typedef struct buffer {
-  byte *start;
-  byte *pos;
-  byte *end;
-} buffer;
+struct buffer {
+	byte *start;
+	byte *pos;
+	byte *end;
+};
 
 #define STACK_BUFFER_INIT(buf,size)		\
   do {						\
@@ -134,23 +127,23 @@ typedef struct buffer {
 #define LOG_BUFFER_SIZE 1024
 
 #define log log_msg
-void log_commit(int class, buffer *buf);
+void log_commit(int class, struct buffer *buf);
 void log_msg(const char *msg, ...);
 void log_rl(struct tbf *rl, const char *msg, ...);
 void die(const char *msg, ...) NORET;
 void bug(const char *msg, ...) NORET;
 
-#define L_DEBUG "\001"			/* Debugging messages */
-#define L_TRACE "\002"			/* Protocol tracing */
-#define L_INFO "\003"			/* Informational messages */
-#define L_REMOTE "\004"			/* Remote protocol errors */
-#define L_WARN "\005"			/* Local warnings */
-#define L_ERR "\006"			/* Local errors */
-#define L_AUTH "\007"			/* Authorization failed etc. */
-#define L_FATAL "\010"			/* Fatal errors */
-#define L_BUG "\011"			/* BIRD bugs */
+#define L_DEBUG "\001"		/* Debugging messages */
+#define L_TRACE "\002"		/* Protocol tracing */
+#define L_INFO "\003"		/* Informational messages */
+#define L_REMOTE "\004"		/* Remote protocol errors */
+#define L_WARN "\005"		/* Local warnings */
+#define L_ERR "\006"		/* Local errors */
+#define L_AUTH "\007"		/* Authorization failed etc. */
+#define L_FATAL "\010"		/* Fatal errors */
+#define L_BUG "\011"		/* BIRD bugs */
 
-void debug(const char *msg, ...);		/* Printf to debug output */
+void debug(const char *msg, ...);	/* Printf to debug output */
 
 /* Debugging */
 

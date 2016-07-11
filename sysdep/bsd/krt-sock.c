@@ -143,9 +143,9 @@ static struct krt_proto *krt_table_map[KRT_MAX_TABLES];
 /* Route socket message processing */
 
 int
-krt_capable(rte *e)
+krt_capable(struct rte *e)
 {
-  rta *a = e->attrs;
+  struct rta *a = e->attrs;
 
   return
     a->cast == RTC_UNICAST &&
@@ -186,10 +186,10 @@ struct ks_msg
     body += l;}
 
 static int
-krt_send_route(struct krt_proto *p, int cmd, rte *e)
+krt_send_route(struct krt_proto *p, int cmd, struct rte *e)
 {
   net *net = e->net;
-  rta *a = e->attrs;
+  struct rta *a = e->attrs;
   static int msg_seq;
   struct iface *j, *i = a->iface;
   int l;
@@ -307,7 +307,7 @@ krt_send_route(struct krt_proto *p, int cmd, rte *e)
 }
 
 void
-krt_replace_rte(struct krt_proto *p, net *n, rte *new, rte *old,
+krt_replace_rte(struct krt_proto *p, net *n, struct rte *new, struct rte *old,
 		struct ea_list *eattrs UNUSED)
 {
   int err = 0;
@@ -331,7 +331,7 @@ krt_read_route(struct ks_msg *msg, struct krt_proto *p, int scan)
 {
   /* p is NULL iff KRT_SHARED_SOCKET and !scan */
 
-  rte *e;
+  struct rte *e;
   net *net;
   sockaddr dst, gate, mask;
   ip_addr idst, igate, imask;
@@ -428,7 +428,7 @@ krt_read_route(struct ks_msg *msg, struct krt_proto *p, int scan)
 
   net = net_get(p->p.table, idst, pxlen);
 
-  rta a = {
+  struct rta a = {
     .src = p->p.main_source,
     .source = RTS_INHERIT,
     .scope = SCOPE_UNIVERSE,
@@ -462,7 +462,7 @@ krt_read_route(struct ks_msg *msg, struct krt_proto *p, int scan)
 
   if (flags & RTF_GATEWAY)
   {
-    neighbor *ng;
+    struct neighbor *ng;
     a.dest = RTD_ROUTER;
     a.gw = igate;
 
@@ -847,7 +847,7 @@ krt_sysctl_scan(struct proto *p, int cmd, int table_id)
   rv = sysctl(mib, mcnt, buf, &needed, NULL, 0);
   if (rv < 0)
   {
-    /* The buffer size changed since last sysctl ('needed' is not changed) */
+    /* The struct buffer size changed since last sysctl ('needed' is not changed) */
     if ((errno == ENOMEM) && retries--)
       goto try;
 
@@ -898,7 +898,7 @@ kif_do_scan(struct kif_proto *p)
 /* Kernel sockets */
 
 static int
-krt_sock_hook(sock *sk, int size UNUSED)
+krt_sock_hook(struct birdsock *sk, int size UNUSED)
 {
   struct ks_msg msg;
   int l = read(sk->fd, (char *)&msg, sizeof(msg));
@@ -911,10 +911,10 @@ krt_sock_hook(sock *sk, int size UNUSED)
   return 0;
 }
 
-static sock *
-krt_sock_open(pool *pool, void *data, int table_id)
+static struct birdsock *
+krt_sock_open(struct pool *pool, void *data, int table_id)
 {
-  sock *sk;
+  struct birdsock *sk;
   int fd;
 
   fd = socket(PF_ROUTE, SOCK_RAW, AF_UNSPEC);
@@ -944,7 +944,7 @@ krt_sock_open(pool *pool, void *data, int table_id)
 
 #ifdef KRT_SHARED_SOCKET
 
-static sock *krt_sock;
+static struct birdsock *krt_sock;
 static int krt_sock_count;
 
 

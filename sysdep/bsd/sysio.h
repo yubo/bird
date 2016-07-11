@@ -39,7 +39,7 @@
   { .imr_multiaddr = ipa_to_in4(maddr), .imr_interface = ipa_to_in4(ifa->addr->ip) }
 
 static inline int
-sk_setup_multicast4(sock *s)
+sk_setup_multicast4(struct birdsock *s)
 {
   struct in_addr ifa = ipa_to_in4(s->iface->addr->ip);
   u8 ttl = s->ttl;
@@ -59,7 +59,7 @@ sk_setup_multicast4(sock *s)
 }
 
 static inline int
-sk_join_group4(sock *s, ip_addr maddr)
+sk_join_group4(struct birdsock *s, ip_addr maddr)
 {
   struct ip_mreq mr = INIT_MREQ4(maddr, s->iface);
 
@@ -70,7 +70,7 @@ sk_join_group4(sock *s, ip_addr maddr)
 }
 
 static inline int
-sk_leave_group4(sock *s, ip_addr maddr)
+sk_leave_group4(struct birdsock *s, ip_addr maddr)
 {
   struct ip_mreq mr = INIT_MREQ4(maddr, s->iface);
 
@@ -92,7 +92,7 @@ sk_leave_group4(sock *s, ip_addr maddr)
 #define CMSG4_SPACE_TTL CMSG_SPACE(sizeof(char))
 
 static inline int
-sk_request_cmsg4_pktinfo(sock *s)
+sk_request_cmsg4_pktinfo(struct birdsock *s)
 {
   int y = 1;
 
@@ -106,7 +106,7 @@ sk_request_cmsg4_pktinfo(sock *s)
 }
 
 static inline int
-sk_request_cmsg4_ttl(sock *s)
+sk_request_cmsg4_ttl(struct birdsock *s)
 {
   int y = 1;
 
@@ -117,7 +117,7 @@ sk_request_cmsg4_ttl(sock *s)
 }
 
 static inline void
-sk_process_cmsg4_pktinfo(sock *s, struct cmsghdr *cm)
+sk_process_cmsg4_pktinfo(struct birdsock *s, struct cmsghdr *cm)
 {
   if (cm->cmsg_type == IP_RECVDSTADDR)
     s->laddr = ipa_from_in4(* (struct in_addr *) CMSG_DATA(cm));
@@ -127,14 +127,14 @@ sk_process_cmsg4_pktinfo(sock *s, struct cmsghdr *cm)
 }
 
 static inline void
-sk_process_cmsg4_ttl(sock *s, struct cmsghdr *cm)
+sk_process_cmsg4_ttl(struct birdsock *s, struct cmsghdr *cm)
 {
   if (cm->cmsg_type == IP_RECVTTL)
     s->rcv_ttl = * (byte *) CMSG_DATA(cm);
 }
 
 static inline void
-sk_prepare_cmsgs4(sock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
+sk_prepare_cmsgs4(struct birdsock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
 {
   /* Unfortunately, IP_SENDSRCADDR does not work for raw IP sockets on BSD kernels */
 
@@ -160,7 +160,7 @@ sk_prepare_cmsgs4(sock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
 }
 
 static void
-sk_prepare_ip_header(sock *s, void *hdr, int dlen)
+sk_prepare_ip_header(struct birdsock *s, void *hdr, int dlen)
 {
   struct ip *ip = hdr;
 
@@ -200,7 +200,7 @@ sk_prepare_ip_header(sock *s, void *hdr, int dlen)
 #endif
 
 int
-sk_set_md5_auth(sock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd, int setkey UNUSED)
+sk_set_md5_auth(struct birdsock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd, int setkey UNUSED)
 {
 #ifdef USE_MD5SIG_SETKEY
   if (setkey)
@@ -221,7 +221,7 @@ sk_set_md5_auth(sock *s, ip_addr local, ip_addr remote, struct iface *ifa, char 
 }
 
 static inline int
-sk_set_min_ttl4(sock *s, int ttl)
+sk_set_min_ttl4(struct birdsock *s, int ttl)
 {
   if (setsockopt(s->fd, IPPROTO_IP, IP_MINTTL, &ttl, sizeof(ttl)) < 0)
   {
@@ -235,20 +235,20 @@ sk_set_min_ttl4(sock *s, int ttl)
 }
 
 static inline int
-sk_set_min_ttl6(sock *s, int ttl)
+sk_set_min_ttl6(struct birdsock *s, int ttl)
 {
   ERR_MSG("Kernel does not support IPv6 TTL security");
 }
 
 static inline int
-sk_disable_mtu_disc4(sock *s)
+sk_disable_mtu_disc4(struct birdsock *s)
 {
   /* TODO: Set IP_DONTFRAG to 0 ? */
   return 0;
 }
 
 static inline int
-sk_disable_mtu_disc6(sock *s)
+sk_disable_mtu_disc6(struct birdsock *s)
 {
   /* TODO: Set IPV6_DONTFRAG to 0 ? */
   return 0;
@@ -257,7 +257,7 @@ sk_disable_mtu_disc6(sock *s)
 int sk_priority_control = -1;
 
 static inline int
-sk_set_priority(sock *s, int prio UNUSED)
+sk_set_priority(struct birdsock *s, int prio UNUSED)
 {
   ERR_MSG("Socket priority not supported");
 }

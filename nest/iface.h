@@ -11,13 +11,13 @@
 
 #include "lib/lists.h"
 
-extern list iface_list;
+extern union list iface_list;
 
 struct proto;
 struct pool;
 
 struct ifa {				/* Interface address */
-  node n;
+  struct node n;
   struct iface *iface;			/* Interface this address belongs to */
   ip_addr ip;				/* IP address of this host */
   ip_addr prefix;			/* Network prefix */
@@ -29,14 +29,14 @@ struct ifa {				/* Interface address */
 };
 
 struct iface {
-  node n;
+  struct node n;
   char name[16];
   unsigned flags;
   unsigned mtu;
   unsigned index;			/* OS-dependent interface index */
-  list addrs;				/* Addresses assigned to this interface */
+  union list addrs;				/* Addresses assigned to this interface */
   struct ifa *addr;			/* Primary address */
-  list neighbors;			/* All neighbors on this interface */
+  union list neighbors;			/* All neighbors on this interface */
 };
 
 #define IF_UP 1				/* IF_ADMIN_UP and IP address known */
@@ -68,7 +68,7 @@ struct iface {
  */
 
 
-#define IF_JUST_CREATED 0x10000000	/* Send creation event as soon as possible */
+#define IF_JUST_CREATED 0x10000000	/* Send creation struct event as soon as possible */
 #define IF_TMP_DOWN 0x20000000		/* Temporary shutdown due to interface reconfiguration */
 #define IF_UPDATED 0x40000000		/* Touched in last scan */
 
@@ -104,10 +104,10 @@ void ifa_recalc_all_primary_addresses(void);
 
 /* The Neighbor Cache */
 
-typedef struct neighbor {
-  node n;				/* Node in global neighbor list */
-  node if_n;				/* Node in per-interface neighbor list */
-  ip_addr addr;				/* Address of the neighbor */
+struct neighbor {
+  struct node n;				/* Node in global struct neighbor union list */
+  struct node if_n;				/* Node in per-interface struct neighbor union list */
+  ip_addr addr;				/* Address of the struct neighbor */
   struct ifa *ifa;			/* Ifa on related iface */
   struct iface *iface;			/* Interface it's connected to */
   struct proto *proto;			/* Protocol this belongs to */
@@ -116,22 +116,22 @@ typedef struct neighbor {
   unsigned flags;
   int scope;				/* Address scope, -1 for unreachable sticky neighbors,
 					   SCOPE_HOST when it's our own address */
-} neighbor;
+};
 
 #define NEF_STICKY 1
 #define NEF_ONLINK 2
 #define NEF_BIND 4			/* Used internally for neighbors bound to an iface */
 
-neighbor *neigh_find(struct proto *, ip_addr *, unsigned flags);
-neighbor *neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags);
+struct neighbor *neigh_find(struct proto *, ip_addr *, unsigned flags);
+struct neighbor *neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags);
 
 static inline int neigh_connected_to(struct proto *p, ip_addr *a, struct iface *i)
 {
-  neighbor *n = neigh_find(p, a, 0);
+  struct neighbor *n = neigh_find(p, a, 0);
   return n && n->iface == i;
 }
 
-void neigh_dump(neighbor *);
+void neigh_dump(struct neighbor *);
 void neigh_dump_all(void);
 void neigh_prune(void);
 void neigh_if_up(struct iface *);
@@ -145,7 +145,7 @@ void neigh_init(struct pool *);
  */
 
 struct iface_patt_node {
-  node n;
+  struct node n;
   int positive;
   byte *pattern;
   ip_addr prefix;
@@ -153,15 +153,15 @@ struct iface_patt_node {
 };
 
 struct iface_patt {
-  node n;
-  list ipn_list;			/* A list of struct iface_patt_node */
+  struct node n;
+  union list ipn_list;			/* A union list of struct iface_patt_node */
 
   /* Protocol-specific data follow after this structure */
 };
 
 int iface_patt_match(struct iface_patt *ifp, struct iface *i, struct ifa *a);
-struct iface_patt *iface_patt_find(list *l, struct iface *i, struct ifa *a);
-int iface_patts_equal(list *, list *, int (*)(struct iface_patt *, struct iface_patt *));
+struct iface_patt *iface_patt_find(union list *l, struct iface *i, struct ifa *a);
+int iface_patts_equal(union list *, union list *, int (*)(struct iface_patt *, struct iface_patt *));
 
 
 u32 if_choose_router_id(struct iface_patt *mask, u32 old_id);

@@ -42,8 +42,8 @@ struct bgp_config {
   int enable_as4;			/* Enable local support for 4B AS numbers [RFC4893] */
   int enable_extended_messages;		/* Enable local support for extended messages [draft] */
   u32 rr_cluster_id;			/* Route reflector cluster ID, if different from local ID */
-  int rr_client;			/* Whether neighbor is RR client of me */
-  int rs_client;			/* Whether neighbor is RS client of me */
+  int rr_client;			/* Whether struct neighbor is RR client of me */
+  int rs_client;			/* Whether struct neighbor is RS client of me */
   int advertise_ipv4;			/* Whether we should add IPv4 capability advertisement to OPEN message */
   int passive;				/* Do not initiate outgoing connection */
   int interpret_communities;		/* Hardwired handling of well-known communities */
@@ -126,10 +126,10 @@ struct bgp_proto {
   u8 add_path_tx;			/* Session expects transmit of ADD-PATH extended NLRI */
   u8 ext_messages;			/* Session allows to use extended messages (both sides support it) */
   u32 local_id;				/* BGP identifier of this router */
-  u32 remote_id;			/* BGP identifier of the neighbor */
+  u32 remote_id;			/* BGP identifier of the struct neighbor */
   u32 rr_cluster_id;			/* Route reflector cluster ID */
-  int rr_client;			/* Whether neighbor is RR client of me */
-  int rs_client;			/* Whether neighbor is RS client of me */
+  int rr_client;			/* Whether struct neighbor is RR client of me */
+  int rs_client;			/* Whether struct neighbor is RS client of me */
   u8 gr_ready;				/* Neighbor could do graceful restart */
   u8 gr_active;				/* Neighbor is doing graceful restart */
   u8 feed_state;			/* Feed state (TX) for EoR, RR packets, see BFS_* */
@@ -137,19 +137,19 @@ struct bgp_proto {
   struct bgp_conn *conn;		/* Connection we have established */
   struct bgp_conn outgoing_conn;	/* Outgoing connection we're working with */
   struct bgp_conn incoming_conn;	/* Incoming connection we have neither accepted nor rejected yet */
-  struct object_lock *lock;		/* Lock for neighbor connection */
+  struct object_lock *lock;		/* Lock for struct neighbor connection */
   struct neighbor *neigh;		/* Neighbor entry corresponding to remote ip, NULL if multihop */
   struct bfd_request *bfd_req;		/* BFD request, if BFD is used */
   ip_addr source_addr;			/* Local address used as an advertised next hop */
-  rtable *igp_table;			/* Table used for recursive next hop lookups */
+  struct rtable *igp_table;			/* Table used for recursive next hop lookups */
   struct event *event;			/* Event for respawning and shutting process */
   struct timer *startup_timer;		/* Timer used to delay protocol startup due to previous errors (startup_delay) */
   struct timer *gr_timer;		/* Timer waiting for reestablishment after graceful restart */
   struct bgp_bucket **bucket_hash;	/* Hash table of attribute buckets */
   uint hash_size, hash_count, hash_limit;
   HASH(struct bgp_prefix) prefix_hash;	/* Prefixes to be sent */
-  slab *prefix_slab;			/* Slab holding prefix nodes */
-  list bucket_queue;			/* Queue of buckets to send */
+  struct slab *prefix_slab;			/* Slab holding prefix nodes */
+  union list bucket_queue;			/* Queue of buckets to send */
   struct bgp_bucket *withdraw_bucket;	/* Withdrawn routes */
   unsigned startup_delay;		/* Time to delay protocol startup by due to errors */
   bird_clock_t last_proto_error;	/* Time of last error that leads to protocol stop */
@@ -170,15 +170,15 @@ struct bgp_prefix {
   } n;
   u32 path_id;
   struct bgp_prefix *next;
-  node bucket_node;			/* Node in per-bucket list */
+  struct node bucket_node;			/* Node in per-bucket union list */
 };
 
 struct bgp_bucket {
-  node send_node;			/* Node in send queue */
+  struct node send_node;			/* Node in send queue */
   struct bgp_bucket *hash_next, *hash_prev;	/* Node in bucket hash table */
   unsigned hash;			/* Hash over extended attributes */
-  list prefixes;			/* Prefixes in this buckets */
-  ea_list eattrs[0];			/* Per-bucket extended attributes */
+  union list prefixes;			/* Prefixes in this buckets */
+  struct ea_list eattrs[0];			/* Per-bucket extended attributes */
 };
 
 #define BGP_PORT		179
@@ -248,15 +248,15 @@ byte *bgp_attach_attr_wa(struct ea_list **to, struct linpool *pool, unsigned att
 struct rta *bgp_decode_attrs(struct bgp_conn *conn, byte *a, uint len, struct linpool *pool, int mandatory);
 int bgp_get_attr(struct eattr *e, byte *buf, int buflen);
 int bgp_rte_better(struct rte *, struct rte *);
-int bgp_rte_mergable(rte *pri, rte *sec);
-int bgp_rte_recalculate(rtable *table, net *net, rte *new, rte *old, rte *old_best);
-void bgp_rt_notify(struct proto *P, rtable *tbl UNUSED, net *n, rte *new, rte *old UNUSED, ea_list *attrs);
+int bgp_rte_mergable(struct rte *pri, struct rte *sec);
+int bgp_rte_recalculate(struct rtable *table, net *net, struct rte *new, struct rte *old, struct rte *old_best);
+void bgp_rt_notify(struct proto *P, struct rtable *tbl UNUSED, net *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs);
 int bgp_import_control(struct proto *, struct rte **, struct ea_list **, struct linpool *);
 void bgp_init_bucket_table(struct bgp_proto *);
 void bgp_free_bucket(struct bgp_proto *p, struct bgp_bucket *buck);
 void bgp_init_prefix_table(struct bgp_proto *p, u32 order);
 void bgp_free_prefix(struct bgp_proto *p, struct bgp_prefix *bp);
-uint bgp_encode_attrs(struct bgp_proto *p, byte *w, ea_list *attrs, int remains);
+uint bgp_encode_attrs(struct bgp_proto *p, byte *w, struct ea_list *attrs, int remains);
 void bgp_get_route_info(struct rte *, byte *buf, struct ea_list *attrs);
 
 inline static void bgp_attach_attr_ip(struct ea_list **to, struct linpool *pool, unsigned attr, ip_addr a)

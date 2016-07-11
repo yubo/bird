@@ -52,7 +52,7 @@
 struct rip_config
 {
   struct proto_config c;
-  list patt_list;			/* List of iface configs (struct rip_iface_config) */
+  union list patt_list;			/* List of iface configs (struct rip_iface_config) */
 
   u8 rip2;				/* RIPv2 (IPv4) or RIPng (IPv6) */
   u8 ecmp;				/* Maximum number of nexthops in ECMP route, or 0 */
@@ -80,23 +80,23 @@ struct rip_iface_config
   u8 ttl_security;			/* bool + 2 for TX only (send, but do not check on RX) */
   u8 check_link;			/* Whether iface link change is used */
   u8 bfd;				/* Use BFD on iface */
-  u16 rx_buffer;			/* RX buffer size, 0 for MTU */
+  u16 rx_buffer;			/* RX struct buffer size, 0 for MTU */
   u16 tx_length;			/* TX packet length limit (including headers), 0 for MTU */
   int tx_tos;
   int tx_priority;
   u32 update_time;			/* Periodic update interval */
   u32 timeout_time;			/* Route expiration timeout */
   u32 garbage_time;			/* Unreachable entry GC timeout */
-  list *passwords;			/* Passwords for authentication */
+  union list *passwords;			/* Passwords for authentication */
 };
 
 struct rip_proto
 {
   struct proto p;
   struct fib rtable;			/* Internal routing table */
-  list iface_list;			/* List of interfaces (struct rip_iface) */
-  slab *rte_slab;			/* Slab for internal routes (struct rip_rte) */
-  timer *timer;				/* Main protocol timer */
+  union list iface_list;			/* List of interfaces (struct rip_iface) */
+  struct slab *rte_slab;			/* Slab for internal routes (struct rip_rte) */
+  struct timer *timer;				/* Main protocol struct timer */
 
   u8 ecmp;				/* Maximum number of nexthops in ECMP route, or 0 */
   u8 infinity;				/* Maximum metric value, representing infinity */
@@ -109,20 +109,20 @@ struct rip_proto
 
 struct rip_iface
 {
-  node n;
+  struct node n;
   struct rip_proto *rip;
   struct iface *iface;			/* Underyling core interface */
   struct rip_iface_config *cf;		/* Related config, must be updated in reconfigure */
   struct object_lock *lock;		/* Interface lock */
-  timer *timer;				/* Interface timer */
-  sock *sk;				/* UDP socket */
+  struct timer *timer;				/* Interface struct timer */
+  struct birdsock *sk;				/* UDP socket */
 
   u8 up;				/* Interface is active */
   u8 csn_ready;				/* Nonzero CSN can be used */
   u16 tx_plen;				/* Max TX packet data length */
   u32 csn;				/* Last used crypto sequence number */
   ip_addr addr;				/* Destination multicast/broadcast address */
-  list neigh_list;			/* List of iface neighbors (struct rip_neighbor) */
+  union list neigh_list;			/* List of iface neighbors (struct rip_neighbor) */
 
   /* Update scheduling */
   bird_clock_t next_regular;		/* Next time when regular update should be called */
@@ -138,12 +138,12 @@ struct rip_iface
 
 struct rip_neighbor
 {
-  node n;
+  struct node n;
   struct rip_iface *ifa;		/* Associated interface, may be NULL if stale */
   struct neighbor *nbr;			/* Associaded core neighbor, may be NULL if stale */
   struct bfd_request *bfd_req;		/* BFD request, if BFD is used */
   bird_clock_t last_seen;		/* Time of last received and accepted message */
-  u32 uc;				/* Use count, number of routes linking the neighbor */
+  u32 uc;				/* Use count, number of routes linking the struct neighbor */
   u32 csn;				/* Last received crypto sequence number */
 };
 
@@ -182,7 +182,7 @@ struct rip_rte
 #define RIP_IM_MULTICAST	1
 #define RIP_IM_BROADCAST	2
 
-#define RIP_ENTRY_DUMMY		0	/* Only used to store list of incoming routes */
+#define RIP_ENTRY_DUMMY		0	/* Only used to store union list of incoming routes */
 #define RIP_ENTRY_VALID		1	/* Valid outgoing route */
 #define RIP_ENTRY_STALE		2	/* Stale outgoing route, waiting for GC */
 

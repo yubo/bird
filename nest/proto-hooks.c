@@ -82,7 +82,7 @@ void dump(struct proto *p)
  * This hook dumps all attributes in the &rte which belong to this
  * protocol to the debug output.
  */
-void dump_attrs(rte *e)
+void dump_attrs(struct rte *e)
 { DUMMY; }
 
 /**
@@ -123,7 +123,7 @@ void cleanup(struct proto *p)
 /**
  * get_status - get instance status
  * @p: protocol instance
- * @buf: buffer to be filled with the status string
+ * @buf: struct buffer to be filled with the status string
  *
  * This hook is called by the core if it wishes to obtain an brief one-line user friendly
  * representation of the status of the instance to be printed by the <cf/show protocols/
@@ -135,19 +135,19 @@ void get_status(struct proto *p, byte *buf)
 /**
  * get_route_info - get route information
  * @e: a route entry
- * @buf: buffer to be filled with the resulting string
+ * @buf: struct buffer to be filled with the resulting string
  * @attrs: extended attributes of the route
  *
- * This hook is called to fill the buffer @buf with a brief user friendly
+ * This hook is called to fill the struct buffer @buf with a brief user friendly
  * representation of metrics of a route belonging to this protocol.
  */
-void get_route_info(rte *e, byte *buf, ea_list *attrs)
+void get_route_info(struct rte *e, byte *buf, struct ea_list *attrs)
 { DUMMY; }
 
 /**
  * get_attr - get attribute information
  * @a: an extended attribute
- * @buf: buffer to be filled with attribute information
+ * @buf: struct buffer to be filled with attribute information
  * @buflen: a length of the @buf parameter
  *
  * The get_attr() hook is called by the core to obtain a user friendly
@@ -158,7 +158,7 @@ void get_route_info(rte *e, byte *buf, ea_list *attrs)
  * or doing the whole conversion (used in case the value requires extra
  * care; return %GA_FULL).
  */
-int get_attr(eattr *a, byte *buf, int buflen)
+int get_attr(struct eattr *a, byte *buf, int buflen)
 { DUMMY; }
 
 /**
@@ -213,33 +213,33 @@ void ifa_notify(struct proto *p, unsigned flags, struct ifa *a)
  * @p->accept_ra_types specifies which kind of route announcements
  * protocol wants to receive.
  */
-void rt_notify(struct proto *p, net *net, rte *new, rte *old, ea_list *attrs)
+void rt_notify(struct proto *p, net *net, struct rte *new, struct rte *old, struct ea_list *attrs)
 { DUMMY; }
 
 /**
- * neigh_notify - notify instance about neighbor status change
- * @neigh: a neighbor cache entry
+ * neigh_notify - notify instance about struct neighbor status change
+ * @neigh: a struct neighbor cache entry
  *
- * The neigh_notify() hook is called by the neighbor cache whenever
- * a neighbor changes its state, that is it gets disconnected or a
- * sticky neighbor gets connected.
+ * The neigh_notify() hook is called by the struct neighbor cache whenever
+ * a struct neighbor changes its state, that is it gets disconnected or a
+ * sticky struct neighbor gets connected.
  */
-void neigh_notify(neighbor *neigh)
+void neigh_notify(struct neighbor *neigh)
 { DUMMY; }
 
 /**
  * make_tmp_attrs - convert embedded attributes to temporary ones
  * @e: route entry
- * @pool: linear pool to allocate attribute memory in
+ * @pool: linear struct pool to allocate attribute memory in
  *
  * This hook is called by the routing table functions if they need
  * to convert the protocol attributes embedded directly in the &rte
  * to temporary extended attributes in order to distribute them
  * to other protocols or to filters. make_tmp_attrs() creates
- * an &ea_list in the linear pool @pool, fills it with values of the
+ * an &ea_list in the linear struct pool @pool, fills it with values of the
  * temporary attributes and returns a pointer to it.
  */
-ea_list *make_tmp_attrs(rte *e, struct linpool *pool)
+struct ea_list *make_tmp_attrs(struct rte *e, struct linpool *pool)
 { DUMMY; }
 
 /**
@@ -248,13 +248,13 @@ ea_list *make_tmp_attrs(rte *e, struct linpool *pool)
  * @attrs: temporary attributes to be converted
  *
  * This hook is an exact opposite of make_tmp_attrs() -- it takes
- * a list of extended attributes and converts them to attributes
+ * a union list of extended attributes and converts them to attributes
  * embedded in the &rte corresponding to this protocol.
  *
  * You must be prepared for any of the attributes being missing
- * from the list and use default values instead.
+ * from the union list and use default values instead.
  */
-void store_tmp_attrs(rte *e, ea_list *attrs)
+void store_tmp_attrs(struct rte *e, struct ea_list *attrs)
 { DUMMY; }
 
 /**
@@ -262,7 +262,7 @@ void store_tmp_attrs(rte *e, ea_list *attrs)
  * @p: protocol instance the route is going to be imported to
  * @e: the route in question
  * @attrs: extended attributes of the route
- * @pool: linear pool for allocation of all temporary data
+ * @pool: linear struct pool for allocation of all temporary data
  *
  * The import_control() hook is called as the first step of a exporting
  * a route from a routing table to the protocol instance. It can modify
@@ -276,7 +276,7 @@ void store_tmp_attrs(rte *e, ea_list *attrs)
  * Result: 1 if the route has to be accepted, -1 if rejected and 0 if it
  * should be passed to the filters.
  */
-int import_control(struct proto *p, rte **e, ea_list **attrs, struct linpool *pool)
+int import_control(struct proto *p, struct rte **e, struct ea_list **attrs, struct linpool *pool)
 { DUMMY; }
 
 /**
@@ -311,7 +311,7 @@ int rte_recalculate(struct rtable *table, struct network *net, struct rte *new, 
  *
  * Result: 1 if @new is better (more preferred) than @old, 0 otherwise.
  */
-int rte_better(rte *new, rte *old)
+int rte_better(struct rte *new, struct rte *old)
 { DUMMY; }
 
 /**
@@ -326,7 +326,7 @@ int rte_better(rte *new, rte *old)
  *
  * Result: 1 if @e1 is identical to @e2, 0 otherwise.
  */
-int rte_same(rte *e1, rte *e2)
+int rte_same(struct rte *e1, struct rte *e2)
 { DUMMY; }
 
 /**
@@ -339,7 +339,7 @@ int rte_same(rte *e1, rte *e2)
  *
  * Please avoid using this function in new protocols.
  */
-void rte_insert(net *n, rte *e)
+void rte_insert(net *n, struct rte *e)
 { DUMMY; }
 
 /**
@@ -352,5 +352,5 @@ void rte_insert(net *n, rte *e)
  *
  * Please avoid using this function in new protocols.
  */
-void rte_remove(net *n, rte *e)
+void rte_remove(net *n, struct rte *e)
 { DUMMY; }

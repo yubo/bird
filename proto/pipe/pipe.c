@@ -44,16 +44,16 @@
 #include "pipe.h"
 
 static void
-pipe_rt_notify(struct proto *P, rtable *src_table, net *n, rte *new, rte *old, ea_list *attrs)
+pipe_rt_notify(struct proto *P, struct rtable *src_table, net *n, struct rte *new, struct rte *old, struct ea_list *attrs)
 {
   struct pipe_proto *p = (struct pipe_proto *) P;
   struct announce_hook *ah = (src_table == P->table) ? p->peer_ahook : P->main_ahook;
-  rtable *dst_table = ah->table;
+  struct rtable *dst_table = ah->table;
   struct rte_src *src;
 
   net *nn;
-  rte *e;
-  rta a;
+  struct rte *e;
+  struct rta a;
 
   if (!new && !old)
     return;
@@ -68,7 +68,7 @@ pipe_rt_notify(struct proto *P, rtable *src_table, net *n, rte *new, rte *old, e
   nn = net_get(dst_table, n->n.prefix, n->n.pxlen);
   if (new)
     {
-      memcpy(&a, new->attrs, sizeof(rta));
+      memcpy(&a, new->attrs, sizeof(struct rta));
 
       if (p->mode == PIPE_OPAQUE)
 	{
@@ -105,7 +105,7 @@ pipe_rt_notify(struct proto *P, rtable *src_table, net *n, rte *new, rte *old, e
 }
 
 static int
-pipe_import_control(struct proto *P, rte **ee, ea_list **ea UNUSED, struct linpool *p UNUSED)
+pipe_import_control(struct proto *P, struct rte **ee, struct ea_list **ea UNUSED, struct linpool *p UNUSED)
 {
   struct proto *pp = (*ee)->sender->proto;
 

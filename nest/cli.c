@@ -30,7 +30,7 @@
  * 1 means `table entry', 8 `runtime error' and 9 `syntax error'.
  *
  * Each CLI session is internally represented by a &cli structure and a
- * resource pool containing all resources associated with the connection,
+ * struct resource struct pool containing all resources associated with the connection,
  * so that it can be easily freed whenever the connection gets closed, not depending
  * on the current state of command processing.
  *
@@ -48,10 +48,10 @@
  * currently parsed, but it's of course available only in command handlers
  * not entered using the @cont hook.
  *
- * TX buffer management works as follows: At cli.tx_buf there is a
- * list of TX buffers (struct cli_out), cli.tx_write is the buffer
+ * TX struct buffer management works as follows: At cli.tx_buf there is a
+ * union list of TX buffers (struct cli_out), cli.tx_write is the buffer
  * currently used by the producer (cli_printf(), cli_alloc_out()) and
- * cli.tx_pos is the buffer currently used by the consumer
+ * cli.tx_pos is the struct buffer currently used by the consumer
  * (cli_write(), in system dependent code). The producer uses
  * cli_out.wpos ptr as the current write position and the consumer
  * uses cli_out.outpos ptr as the current read position. When the
@@ -68,10 +68,10 @@
 #include "conf/conf.h"
 #include "lib/string.h"
 
-pool *cli_pool;
+struct pool *cli_pool;
 
 static byte *
-cli_alloc_out(cli *c, int size)
+cli_alloc_out(struct cli *c, int size)
 {
   struct cli_out *o;
 
@@ -117,7 +117,7 @@ cli_alloc_out(cli *c, int size)
  * macro instead.
  */
 void
-cli_printf(cli *c, int code, char *msg, ...)
+cli_printf(struct cli *c, int code, char *msg, ...)
 {
   va_list args;
   byte buf[CLI_LINE_SIZE];
@@ -160,7 +160,7 @@ cli_printf(cli *c, int code, char *msg, ...)
 }
 
 static void
-cli_copy_message(cli *c)
+cli_copy_message(struct cli *c)
 {
   byte *p, *q;
   uint cnt = 2;
@@ -197,14 +197,14 @@ cli_copy_message(cli *c)
 }
 
 static void
-cli_hello(cli *c)
+cli_hello(struct cli *c)
 {
   cli_printf(c, 1, "BIRD " BIRD_VERSION " ready.");
   c->cont = NULL;
 }
 
 static void
-cli_free_out(cli *c)
+cli_free_out(struct cli *c)
 {
   struct cli_out *o, *p;
 
@@ -222,7 +222,7 @@ cli_free_out(cli *c)
 }
 
 void
-cli_written(cli *c)
+cli_written(struct cli *c)
 {
   cli_free_out(c);
   ev_schedule(c->event);
@@ -275,7 +275,7 @@ cli_command(struct cli *c)
 static void
 cli_event(void *data)
 {
-  cli *c = data;
+  struct cli *c = data;
   int err;
 
   while (c->ring_read != c->ring_write &&
@@ -300,13 +300,13 @@ cli_event(void *data)
   cli_write_trigger(c);
 }
 
-cli *
+struct cli *
 cli_new(void *priv)
 {
-  pool *p = rp_new(cli_pool, "CLI");
-  cli *c = mb_alloc(p, sizeof(cli));
+  struct pool *p = rp_new(cli_pool, "CLI");
+  struct cli *c = mb_alloc(p, sizeof(struct cli));
 
-  bzero(c, sizeof(cli));
+  bzero(c, sizeof(struct cli));
   c->pool = p;
   c->priv = priv;
   c->event = ev_new(p);
@@ -320,17 +320,17 @@ cli_new(void *priv)
 }
 
 void
-cli_kick(cli *c)
+cli_kick(struct cli *c)
 {
   if (!c->cont && !c->tx_pos)
     ev_schedule(c->event);
 }
 
-static list cli_log_hooks;
+static union list cli_log_hooks;
 static int cli_log_inited;
 
 void
-cli_set_log_echo(cli *c, uint mask, uint size)
+cli_set_log_echo(struct cli *c, uint mask, uint size)
 {
   if (c->ring_buf)
     {
@@ -354,7 +354,7 @@ void
 cli_echo(uint class, byte *msg)
 {
   unsigned len, free, i, l;
-  cli *c;
+  struct cli *c;
   byte *m;
 
   if (!cli_log_inited || EMPTY_LIST(cli_log_hooks))
@@ -397,10 +397,10 @@ cli_echo(uint class, byte *msg)
 }
 
 /* Hack for scheduled undo notification */
-extern cli *cmd_reconfig_stored_cli;
+extern struct cli *cmd_reconfig_stored_cli;
 
 void
-cli_free(cli *c)
+cli_free(struct cli *c)
 {
   cli_set_log_echo(c, 0, 0);
   if (c->cleanup)

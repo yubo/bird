@@ -78,10 +78,10 @@ print_size(char *dsc, size_t val)
   cli_msg(-1018, "%-17s %4u %cB", dsc, (unsigned) val, px[i]);
 }
 
-extern pool *rt_table_pool;
-extern pool *rta_pool;
-extern pool *roa_pool;
-extern pool *proto_pool;
+extern struct pool *rt_table_pool;
+extern struct pool *rta_pool;
+extern struct pool *roa_pool;
+extern struct pool *proto_pool;
 
 void
 cmd_show_memory(void)
@@ -106,7 +106,7 @@ cmd_eval(struct f_inst *expr)
       return;
     }
 
-  buffer buf;
+  struct buffer buf;
   LOG_BUFFER_INIT(buf);
   val_format(v, &buf);
   cli_msg(23, "%s", buf.start);

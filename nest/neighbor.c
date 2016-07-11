@@ -13,13 +13,13 @@
  * neighboring routers, check whether an address given as the next hop
  * attribute of a route is really an address of a directly connected host
  * and which interface is it connected through. Also, they often need to
- * be notified when a neighbor ceases to exist or when their long awaited
- * neighbor becomes connected. The neighbor cache is there to solve all
+ * be notified when a struct neighbor ceases to exist or when their long awaited
+ * struct neighbor becomes connected. The struct neighbor cache is there to solve all
  * these problems.
  *
- * The neighbor cache maintains a collection of neighbor entries. Each
+ * The struct neighbor cache maintains a collection of struct neighbor entries. Each
  * entry represents one IP address corresponding to either our directly
- * connected neighbor or our own end of the link (when the scope of the
+ * connected struct neighbor or our own end of the link (when the scope of the
  * address is set to %SCOPE_HOST) together with per-neighbor data belonging to a
  * single protocol.
  *
@@ -28,12 +28,12 @@
  * two linked lists: one global and one per-interface (allowing quick
  * processing of interface change events). Inactive entries exist only
  * when the protocol has explicitly requested it via the %NEF_STICKY
- * flag because it wishes to be notified when the node will again become
- * a neighbor. Such entries are enqueued in a special list which is walked
+ * flag because it wishes to be notified when the struct node will again become
+ * a neighbor. Such entries are enqueued in a special union list which is walked
  * whenever an interface changes its state to up.
  *
- * When a neighbor event occurs (a neighbor gets disconnected or a sticky
- * inactive neighbor becomes connected), the protocol hook neigh_notify()
+ * When a struct neighbor struct event occurs (a struct neighbor gets disconnected or a sticky
+ * inactive struct neighbor becomes connected), the protocol hook neigh_notify()
  * is called to advertise the change.
  */
 
@@ -46,8 +46,8 @@
 
 #define NEIGH_HASH_SIZE 256
 
-static slab *neigh_slab;
-static list sticky_neigh_list, neigh_hash_table[NEIGH_HASH_SIZE];
+static struct slab *neigh_slab;
+static union list sticky_neigh_list, neigh_hash_table[NEIGH_HASH_SIZE];
 
 static inline uint
 neigh_hash(struct proto *p, ip_addr *a)
@@ -101,30 +101,30 @@ if_connected(ip_addr *a, struct iface *i, struct ifa **ap)
 }
 
 /**
- * neigh_find - find or create a neighbor entry.
+ * neigh_find - find or create a struct neighbor entry.
  * @p: protocol which asks for the entry.
- * @a: pointer to IP address of the node to be searched for.
+ * @a: pointer to IP address of the struct node to be searched for.
  * @flags: 0 or %NEF_STICKY if you want to create a sticky entry.
  *
- * Search the neighbor cache for a node with given IP address. If
- * it's found, a pointer to the neighbor entry is returned. If no
- * such entry exists and the node is directly connected on
+ * Search the struct neighbor cache for a struct node with given IP address. If
+ * it's found, a pointer to the struct neighbor entry is returned. If no
+ * such entry exists and the struct node is directly connected on
  * one of our active interfaces, a new entry is created and returned
  * to the caller with protocol-dependent fields initialized to zero.
- * If the node is not connected directly or *@a is not a valid unicast
+ * If the struct node is not connected directly or *@a is not a valid unicast
  * IP address, neigh_find() returns %NULL.
  */
-neighbor *
+struct neighbor *
 neigh_find(struct proto *p, ip_addr *a, unsigned flags)
 {
   return neigh_find2(p, a, NULL, flags);
 }
 
 
-neighbor *
+struct neighbor *
 neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags)
 {
-  neighbor *n;
+  struct neighbor *n;
   int class, scope = -1;
   uint h = neigh_hash(p, a);
   struct iface *i;
@@ -158,7 +158,7 @@ neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags)
 	  break;
 	}
 
-  /* scope < 0 means i don't know neighbor */
+  /* scope < 0 means i don't know struct neighbor */
   /* scope >= 0 implies ifa != NULL */
 
   if ((scope < 0) && !(flags & NEF_STICKY))
@@ -187,14 +187,14 @@ neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags)
 }
 
 /**
- * neigh_dump - dump specified neighbor entry.
+ * neigh_dump - dump specified struct neighbor entry.
  * @n: the entry to dump
  *
- * This functions dumps the contents of a given neighbor entry
+ * This functions dumps the contents of a given struct neighbor entry
  * to debug output.
  */
 void
-neigh_dump(neighbor *n)
+neigh_dump(struct neighbor *n)
 {
   debug("%p %I ", n, n->addr);
   if (n->iface)
@@ -208,15 +208,15 @@ neigh_dump(neighbor *n)
 }
 
 /**
- * neigh_dump_all - dump all neighbor entries.
+ * neigh_dump_all - dump all struct neighbor entries.
  *
- * This function dumps the contents of the neighbor cache to
+ * This function dumps the contents of the struct neighbor cache to
  * debug output.
  */
 void
 neigh_dump_all(void)
 {
-  neighbor *n;
+  struct neighbor *n;
   int i;
 
   debug("Known neighbors:\n");
@@ -229,7 +229,7 @@ neigh_dump_all(void)
 }
 
 static void
-neigh_up(neighbor *n, struct iface *i, int scope, struct ifa *a)
+neigh_up(struct neighbor *n, struct iface *i, int scope, struct ifa *a)
 {
   n->iface = i;
   n->ifa = a;
@@ -237,15 +237,15 @@ neigh_up(neighbor *n, struct iface *i, int scope, struct ifa *a)
   add_tail(&i->neighbors, &n->if_n);
   rem_node(&n->n);
   add_tail(&neigh_hash_table[neigh_hash(n->proto, &n->addr)], &n->n);
-  DBG("Waking up sticky neighbor %I\n", n->addr);
+  DBG("Waking up sticky struct neighbor %I\n", n->addr);
   if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
     n->proto->neigh_notify(n);
 }
 
 static void
-neigh_down(neighbor *n)
+neigh_down(struct neighbor *n)
 {
-  DBG("Flushing neighbor %I on %s\n", n->addr, n->iface->name);
+  DBG("Flushing struct neighbor %I on %s\n", n->addr, n->iface->name);
   rem_node(&n->if_n);
   if (! (n->flags & NEF_BIND))
     n->iface = NULL;
@@ -258,7 +258,7 @@ neigh_down(neighbor *n)
     {
       add_tail(&sticky_neigh_list, &n->n);
 
-      /* Respawn neighbor if there is another matching prefix */
+      /* Respawn struct neighbor if there is another matching prefix */
       struct iface *i;
       struct ifa *a;
       int scope;
@@ -277,19 +277,19 @@ neigh_down(neighbor *n)
 
 
 /**
- * neigh_if_up: notify neighbor cache about interface up event
+ * neigh_if_up: notify struct neighbor cache about interface up event
  * @i: interface in question
  *
- * Tell the neighbor cache that a new interface became up.
+ * Tell the struct neighbor cache that a new interface became up.
  *
- * The neighbor cache wakes up all inactive sticky neighbors with
+ * The struct neighbor cache wakes up all inactive sticky neighbors with
  * addresses belonging to prefixes of the interface @i.
  */
 void
 neigh_if_up(struct iface *i)
 {
   struct ifa *a;
-  neighbor *n, *next;
+  struct neighbor *n, *next;
   int scope;
 
   WALK_LIST_DELSAFE(n, next, sticky_neigh_list)
@@ -299,10 +299,10 @@ neigh_if_up(struct iface *i)
 }
 
 /**
- * neigh_if_down - notify neighbor cache about interface down event
+ * neigh_if_down - notify struct neighbor cache about interface down event
  * @i: the interface in question
  *
- * Notify the neighbor cache that an interface has ceased to exist.
+ * Notify the struct neighbor cache that an interface has ceased to exist.
  *
  * It causes all entries belonging to neighbors connected to this interface
  * to be flushed.
@@ -310,40 +310,40 @@ neigh_if_up(struct iface *i)
 void
 neigh_if_down(struct iface *i)
 {
-  node *x, *y;
+  struct node *x, *y;
 
   WALK_LIST_DELSAFE(x, y, i->neighbors)
-    neigh_down(SKIP_BACK(neighbor, if_n, x));
+    neigh_down(SKIP_BACK(struct neighbor, if_n, x));
 }
 
 /**
- * neigh_if_link - notify neighbor cache about interface link change
+ * neigh_if_link - notify struct neighbor cache about interface link change
  * @i: the interface in question
  *
- * Notify the neighbor cache that an interface changed link state.
- * All owners of neighbor entries connected to this interface are
+ * Notify the struct neighbor cache that an interface changed link state.
+ * All owners of struct neighbor entries connected to this interface are
  * notified.
  */
 void
 neigh_if_link(struct iface *i)
 {
-  node *x, *y;
+  struct node *x, *y;
 
   WALK_LIST_DELSAFE(x, y, i->neighbors)
     {
-      neighbor *n = SKIP_BACK(neighbor, if_n, x);
+      struct neighbor *n = SKIP_BACK(struct neighbor, if_n, x);
       if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
 	n->proto->neigh_notify(n);
     }
 }
 
 /**
- * neigh_ifa_update: notify neighbor cache about interface address add or remove event
+ * neigh_ifa_update: notify struct neighbor cache about interface address add or remove event
  * @a: interface address in question
  *
- * Tell the neighbor cache that an address was added or removed.
+ * Tell the struct neighbor cache that an address was added or removed.
  *
- * The neighbor cache wakes up all inactive sticky neighbors with
+ * The struct neighbor cache wakes up all inactive sticky neighbors with
  * addresses belonging to prefixes of the interface belonging to @ifa
  * and causes all unreachable neighbors to be flushed.
  */
@@ -351,13 +351,13 @@ void
 neigh_ifa_update(struct ifa *a)
 {
   struct iface *i = a->iface;
-  node *x, *y;
+  struct node *x, *y;
  
   /* Remove all neighbors whose scope has changed */
   WALK_LIST_DELSAFE(x, y, i->neighbors)
     {
       struct ifa *aa;
-      neighbor *n = SKIP_BACK(neighbor, if_n, x);
+      struct neighbor *n = SKIP_BACK(struct neighbor, if_n, x);
       if (if_connected(&n->addr, i, &aa) != n->scope)
 	neigh_down(n);
     }
@@ -367,7 +367,7 @@ neigh_ifa_update(struct ifa *a)
 }
 
 static inline void
-neigh_prune_one(neighbor *n)
+neigh_prune_one(struct neighbor *n)
 {
   if (n->proto->proto_state != PS_DOWN)
     return;
@@ -378,17 +378,17 @@ neigh_prune_one(neighbor *n)
 }
 
 /**
- * neigh_prune - prune neighbor cache
+ * neigh_prune - prune struct neighbor cache
  *
- * neigh_prune() examines all neighbor entries cached and removes those
+ * neigh_prune() examines all struct neighbor entries cached and removes those
  * corresponding to inactive protocols. It's called whenever a protocol
  * is shut down to get rid of all its heritage.
  */
 void
 neigh_prune(void)
 {
-  neighbor *n;
-  node *m;
+  struct neighbor *n;
+  struct node *m;
   int i;
 
   DBG("Pruning neighbors\n");
@@ -400,18 +400,18 @@ neigh_prune(void)
 }
 
 /**
- * neigh_init - initialize the neighbor cache.
- * @if_pool: resource pool to be used for neighbor entries.
+ * neigh_init - initialize the struct neighbor cache.
+ * @if_pool: struct resource struct pool to be used for struct neighbor entries.
  *
  * This function is called during BIRD startup to initialize
- * the neighbor cache module.
+ * the struct neighbor cache module.
  */
 void
-neigh_init(pool *if_pool)
+neigh_init(struct pool *if_pool)
 {
   int i;
 
-  neigh_slab = sl_new(if_pool, sizeof(neighbor));
+  neigh_slab = sl_new(if_pool, sizeof(struct neighbor));
   init_list(&sticky_neigh_list);
   for(i=0; i<NEIGH_HASH_SIZE; i++)
     init_list(&neigh_hash_table[i]);

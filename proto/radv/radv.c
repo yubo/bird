@@ -20,7 +20,7 @@
  * The RAdv is structured in the usual way - for each handled interface
  * there is a structure &radv_iface that contains a state related to
  * that interface together with its resources (a socket, a timer).
- * There is also a prepared RA stored in a TX buffer of the socket
+ * There is also a prepared RA stored in a TX struct buffer of the socket
  * associated with an iface. These iface structures are created
  * and removed according to iface events from BIRD core handled by
  * radv_if_notify() callback.
@@ -44,7 +44,7 @@
  */
 
 static void
-radv_timer(timer *tm)
+radv_timer(struct timer *tm)
 {
   struct radv_iface *ifa = tm->data;
   struct proto_radv *ra = ifa->ra;
@@ -53,7 +53,7 @@ radv_timer(timer *tm)
 
   radv_send_ra(ifa, 0);
 
-  /* Update timer */
+  /* Update struct timer */
   ifa->last = now;
   unsigned after = ifa->cf->min_ra_int;
   after += random() % (ifa->cf->max_ra_int - ifa->cf->min_ra_int + 1);
@@ -91,7 +91,7 @@ radv_iface_notify(struct radv_iface *ifa, int event)
     break;
   }
 
-  /* Update timer */
+  /* Update struct timer */
   unsigned delta = now - ifa->last;
   unsigned after = 0;
 
@@ -152,7 +152,7 @@ find_lladdr(struct iface *iface)
 static void
 radv_iface_new(struct proto_radv *ra, struct iface *iface, struct radv_iface_config *cf)
 {
-  pool *pool = ra->p.pool;
+  struct pool *pool = ra->p.pool;
   struct radv_iface *ifa;
 
   RADV_TRACE(D_EVENTS, "Adding interface %s", iface->name);
@@ -171,7 +171,7 @@ radv_iface_new(struct proto_radv *ra, struct iface *iface, struct radv_iface_con
     return;
   }
 
-  timer *tm = tm_new(pool);
+  struct timer *tm = tm_new(pool);
   tm->hook = radv_timer;
   tm->data = ifa;
   tm->randomize = 0;
@@ -264,7 +264,7 @@ static inline int radv_net_match_trigger(struct radv_config *cf, net *n)
 }
 
 int
-radv_import_control(struct proto *p, rte **new, ea_list **attrs UNUSED, struct linpool *pool UNUSED)
+radv_import_control(struct proto *p, struct rte **new, struct ea_list **attrs UNUSED, struct linpool *pool UNUSED)
 {
   // struct proto_radv *ra = (struct proto_radv *) p;
   struct radv_config *cf = (struct radv_config *) (p->cf);
@@ -276,7 +276,7 @@ radv_import_control(struct proto *p, rte **new, ea_list **attrs UNUSED, struct l
 }
 
 static void
-radv_rt_notify(struct proto *p, rtable *tbl UNUSED, net *n, rte *new, rte *old UNUSED, ea_list *attrs UNUSED)
+radv_rt_notify(struct proto *p, struct rtable *tbl UNUSED, net *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs UNUSED)
 {
   struct proto_radv *ra = (struct proto_radv *) p;
   struct radv_config *cf = (struct radv_config *) (p->cf);

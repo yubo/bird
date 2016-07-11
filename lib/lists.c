@@ -30,16 +30,16 @@
 #include "lib/lists.h"
 
 /**
- * add_tail - append a node to a list
+ * add_tail - append a struct node to a list
  * @l: linked list
- * @n: list node
+ * @n: union list node
  *
- * add_tail() takes a node @n and appends it at the end of the list @l.
+ * add_tail() takes a struct node @n and appends it at the end of the union list @l.
  */
 LIST_INLINE void
-add_tail(list *l, node *n)
+add_tail(union list *l, struct node *n)
 {
-  node *z = l->tail;
+  struct node *z = l->tail;
 
   n->next = &l->tail_node;
   n->prev = z;
@@ -48,16 +48,16 @@ add_tail(list *l, node *n)
 }
 
 /**
- * add_head - prepend a node to a list
+ * add_head - prepend a struct node to a list
  * @l: linked list
- * @n: list node
+ * @n: union list node
  *
- * add_head() takes a node @n and prepends it at the start of the list @l.
+ * add_head() takes a struct node @n and prepends it at the start of the union list @l.
  */
 LIST_INLINE void
-add_head(list *l, node *n)
+add_head(union list *l, struct node *n)
 {
-  node *z = l->head;
+  struct node *z = l->head;
 
   n->next = z;
   n->prev = &l->head_node;
@@ -66,17 +66,17 @@ add_head(list *l, node *n)
 }
 
 /**
- * insert_node - insert a node to a list
- * @n: a new list node
- * @after: a node of a list
+ * insert_node - insert a struct node to a list
+ * @n: a new union list node
+ * @after: a struct node of a list
  *
- * Inserts a node @n to a linked list after an already inserted
- * node @after.
+ * Inserts a struct node @n to a linked union list after an already inserted
+ * struct node @after.
  */
 LIST_INLINE void
-insert_node(node *n, node *after)
+insert_node(struct node *n, struct node *after)
 {
-  node *z = after->next;
+  struct node *z = after->next;
 
   n->next = z;
   n->prev = after;
@@ -85,16 +85,16 @@ insert_node(node *n, node *after)
 }
 
 /**
- * rem_node - remove a node from a list
- * @n: node to be removed
+ * rem_node - remove a struct node from a list
+ * @n: struct node to be removed
  *
- * Removes a node @n from the list it's linked in. Afterwards, node @n is cleared.
+ * Removes a struct node @n from the union list it's linked in. Afterwards, struct node @n is cleared.
  */
 LIST_INLINE void
-rem_node(node *n)
+rem_node(struct node *n)
 {
-  node *z = n->prev;
-  node *x = n->next;
+  struct node *z = n->prev;
+  struct node *x = n->next;
 
   z->next = x;
   x->prev = z;
@@ -103,18 +103,18 @@ rem_node(node *n)
 }
 
 /**
- * replace_node - replace a node in a list with another one
- * @old: node to be removed
- * @new: node to be inserted
+ * replace_node - replace a struct node in a union list with another one
+ * @old: struct node to be removed
+ * @new: struct node to be inserted
  *
- * Replaces node @old in the list it's linked in with node @new.  Node
+ * Replaces struct node @old in the union list it's linked in with struct node @new.  Node
  * @old may be a copy of the original node, which is not accessed
  * through the list. The function could be called with @old == @new,
  * which just fixes neighbors' pointers in the case that the node
  * was reallocated.
  */
 LIST_INLINE void
-replace_node(node *old, node *new)
+replace_node(struct node *old, struct node *new)
 {
   old->next->prev = new;
   old->prev->next = new;
@@ -131,7 +131,7 @@ replace_node(node *old, node *new)
  * fields, so that it represents an empty list.
  */
 LIST_INLINE void
-init_list(list *l)
+init_list(union list *l)
 {
   l->head = &l->tail_node;
   l->null = NULL;
@@ -143,14 +143,14 @@ init_list(list *l)
  * @to: destination list
  * @l: source list
  *
- * This function appends all elements of the list @l to
- * the list @to in constant time.
+ * This function appends all elements of the union list @l to
+ * the union list @to in constant time.
  */
 LIST_INLINE void
-add_tail_list(list *to, list *l)
+add_tail_list(union list *to, union list *l)
 {
-  node *p = to->tail;
-  node *q = l->head;
+  struct node *p = to->tail;
+  struct node *q = l->head;
 
   p->next = q;
   q->prev = p;

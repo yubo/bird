@@ -14,63 +14,64 @@
 
 #include "lib/resource.h"
 
-typedef struct birdsock {
-  resource r;
-  pool *pool;				/* Pool where incoming connections should be allocated (for SK_xxx_PASSIVE) */
-  int type;				/* Socket type */
-  void *data;				/* User data */
-  ip_addr saddr, daddr;			/* IPA_NONE = unspecified */
-  uint sport, dport;			/* 0 = unspecified (for IP: protocol type) */
-  int tos;				/* TOS / traffic class, -1 = default */
-  int priority;				/* Local socket priority, -1 = default */
-  int ttl;				/* Time To Live, -1 = default */
-  u32 flags;
-  struct iface *iface;			/* Interface; specify this for broad/multicast sockets */
+struct birdsock {
+	struct resource r;
+	struct pool *pool;	/* Pool where incoming connections should be allocated (for SK_xxx_PASSIVE) */
+	int type;		/* Socket type */
+	void *data;		/* User data */
+	ip_addr saddr, daddr;	/* IPA_NONE = unspecified */
+	uint sport, dport;	/* 0 = unspecified (for IP: protocol type) */
+	int tos;		/* TOS / traffic class, -1 = default */
+	int priority;		/* Local socket priority, -1 = default */
+	int ttl;		/* Time To Live, -1 = default */
+	u32 flags;
+	struct iface *iface;	/* Interface; specify this for broad/multicast sockets */
 
-  byte *rbuf, *rpos;			/* NULL=allocate automatically */
-  uint fast_rx;				/* RX has higher priority in event loop */
-  uint rbsize;
-  int (*rx_hook)(struct birdsock *, int size); /* NULL=receiving turned off, returns 1 to clear rx buffer */
+	byte *rbuf, *rpos;	/* NULL=allocate automatically */
+	uint fast_rx;		/* RX has higher priority in struct event loop */
+	uint rbsize;
+	int (*rx_hook) (struct birdsock *, int size);	/* NULL=receiving turned off, returns 1 to clear rx struct buffer */
 
-  byte *tbuf, *tpos;			/* NULL=allocate automatically */
-  byte *ttx;				/* Internal */
-  uint tbsize;
-  void (*tx_hook)(struct birdsock *);
+	byte *tbuf, *tpos;	/* NULL=allocate automatically */
+	byte *ttx;		/* Internal */
+	uint tbsize;
+	void (*tx_hook) (struct birdsock *);
 
-  void (*err_hook)(struct birdsock *, int); /* errno or zero if EOF */
+	void (*err_hook) (struct birdsock *, int);	/* errno or zero if EOF */
 
-  /* Information about received datagrams (UDP, RAW), valid in rx_hook */
-  ip_addr faddr, laddr;			/* src (From) and dst (Local) address of the datagram */
-  uint fport;				/* src port of the datagram */
-  uint lifindex;			/* local interface that received the datagram */
-  /* laddr and lifindex are valid only if SKF_LADDR_RX flag is set to request it */
+	/* Information about received datagrams (UDP, RAW), valid in rx_hook */
+	ip_addr faddr, laddr;	/* src (From) and dst (Local) address of the datagram */
+	uint fport;		/* src port of the datagram */
+	uint lifindex;		/* local interface that received the datagram */
+	/* laddr and lifindex are valid only if SKF_LADDR_RX flag is set to request it */
 
-  int af;				/* Address family (AF_INET, AF_INET6 or 0 for non-IP) of fd */
-  int fd;				/* System-dependent data */
-  int index;				/* Index in poll buffer */
-  int rcv_ttl;				/* TTL of last received datagram */
-  node n;
-  void *rbuf_alloc, *tbuf_alloc;
-  char *password;			/* Password for MD5 authentication */
-  char *err;				/* Error message */
-} sock;
+	int af;			/* Address family (AF_INET, AF_INET6 or 0 for non-IP) of fd */
+	int fd;			/* System-dependent data */
+	int index;		/* Index in poll struct buffer */
+	int rcv_ttl;		/* TTL of last received datagram */
+	struct node n;
+	void *rbuf_alloc, *tbuf_alloc;
+	char *password;		/* Password for MD5 authentication */
+	char *err;		/* Error message */
+};
 
-sock *sock_new(pool *);			/* Allocate new socket */
-#define sk_new(X) sock_new(X)		/* Wrapper to avoid name collision with OpenSSL */
+struct birdsock *sock_new(struct pool *);	/* Allocate new socket */
+#define sk_new(X) sock_new(X)	/* Wrapper to avoid name collision with OpenSSL */
 
-int sk_open(sock *);			/* Open socket */
-int sk_rx_ready(sock *s);
-int sk_send(sock *, uint len);		/* Send data, <0=err, >0=ok, 0=sleep */
-int sk_send_to(sock *, uint len, ip_addr to, uint port); /* sk_send to given destination */
-void sk_reallocate(sock *);		/* Free and allocate tbuf & rbuf */
-void sk_set_rbsize(sock *s, uint val);	/* Resize RX buffer */
-void sk_set_tbsize(sock *s, uint val);	/* Resize TX buffer, keeping content */
-void sk_set_tbuf(sock *s, void *tbuf);	/* Switch TX buffer, NULL-> return to internal */
+int sk_open(struct birdsock *);		/* Open socket */
+int sk_rx_ready(struct birdsock * s);
+int sk_send(struct birdsock *, uint len);	/* Send data, <0=err, >0=ok, 0=sleep */
+int sk_send_to(struct birdsock *, uint len, ip_addr to, uint port);	/* sk_send to given destination */
+void sk_reallocate(struct birdsock *);	/* Free and allocate tbuf & rbuf */
+void sk_set_rbsize(struct birdsock * s, uint val);	/* Resize RX struct buffer */
+void sk_set_tbsize(struct birdsock * s, uint val);	/* Resize TX buffer, keeping content */
+void sk_set_tbuf(struct birdsock * s, void *tbuf);	/* Switch TX buffer, NULL-> return to internal */
 void sk_dump_all(void);
 
-static inline int sk_send_buffer_empty(sock *sk)
-{ return sk->tbuf == sk->tpos; }
-
+static inline int sk_send_buffer_empty(struct birdsock * sk)
+{
+	return sk->tbuf == sk->tpos;
+}
 
 #ifdef IPV6
 #define sk_is_ipv4(X) 0
@@ -80,22 +81,21 @@ static inline int sk_send_buffer_empty(sock *sk)
 #define sk_is_ipv6(X) 0
 #endif
 
+int sk_setup_multicast(struct birdsock * s);	/* Prepare UDP or IP socket for multicasting */
+int sk_join_group(struct birdsock * s, ip_addr maddr);	/* Join multicast group on sk iface */
+int sk_leave_group(struct birdsock * s, ip_addr maddr);	/* Leave multicast group on sk iface */
+int sk_setup_broadcast(struct birdsock * s);
+int sk_set_ttl(struct birdsock * s, int ttl);	/* Set transmit TTL for given socket */
+int sk_set_min_ttl(struct birdsock * s, int ttl);	/* Set minimal accepted TTL for given socket */
+int sk_set_md5_auth(struct birdsock * s, ip_addr local, ip_addr remote, struct iface *ifa,
+		    char *passwd, int setkey);
+int sk_set_ipv6_checksum(struct birdsock * s, int offset);
+int sk_set_icmp6_filter(struct birdsock * s, int p1, int p2);
+void sk_log_error(struct birdsock * s, const char *p);
 
-int sk_setup_multicast(sock *s);	/* Prepare UDP or IP socket for multicasting */
-int sk_join_group(sock *s, ip_addr maddr);	/* Join multicast group on sk iface */
-int sk_leave_group(sock *s, ip_addr maddr);	/* Leave multicast group on sk iface */
-int sk_setup_broadcast(sock *s);
-int sk_set_ttl(sock *s, int ttl);	/* Set transmit TTL for given socket */
-int sk_set_min_ttl(sock *s, int ttl);	/* Set minimal accepted TTL for given socket */
-int sk_set_md5_auth(sock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd, int setkey);
-int sk_set_ipv6_checksum(sock *s, int offset);
-int sk_set_icmp6_filter(sock *s, int p1, int p2);
-void sk_log_error(sock *s, const char *p);
+byte *sk_rx_buffer(struct birdsock * s, int *len);	/* Temporary */
 
-byte * sk_rx_buffer(sock *s, int *len);	/* Temporary */
-
-extern int sk_priority_control;		/* Suggested priority for control traffic, should be sysdep define */
-
+extern int sk_priority_control;	/* Suggested priority for control traffic, should be sysdep define */
 
 /* Socket flags */
 
@@ -115,12 +115,12 @@ extern int sk_priority_control;		/* Suggested priority for control traffic, shou
  *	Socket types		     SA SP DA DP IF  TTL SendTo	(?=may, -=must not, *=must)
  */
 
-#define SK_TCP_PASSIVE	0	   /* ?  *  -  -  -  ?   -	*/
-#define SK_TCP_ACTIVE	1          /* ?  ?  *  *  -  ?   -	*/
+#define SK_TCP_PASSIVE	0	/* ?  *  -  -  -  ?   -      */
+#define SK_TCP_ACTIVE	1	/* ?  ?  *  *  -  ?   -      */
 #define SK_TCP		2
-#define SK_UDP		3          /* ?  ?  ?  ?  ?  ?   ?	*/
-#define SK_IP		5          /* ?  -  ?  *  ?  ?   ?	*/
-#define SK_MAGIC	7	   /* Internal use by sysdep code */
+#define SK_UDP		3	/* ?  ?  ?  ?  ?  ?   ?      */
+#define SK_IP		5	/* ?  -  ?  *  ?  ?   ?      */
+#define SK_MAGIC	7	/* Internal use by sysdep code */
 #define SK_UNIX_PASSIVE	8
 #define SK_UNIX		9
 

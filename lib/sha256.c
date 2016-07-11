@@ -223,14 +223,14 @@ sha256_update(struct sha256_context *ctx, const byte *buf, size_t len)
 {
   if (ctx->count)
   {
-    /* Fill rest of internal buffer */
+    /* Fill rest of internal struct buffer */
     for (; len && ctx->count < SHA256_BLOCK_SIZE; len--)
       ctx->buf[ctx->count++] = *buf++;
 
     if (ctx->count < SHA256_BLOCK_SIZE)
       return;
 
-    /* Process data from internal buffer */
+    /* Process data from internal struct buffer */
     sha256_transform(ctx, ctx->buf);
     ctx->nblocks++;
     ctx->count = 0;
@@ -239,7 +239,7 @@ sha256_update(struct sha256_context *ctx, const byte *buf, size_t len)
   if (!len)
     return;
 
-  /* Process data from input buffer */
+  /* Process data from input struct buffer */
   while (len >= SHA256_BLOCK_SIZE)
   {
     sha256_transform(ctx, buf);
@@ -248,7 +248,7 @@ sha256_update(struct sha256_context *ctx, const byte *buf, size_t len)
     len -= SHA256_BLOCK_SIZE;
   }
 
-  /* Copy remaining data to internal buffer */
+  /* Copy remaining data to internal struct buffer */
   memcpy(ctx->buf, buf, len);
   ctx->count = len;
 }

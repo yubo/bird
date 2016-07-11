@@ -13,7 +13,7 @@
  * two lists of static routes: one containing interface routes and one
  * holding the remaining ones. Interface routes are inserted and removed according
  * to interface events received from the core via the if_notify() hook. Routes
- * pointing to a neighboring router use a sticky node in the neighbor cache
+ * pointing to a neighboring router use a sticky struct node in the struct neighbor cache
  * to be notified about gaining or losing the neighbor. Special
  * routes like black holes or rejects are inserted all the time.
  *
@@ -21,10 +21,10 @@
  * several neighbors we need to integrate that to the neighbor
  * notification handling, we use dummy static_route nodes, one for
  * each nexthop. Therefore, a multipath route consists of a master
- * static_route node (of dest RTD_MULTIPATH), which specifies prefix
- * and is used in most circumstances, and a list of dummy static_route
+ * static_route struct node (of dest RTD_MULTIPATH), which specifies prefix
+ * and is used in most circumstances, and a union list of dummy static_route
  * nodes (of dest RTD_NONE), which stores info about nexthops and are
- * connected to neighbor entries and neighbor notifications. Dummy
+ * connected to struct neighbor entries and struct neighbor notifications. Dummy
  * nodes are chained using mp_next, they aren't in other_routes list,
  * and abuse some fields (masklen, if_name) for other purposes.
  *
@@ -48,9 +48,9 @@
 
 #include "static.h"
 
-static linpool *static_lp;
+static struct linpool *static_lp;
 
-static inline rtable *
+static inline struct rtable *
 p_igp_table(struct proto *p)
 {
   struct static_config *cf = (void *) p->cf;
@@ -61,8 +61,8 @@ static void
 static_install(struct proto *p, struct static_route *r, struct iface *ifa)
 {
   net *n;
-  rta a;
-  rte *e;
+  struct rta a;
+  struct rte *e;
 
   if (r->installed > 0)
     return;
@@ -366,7 +366,7 @@ static_neigh_notify(struct neighbor *n)
   struct proto *p = n->proto;
   struct static_route *r;
 
-  DBG("Static: neighbor notify for %I: iface %p\n", n->addr, n->iface);
+  DBG("Static: struct neighbor notify for %I: iface %p\n", n->addr, n->iface);
   for(r=n->data; r; r=r->chain)
   {
     static_update_bfd(p, r);
@@ -438,7 +438,7 @@ static_if_notify(struct proto *p, unsigned flags, struct iface *i)
 }
 
 int
-static_rte_mergable(rte *pri, rte *sec)
+static_rte_mergable(struct rte *pri, struct rte *sec)
 {
   return 1;
 }
@@ -539,7 +539,7 @@ static_match(struct proto *p, struct static_route *r, struct static_config *n)
     t->installed = r->installed;
 }
 
-static inline rtable *
+static inline struct rtable *
 cf_igp_table(struct static_config *cf)
 {
   return cf->igp_table ? cf->igp_table->table : NULL;
@@ -555,7 +555,7 @@ static_reconfigure(struct proto *p, struct proto_config *new)
   if (cf_igp_table(o) != cf_igp_table(n))
     return 0;
 
-  /* Delete all obsolete routes and reset neighbor entries */
+  /* Delete all obsolete routes and reset struct neighbor entries */
   WALK_LIST(r, o->iface_routes)
     static_match(p, r, n);
   WALK_LIST(r, o->other_routes)
@@ -578,7 +578,7 @@ static_reconfigure(struct proto *p, struct proto_config *new)
 }
 
 static void
-static_copy_routes(list *dlst, list *slst)
+static_copy_routes(union list *dlst, union list *slst)
 {
   struct static_route *dr, *sr;
 
@@ -610,7 +610,7 @@ static_copy_routes(list *dlst, list *slst)
 	  *mp_last = NULL;
 	}
 
-      add_tail(dlst, (node *) dr);
+      add_tail(dlst, (struct node *) dr);
     }
 }
 

@@ -17,8 +17,8 @@
  * &rte's with these attributes.
  *
  * Each &rta contains all the static attributes of the route (i.e.,
- * those which are always present) as structure members and a list of
- * dynamic attributes represented by a linked list of &ea_list
+ * those which are always present) as structure members and a union list of
+ * dynamic attributes represented by a linked union list of &ea_list
  * structures, each of them consisting of an array of &eattr's containing
  * the individual attributes. An attribute can be specified more than once
  * in the &ea_list chain and in such case the first occurrence overrides
@@ -55,18 +55,18 @@
 #include "lib/resource.h"
 #include "lib/string.h"
 
-pool *rta_pool;
+struct pool *rta_pool;
 
-static slab *rta_slab;
-static slab *mpnh_slab;
-static slab *rte_src_slab;
+static struct slab *rta_slab;
+static struct slab *mpnh_slab;
+static struct slab *rte_src_slab;
 
-/* rte source ID bitmap */
+/* struct rte source ID bitmap */
 static u32 *src_ids;
 static u32 src_id_size, src_id_used, src_id_pos;
 #define SRC_ID_INIT_SIZE 4
 
-/* rte source hash */
+/* struct rte source hash */
 
 #define RSH_KEY(n)		n->proto, n->private_id
 #define RSH_NEXT(n)		n->next
@@ -238,7 +238,7 @@ mpnh_compare_node(struct mpnh *x, struct mpnh *y)
 }
 
 static inline struct mpnh *
-mpnh_copy_node(const struct mpnh *src, linpool *lp)
+mpnh_copy_node(const struct mpnh *src, struct linpool *lp)
 {
   struct mpnh *n = lp_alloc(lp, sizeof(struct mpnh));
   n->gw = src->gw;
@@ -250,28 +250,28 @@ mpnh_copy_node(const struct mpnh *src, linpool *lp)
 
 /**
  * mpnh_merge - merge nexthop lists
- * @x: list 1
- * @y: list 2
- * @rx: reusability of list @x
- * @ry: reusability of list @y
+ * @x: union list 1
+ * @y: union list 2
+ * @rx: reusability of union list @x
+ * @ry: reusability of union list @y
  * @max: max number of nexthops
- * @lp: linpool for allocating nexthops
+ * @lp: struct linpool for allocating nexthops
  *
  * The mpnh_merge() function takes two nexthop lists @x and @y and merges them,
  * eliminating possible duplicates. The input lists must be sorted and the
  * result is sorted too. The number of nexthops in result is limited by @max.
- * New nodes are allocated from linpool @lp.
+ * New nodes are allocated from struct linpool @lp.
  *
  * The arguments @rx and @ry specify whether corresponding input lists may be
  * consumed by the function (i.e. their nodes reused in the resulting list), in
  * that case the caller should not access these lists after that. To eliminate
  * issues with deallocation of these lists, the caller should use some form of
  * bulk deallocation (e.g. stack or linpool) to free these nodes when the
- * resulting list is no longer needed. When reusability is not set, the
+ * resulting union list is no longer needed. When reusability is not set, the
  * corresponding lists are not modified nor linked from the resulting list.
  */
 struct mpnh *
-mpnh_merge(struct mpnh *x, struct mpnh *y, int rx, int ry, int max, linpool *lp)
+mpnh_merge(struct mpnh *x, struct mpnh *y, int rx, int ry, int max, struct linpool *lp)
 {
   struct mpnh *root = NULL;
   struct mpnh **n = &root;
@@ -342,10 +342,10 @@ mpnh_free(struct mpnh *o)
  *	Extended Attributes
  */
 
-static inline eattr *
-ea__find(ea_list *e, unsigned id)
+static inline struct eattr *
+ea__find(struct ea_list *e, unsigned id)
 {
-  eattr *a;
+  struct eattr *a;
   int l, r, m;
 
   while (e)
@@ -377,17 +377,17 @@ ea__find(ea_list *e, unsigned id)
 
 /**
  * ea_find - find an extended attribute
- * @e: attribute list to search in
+ * @e: attribute union list to search in
  * @id: attribute ID to search for
  *
  * Given an extended attribute list, ea_find() searches for a first
  * occurrence of an attribute with specified ID, returning either a pointer
  * to its &eattr structure or %NULL if no such attribute exists.
  */
-eattr *
-ea_find(ea_list *e, unsigned id)
+struct eattr *
+ea_find(struct ea_list *e, unsigned id)
 {
-  eattr *a = ea__find(e, id & EA_CODE_MASK);
+  struct eattr *a = ea__find(e, id & EA_CODE_MASK);
 
   if (a && (a->type & EAF_TYPE_MASK) == EAF_TYPE_UNDEF &&
       !(id & EA_ALLOW_UNDEF))
@@ -401,7 +401,7 @@ ea_find(ea_list *e, unsigned id)
  * @id: start of attribute ID interval
  * @max: length of attribute ID interval
  *
- * Given an extended attribute list, ea_walk() walks through the list looking
+ * Given an extended attribute list, ea_walk() walks through the union list looking
  * for first occurrences of attributes with ID in specified interval from @id to
  * (@id + @max - 1), returning pointers to found &eattr structures, storing its
  * walk state in @s for subsequent calls.
@@ -409,15 +409,15 @@ ea_find(ea_list *e, unsigned id)
  * The function ea_walk() is supposed to be called in a loop, with initially
  * zeroed walk state structure @s with filled the initial extended attribute
  * list, returning one found attribute in each call or %NULL when no other
- * attribute exists. The extended attribute list or the arguments should not be
+ * attribute exists. The extended attribute union list or the arguments should not be
  * modified between calls. The maximum value of @max is 128.
  */
-eattr *
+struct eattr *
 ea_walk(struct ea_walk_state *s, uint id, uint max)
 {
-  ea_list *e = s->eattrs;
-  eattr *a = s->ea;
-  eattr *a_max;
+  struct ea_list *e = s->eattrs;
+  struct eattr *a = s->ea;
+  struct eattr *a_max;
 
   max = id + max;
 
@@ -482,20 +482,20 @@ ea_walk(struct ea_walk_state *s, uint id, uint max)
  * a provided default if no such attribute is present.
  */
 int
-ea_get_int(ea_list *e, unsigned id, int def)
+ea_get_int(struct ea_list *e, unsigned id, int def)
 {
-  eattr *a = ea_find(e, id);
+  struct eattr *a = ea_find(e, id);
   if (!a)
     return def;
   return a->u.data;
 }
 
 static inline void
-ea_do_sort(ea_list *e)
+ea_do_sort(struct ea_list *e)
 {
   unsigned n = e->count;
-  eattr *a = e->attrs;
-  eattr *b = alloca(n * sizeof(eattr));
+  struct eattr *a = e->attrs;
+  struct eattr *b = alloca(n * sizeof(struct eattr));
   unsigned s, ss;
 
   /* We need to use a stable sorting algorithm, hence mergesort */
@@ -504,7 +504,7 @@ ea_do_sort(ea_list *e)
       s = ss = 0;
       while (s < n)
 	{
-	  eattr *p, *q, *lo, *hi;
+	  struct eattr *p, *q, *lo, *hi;
 	  p = b;
 	  ss = s;
 	  *p++ = a[s++];
@@ -535,9 +535,9 @@ ea_do_sort(ea_list *e)
 }
 
 static inline void
-ea_do_prune(ea_list *e)
+ea_do_prune(struct ea_list *e)
 {
-  eattr *s, *d, *l, *s0;
+  struct eattr *s, *d, *l, *s0;
   int i = 0;
 
   /* Discard duplicates and undefs. Do you remember sorting was stable? */
@@ -562,7 +562,7 @@ ea_do_prune(ea_list *e)
 
 /**
  * ea_sort - sort an attribute list
- * @e: list to be sorted
+ * @e: union list to be sorted
  *
  * This function takes a &ea_list chain and sorts the attributes
  * within each of its entries.
@@ -571,7 +571,7 @@ ea_do_prune(ea_list *e)
  * ea_sort() leaves only the first (the only significant) occurrence.
  */
 void
-ea_sort(ea_list *e)
+ea_sort(struct ea_list *e)
 {
   while (e)
     {
@@ -588,14 +588,14 @@ ea_sort(ea_list *e)
 }
 
 /**
- * ea_scan - estimate attribute list size
+ * ea_scan - estimate attribute union list size
  * @e: attribute list
  *
  * This function calculates an upper bound of the size of
  * a given &ea_list after merging with ea_merge().
  */
 unsigned
-ea_scan(ea_list *e)
+ea_scan(struct ea_list *e)
 {
   unsigned cnt = 0;
 
@@ -604,34 +604,34 @@ ea_scan(ea_list *e)
       cnt += e->count;
       e = e->next;
     }
-  return sizeof(ea_list) + sizeof(eattr)*cnt;
+  return sizeof(struct ea_list) + sizeof(struct eattr)*cnt;
 }
 
 /**
  * ea_merge - merge segments of an attribute list
  * @e: attribute list
- * @t: buffer to store the result to
+ * @t: struct buffer to store the result to
  *
  * This function takes a possibly multi-segment attribute list
  * and merges all of its segments to one.
  *
  * The primary use of this function is for &ea_list normalization:
  * first call ea_scan() to determine how much memory will the result
- * take, then allocate a buffer (usually using alloca()), merge the
+ * take, then allocate a struct buffer (usually using alloca()), merge the
  * segments with ea_merge() and finally sort and prune the result
  * by calling ea_sort().
  */
 void
-ea_merge(ea_list *e, ea_list *t)
+ea_merge(struct ea_list *e, struct ea_list *t)
 {
-  eattr *d = t->attrs;
+  struct eattr *d = t->attrs;
 
   t->flags = 0;
   t->count = 0;
   t->next = NULL;
   while (e)
     {
-      memcpy(d, e->attrs, sizeof(eattr)*e->count);
+      memcpy(d, e->attrs, sizeof(struct eattr)*e->count);
       t->count += e->count;
       d += e->count;
       e = e->next;
@@ -647,7 +647,7 @@ ea_merge(ea_list *e, ea_list *t)
  * 1 if they contain the same attributes, 0 otherwise.
  */
 int
-ea_same(ea_list *x, ea_list *y)
+ea_same(struct ea_list *x, struct ea_list *y)
 {
   int c;
 
@@ -658,8 +658,8 @@ ea_same(ea_list *x, ea_list *y)
     return 0;
   for(c=0; c<x->count; c++)
     {
-      eattr *a = &x->attrs[c];
-      eattr *b = &y->attrs[c];
+      struct eattr *a = &x->attrs[c];
+      struct eattr *b = &y->attrs[c];
 
       if (a->id != b->id ||
 	  a->flags != b->flags ||
@@ -670,22 +670,22 @@ ea_same(ea_list *x, ea_list *y)
   return 1;
 }
 
-static inline ea_list *
-ea_list_copy(ea_list *o)
+static inline struct ea_list *
+ea_list_copy(struct ea_list *o)
 {
-  ea_list *n;
+  struct ea_list *n;
   unsigned i, len;
 
   if (!o)
     return NULL;
   ASSERT(!o->next);
-  len = sizeof(ea_list) + sizeof(eattr) * o->count;
+  len = sizeof(struct ea_list) + sizeof(struct eattr) * o->count;
   n = mb_alloc(rta_pool, len);
   memcpy(n, o, len);
   n->flags |= EALF_CACHED;
   for(i=0; i<o->count; i++)
     {
-      eattr *a = &n->attrs[i];
+      struct eattr *a = &n->attrs[i];
       if (!(a->type & EAF_EMBEDDED))
 	{
 	  unsigned size = sizeof(struct adata) + a->u.ptr->length;
@@ -698,7 +698,7 @@ ea_list_copy(ea_list *o)
 }
 
 static inline void
-ea_free(ea_list *o)
+ea_free(struct ea_list *o)
 {
   int i;
 
@@ -707,7 +707,7 @@ ea_free(ea_list *o)
       ASSERT(!o->next);
       for(i=0; i<o->count; i++)
 	{
-	  eattr *a = &o->attrs[i];
+	  struct eattr *a = &o->attrs[i];
 	  if (!(a->type & EAF_EMBEDDED))
 	    mb_free(a->u.ptr);
 	}
@@ -716,7 +716,7 @@ ea_free(ea_list *o)
 }
 
 static int
-get_generic_attr(eattr *a, byte **buf, int buflen UNUSED)
+get_generic_attr(struct eattr *a, byte **buf, int buflen UNUSED)
 {
   if (a->id == EA_GEN_IGP_METRIC)
     {
@@ -812,7 +812,7 @@ ea_show_ec_set(struct cli *c, struct adata *ad, byte *pos, byte *buf, byte *end)
  * get_attr() hook, it's consulted first.
  */
 void
-ea_show(struct cli *c, eattr *e)
+ea_show(struct cli *c, struct eattr *e)
 {
   struct protocol *p;
   int status = GA_UNKNOWN;
@@ -880,7 +880,7 @@ ea_show(struct cli *c, eattr *e)
  * the debug output.
  */
 void
-ea_dump(ea_list *e)
+ea_dump(struct ea_list *e)
 {
   int i;
 
@@ -897,7 +897,7 @@ ea_dump(ea_list *e)
 	    (e->flags & EALF_CACHED) ? 'C' : 'c');
       for(i=0; i<e->count; i++)
 	{
-	  eattr *a = &e->attrs[i];
+	  struct eattr *a = &e->attrs[i];
 	  debug(" %02x:%02x.%02x", EA_PROTO(a->id), EA_ID(a->id), a->flags);
 	  if (a->type & EAF_TEMP)
 	    debug("T");
@@ -923,11 +923,11 @@ ea_dump(ea_list *e)
  * ea_hash - calculate an &ea_list hash key
  * @e: attribute list
  *
- * ea_hash() takes an extended attribute list and calculated a hopefully
+ * ea_hash() takes an extended attribute union list and calculated a hopefully
  * uniformly distributed hash value from its contents.
  */
 inline uint
-ea_hash(ea_list *e)
+ea_hash(struct ea_list *e)
 {
   u32 h = 0;
   int i;
@@ -964,16 +964,16 @@ ea_hash(ea_list *e)
 
 /**
  * ea_append - concatenate &ea_list's
- * @to: destination list (can be %NULL)
- * @what: list to be appended (can be %NULL)
+ * @to: destination union list (can be %NULL)
+ * @what: union list to be appended (can be %NULL)
  *
  * This function appends the &ea_list @what at the end of
  * &ea_list @to and returns a pointer to the resulting list.
  */
-ea_list *
-ea_append(ea_list *to, ea_list *what)
+struct ea_list *
+ea_append(struct ea_list *to, struct ea_list *what)
 {
-  ea_list *res;
+  struct ea_list *res;
 
   if (!to)
     return what;
@@ -992,12 +992,12 @@ static uint rta_cache_count;
 static uint rta_cache_size = 32;
 static uint rta_cache_limit;
 static uint rta_cache_mask;
-static rta **rta_hash_table;
+static struct rta **rta_hash_table;
 
 static void
 rta_alloc_hash(void)
 {
-  rta_hash_table = mb_allocz(rta_pool, sizeof(rta *) * rta_cache_size);
+  rta_hash_table = mb_allocz(rta_pool, sizeof(struct rta *) * rta_cache_size);
   if (rta_cache_size < 32768)
     rta_cache_limit = rta_cache_size * 2;
   else
@@ -1006,14 +1006,14 @@ rta_alloc_hash(void)
 }
 
 static inline uint
-rta_hash(rta *a)
+rta_hash(struct rta *a)
 {
   return (((uint) (uintptr_t) a->src) ^ ipa_hash(a->gw) ^
 	  mpnh_hash(a->nexthops) ^ ea_hash(a->eattrs)) & 0xffff;
 }
 
 static inline int
-rta_same(rta *x, rta *y)
+rta_same(struct rta *x, struct rta *y)
 {
   return (x->src == y->src &&
 	  x->source == y->source &&
@@ -1030,12 +1030,12 @@ rta_same(rta *x, rta *y)
 	  ea_same(x->eattrs, y->eattrs));
 }
 
-static rta *
-rta_copy(rta *o)
+static struct rta *
+rta_copy(struct rta *o)
 {
-  rta *r = sl_alloc(rta_slab);
+  struct rta *r = sl_alloc(rta_slab);
 
-  memcpy(r, o, sizeof(rta));
+  memcpy(r, o, sizeof(struct rta));
   r->uc = 1;
   r->nexthops = mpnh_copy(o->nexthops);
   r->eattrs = ea_list_copy(o->eattrs);
@@ -1043,7 +1043,7 @@ rta_copy(rta *o)
 }
 
 static inline void
-rta_insert(rta *r)
+rta_insert(struct rta *r)
 {
   uint h = r->hash_key & rta_cache_mask;
   r->next = rta_hash_table[h];
@@ -1058,11 +1058,11 @@ rta_rehash(void)
 {
   uint ohs = rta_cache_size;
   uint h;
-  rta *r, *n;
-  rta **oht = rta_hash_table;
+  struct rta *r, *n;
+  struct rta **oht = rta_hash_table;
 
   rta_cache_size = 2*rta_cache_size;
-  DBG("Rehashing rta cache from %d to %d entries.\n", ohs, rta_cache_size);
+  DBG("Rehashing struct rta cache from %d to %d entries.\n", ohs, rta_cache_size);
   rta_alloc_hash();
   for(h=0; h<ohs; h++)
     for(r=oht[h]; r; r=n)
@@ -1086,10 +1086,10 @@ rta_rehash(void)
  * The extended attribute lists attached to the &rta are automatically
  * converted to the normalized form.
  */
-rta *
-rta_lookup(rta *o)
+struct rta *
+rta_lookup(struct rta *o)
 {
-  rta *r;
+  struct rta *r;
   uint h;
 
   ASSERT(!(o->aflags & RTAF_CACHED));
@@ -1097,7 +1097,7 @@ rta_lookup(rta *o)
     {
       if (o->eattrs->next)	/* Multiple ea_list's, need to merge them */
 	{
-	  ea_list *ml = alloca(ea_scan(o->eattrs));
+	  struct ea_list *ml = alloca(ea_scan(o->eattrs));
 	  ea_merge(o->eattrs, ml);
 	  o->eattrs = ml;
 	}
@@ -1123,7 +1123,7 @@ rta_lookup(rta *o)
 }
 
 void
-rta__free(rta *a)
+rta__free(struct rta *a)
 {
   ASSERT(rta_cache_count && (a->aflags & RTAF_CACHED));
   rta_cache_count--;
@@ -1138,11 +1138,11 @@ rta__free(rta *a)
   sl_free(rta_slab, a);
 }
 
-rta *
-rta_do_cow(rta *o, linpool *lp)
+struct rta *
+rta_do_cow(struct rta *o, struct linpool *lp)
 {
-  rta *r = lp_alloc(lp, sizeof(rta));
-  memcpy(r, o, sizeof(rta));
+  struct rta *r = lp_alloc(lp, sizeof(struct rta));
+  memcpy(r, o, sizeof(struct rta));
   r->aflags = 0;
   r->uc = 0;
   return r;
@@ -1155,7 +1155,7 @@ rta_do_cow(rta *o, linpool *lp)
  * This function takes a &rta and dumps its contents to the debug output.
  */
 void
-rta_dump(rta *a)
+rta_dump(struct rta *a)
 {
   static char *rts[] = { "RTS_DUMMY", "RTS_STATIC", "RTS_INHERIT", "RTS_DEVICE",
 			 "RTS_STAT_DEV", "RTS_REDIR", "RTS_RIP",
@@ -1190,7 +1190,7 @@ rta_dump(rta *a)
 void
 rta_dump_all(void)
 {
-  rta *a;
+  struct rta *a;
   uint h;
 
   debug("Route attribute cache (%d entries, rehash at %d):\n", rta_cache_count, rta_cache_limit);
@@ -1205,7 +1205,7 @@ rta_dump_all(void)
 }
 
 void
-rta_show(struct cli *c, rta *a, ea_list *eal)
+rta_show(struct cli *c, struct rta *a, struct ea_list *eal)
 {
   static char *src_names[] = { "dummy", "static", "inherit", "device", "static-device", "redirect",
 			       "RIP", "OSPF", "OSPF-IA", "OSPF-E1", "OSPF-E2", "BGP", "pipe" };
@@ -1230,7 +1230,7 @@ void
 rta_init(void)
 {
   rta_pool = rp_new(&root_pool, "Attributes");
-  rta_slab = sl_new(rta_pool, sizeof(rta));
+  rta_slab = sl_new(rta_pool, sizeof(struct rta));
   mpnh_slab = sl_new(rta_pool, sizeof(struct mpnh));
   rta_alloc_hash();
   rte_src_init();
@@ -1249,7 +1249,7 @@ rta_init(void)
  * copy. Currently it works by just returning the original &rta with
  * its use count incremented.
  */
-static inline rta *rta_clone(rta *r)
+static inline struct rta *rta_clone(struct rta *r)
 { DUMMY; }
 
 /**
@@ -1261,7 +1261,7 @@ static inline rta *rta_clone(rta *r)
  * attribute is no longer in use and can be freed if you were the last
  * user (which rta_free() tests by inspecting the use count).
  */
-static inline void rta_free(rta *r)
+static inline void rta_free(struct rta *r)
 { DUMMY; }
 
 #endif

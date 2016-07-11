@@ -29,7 +29,7 @@
  * printed item is returned. This value can be used as @from argument
  * in subsequent calls. If truncated output suffices, -1 can be
  * instead used as @from, in that case " ..." is eventually added at
- * the buffer to indicate truncation.
+ * the struct buffer to indicate truncation.
  */
 int
 int_set_format(struct adata *set, int way, int from, byte *buf, uint size)

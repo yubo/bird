@@ -17,7 +17,7 @@
  * @val: value to find
  *
  * Search for given value in the tree. I relies on fact that sorted tree is populated
- * by &f_val structures (that can be compared by val_compare()). In each node of tree, 
+ * by &f_val structures (that can be compared by val_compare()). In each struct node of tree, 
  * either single value (then t->from==t->to) or range is present.
  *
  * Both set matching and |switch() { }| construction is implemented using this function,
@@ -140,7 +140,7 @@ same_tree(struct f_tree *t1, struct f_tree *t2)
 
 
 static void
-tree_node_format(struct f_tree *t, buffer *buf)
+tree_node_format(struct f_tree *t, struct buffer *buf)
 {
   if (t == NULL)
     return;
@@ -159,7 +159,7 @@ tree_node_format(struct f_tree *t, buffer *buf)
 }
 
 void
-tree_format(struct f_tree *t, buffer *buf)
+tree_format(struct f_tree *t, struct buffer *buf)
 {
   buffer_puts(buf, "[");
  

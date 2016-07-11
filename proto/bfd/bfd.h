@@ -39,8 +39,8 @@ struct bfd_iface_config;
 struct bfd_config
 {
   struct proto_config c;
-  list patt_list;		/* List of iface configs (struct bfd_iface_config) */
-  list neigh_list;		/* List of configured neighbors (struct bfd_neighbor) */
+  union list patt_list;		/* List of iface configs (struct bfd_iface_config) */
+  union list neigh_list;		/* List of configured neighbors (struct bfd_neighbor) */
   struct bfd_iface_config *multihop; /* Multihop pseudoiface config */
 };
 
@@ -56,7 +56,7 @@ struct bfd_iface_config
 
 struct bfd_neighbor
 {
-  node n;
+  struct node n;
   ip_addr addr;
   ip_addr local;
   struct iface *iface;
@@ -72,39 +72,39 @@ struct bfd_proto
 {
   struct proto p;
   struct birdloop *loop;
-  pool *tpool;
+  struct pool *tpool;
   pthread_spinlock_t lock;
-  node bfd_node;
+  struct node bfd_node;
 
-  slab *session_slab;
+  struct slab *session_slab;
   HASH(struct bfd_session) session_hash_id;
   HASH(struct bfd_session) session_hash_ip;
 
-  sock *notify_rs;
-  sock *notify_ws;
-  list notify_list;
+  struct birdsock *notify_rs;
+  struct birdsock *notify_ws;
+  union list notify_list;
 
-  sock *rx_1;
-  sock *rx_m;
-  list iface_list;
+  struct birdsock *rx_1;
+  struct birdsock *rx_m;
+  union list iface_list;
 };
 
 struct bfd_iface
 {
-  node n;
+  struct node n;
   ip_addr local;
   struct iface *iface;
   struct bfd_iface_config *cf;
   struct bfd_proto *bfd;
 
-  sock *sk;
+  struct birdsock *sk;
   u32 uc;
   u8 changed;
 };
 
 struct bfd_session
 {
-  node n;
+  struct node n;
   ip_addr addr;				/* Address of session */
   struct bfd_iface *ifa;		/* Iface associated with session */
   struct bfd_session *next_id;		/* Next in bfd.session_hash_id */
@@ -135,10 +135,10 @@ struct bfd_session
   btime last_tx;			/* Time of last sent periodic control packet */
   btime last_rx;			/* Time of last received valid control packet */
 
-  timer2 *tx_timer;			/* Periodic control packet timer */
-  timer2 *hold_timer;			/* Timer for session down detection time */
+  struct timer2 *tx_timer;			/* Periodic control packet struct timer */
+  struct timer2 *hold_timer;			/* Timer for session down detection time */
 
-  list request_list;			/* List of client requests (struct bfd_request) */
+  union list request_list;			/* List of client requests (struct bfd_request) */
   bird_clock_t last_state_change;	/* Time of last state change */
   u8 notify_running;			/* 1 if notify hooks are running */
 };
@@ -184,8 +184,8 @@ void bfd_show_sessions(struct proto *P);
 
 /* packets.c */
 void bfd_send_ctl(struct bfd_proto *p, struct bfd_session *s, int final);
-sock * bfd_open_rx_sk(struct bfd_proto *p, int multihop);
-sock * bfd_open_tx_sk(struct bfd_proto *p, ip_addr local, struct iface *ifa);
+struct birdsock * bfd_open_rx_sk(struct bfd_proto *p, int multihop);
+struct birdsock * bfd_open_tx_sk(struct bfd_proto *p, ip_addr local, struct iface *ifa);
 
 
 #endif /* _BIRD_BFD_H_ */
