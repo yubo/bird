@@ -12,7 +12,7 @@ add_definitions(-I${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions(-pthread -Wall -Wstrict-prototypes -Wno-parentheses -Wno-pointer-sign -fno-strict-aliasing -fno-strict-overflow)
 
 if(DEBUG)
-	add_definitions(-DDEBUG -g -O0)
+	add_definitions(-D_DEBUG -g -O0)
 	set(CMAKE_EXE_LINKER_FLAGS "-rdynamic")
 	set(CMAKE_BUILD_TYPE "Debug")
 else(DEBUG)

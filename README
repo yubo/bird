@@ -4,6 +4,7 @@
                 (c) 1998--2000  Pavel Machek <pavel@ucw.cz>
                 (c) 1998--2008  Ondrej Filip <feela@network.cz>
                 (c) 2009--2013  CZ.NIC z.s.p.o.
+		(c) 2016--2016  Yu Bo <yubo@xiaomi.com>
 
 ================================================================================
 
@@ -41,12 +42,12 @@ by CZ.NIC z.s.p.o. http://www.nic.cz/ since 2009.
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 
-How to install BIRD:
+How to gdb BIRD:
 
-	./configure
+	cmake -DDEBUG=1 .
 	make
-	make install
-	vi /usr/local/etc/bird.conf
+	gdb
+
 
 Online documentation is available as HTML files in the doc directory,
 you can install it by `make install-docs' and rebuild it by `make docs',

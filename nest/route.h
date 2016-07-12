@@ -53,8 +53,8 @@ struct fib_iterator {		/* See lib/slists.h for an explanation */
 typedef void (*fib_init_func) (struct fib_node *);
 
 struct fib {
-	struct pool *fib_pool;		/* Pool holding all our data */
-	struct slab *fib_slab;		/* Slab holding all fib nodes */
+	struct pool *fib_pool;	/* Pool holding all our data */
+	struct slab *fib_slab;	/* Slab holding all fib nodes */
 	struct fib_node **hash_table;	/* Node hash table */
 	uint hash_size;		/* Number of hash table entries (a power of two) */
 	uint hash_order;	/* Binary logarithm of hash_size */
@@ -64,8 +64,8 @@ struct fib {
 	fib_init_func init;	/* Constructor */
 };
 
-void fib_init(struct fib *, struct pool *, unsigned node_size, unsigned hash_order,
-	      fib_init_func init);
+void fib_init(struct fib *, struct pool *, unsigned node_size,
+	      unsigned hash_order, fib_init_func init);
 void *fib_find(struct fib *, ip_addr *, int);	/* Find or return NULL if doesn't exist */
 void *fib_get(struct fib *, ip_addr *, int);	/* Find or create new if nonexistent */
 void *fib_route(struct fib *, ip_addr, int);	/* Longest-match routing lookup */
@@ -132,10 +132,10 @@ struct rtable_config {
 };
 
 struct rtable {
-	struct node n;			/* Node in union list of all tables */
+	struct node n;		/* Node in union list of all tables */
 	struct fib fib;
 	char *name;		/* Name of this table */
-	union list hooks;		/* List of announcement hooks */
+	union list hooks;	/* List of announcement hooks */
 	int pipe_busy;		/* Pipe loop detection */
 	int use_count;		/* Number of protocols using this table */
 	struct hostcache *hostcache;
@@ -165,12 +165,12 @@ typedef struct network {
 } net;
 
 struct hostcache {
-	struct slab *slab;		/* Slab holding all hostentries */
+	struct slab *slab;	/* Slab holding all hostentries */
 	struct hostentry **hash_table;	/* Hash table for hostentries */
 	unsigned hash_order, hash_shift;
 	unsigned hash_max, hash_min;
 	unsigned hash_items;
-	struct linpool *lp;		/* Linpool for trie */
+	struct linpool *lp;	/* Linpool for trie */
 	struct f_trie *trie;	/* Trie of prefixes that might affect hostentries */
 	union list hostentries;	/* List of all hostentries */
 	byte update_hostcache;
@@ -242,13 +242,13 @@ struct rte {
 #define REF_DISCARD	8	/* Route is scheduled for discard */
 
 /* Route is valid for propagation (may depend on other flags in the future), accepts NULL */
-static inline int rte_is_valid(struct rte * r)
+static inline int rte_is_valid(struct rte *r)
 {
 	return r && !(r->flags & REF_FILTERED);
 }
 
 /* Route just has REF_FILTERED flag */
-static inline int rte_is_filtered(struct rte * r)
+static inline int rte_is_filtered(struct rte *r)
 {
 	return ! !(r->flags & REF_FILTERED);
 }
@@ -273,41 +273,42 @@ void rt_commit(struct config *new, struct config *old);
 void rt_lock_table(struct rtable *);
 void rt_unlock_table(struct rtable *);
 void rt_setup(struct pool *, struct rtable *, char *, struct rtable_config *);
-static inline net *net_find(struct rtable * tab, ip_addr addr, unsigned len)
+static inline net *net_find(struct rtable *tab, ip_addr addr, unsigned len)
 {
 	return (net *) fib_find(&tab->fib, &addr, len);
 }
 
-static inline net *net_get(struct rtable * tab, ip_addr addr, unsigned len)
+static inline net *net_get(struct rtable *tab, ip_addr addr, unsigned len)
 {
 	return (net *) fib_get(&tab->fib, &addr, len);
 }
 
-struct rte *rte_find(net * net, struct rte_src * src);
+struct rte *rte_find(net * net, struct rte_src *src);
 struct rte *rte_get_temp(struct rta *);
-void rte_update2(struct announce_hook *ah, net * net, struct rte * new,
+void rte_update2(struct announce_hook *ah, net * net, struct rte *new,
 		 struct rte_src *src);
-static inline void rte_update(struct proto *p, net * net, struct rte * new)
+static inline void rte_update(struct proto *p, net * net, struct rte *new)
 {
 	rte_update2(p->main_ahook, net, new, p->main_source);
 }
 
-void rte_discard(struct rtable * tab, struct rte * old);
-int rt_examine(struct rtable * t, ip_addr prefix, int pxlen, struct proto *p,
+void rte_discard(struct rtable *tab, struct rte *old);
+int rt_examine(struct rtable *t, ip_addr prefix, int pxlen, struct proto *p,
 	       struct filter *filter);
-struct rte *rt_export_merged(struct announce_hook *ah, net * net, struct rte ** rt_free,
-		      struct ea_list **tmpa, int silent);
-void rt_refresh_begin(struct rtable * t, struct announce_hook *ah);
-void rt_refresh_end(struct rtable * t, struct announce_hook *ah);
+struct rte *rt_export_merged(struct announce_hook *ah, net * net,
+			     struct rte **rt_free, struct ea_list **tmpa,
+			     int silent);
+void rt_refresh_begin(struct rtable *t, struct announce_hook *ah);
+void rt_refresh_end(struct rtable *t, struct announce_hook *ah);
 void rte_dump(struct rte *);
 void rte_free(struct rte *);
 struct rte *rte_do_cow(struct rte *);
-static inline struct rte *rte_cow(struct rte * r)
+static inline struct rte *rte_cow(struct rte *r)
 {
 	return (r->flags & REF_COW) ? rte_do_cow(r) : r;
 }
 
-struct rte *rte_cow_rta(struct rte * r, struct linpool * lp);
+struct rte *rte_cow_rta(struct rte *r, struct linpool *lp);
 void rt_dump(struct rtable *);
 void rt_dump_all(void);
 int rt_feed_baby(struct proto *p);
@@ -315,7 +316,7 @@ void rt_feed_baby_abort(struct proto *p);
 int rt_prune_loop(void);
 struct rtable_config *rt_new_table(struct symbol *s);
 
-static inline void rt_mark_for_prune(struct rtable * tab)
+static inline void rt_mark_for_prune(struct rtable *tab)
 {
 	if (tab->prune_state == RPS_RUNNING)
 		fit_get(&tab->fib, &tab->prune_fit);
@@ -427,7 +428,7 @@ struct rta {
 					   protocol-specific metric is availabe */
 
 /* Route has regular, reachable nexthop (i.e. not RTD_UNREACHABLE and like) */
-static inline int rte_is_reachable(struct rte * r)
+static inline int rte_is_reachable(struct rte *r)
 {
 	uint d = r->attrs->dest;
 	return (d == RTD_ROUTER) || (d == RTD_DEVICE) || (d == RTD_MULTIPATH);
@@ -495,7 +496,7 @@ struct ea_list {
 	byte flags;		/* Flags: EALF_... */
 	byte rfu;
 	word count;		/* Number of attributes */
-	struct eattr attrs[0];		/* Attribute definitions themselves */
+	struct eattr attrs[0];	/* Attribute definitions themselves */
 };
 
 #define EALF_SORTED 1		/* Attributes are sorted by code */
@@ -518,7 +519,7 @@ void rt_prune_sources(void);
 
 struct ea_walk_state {
 	struct ea_list *eattrs;	/* Ccurrent ea_list, initially set by caller */
-	struct eattr *ea;		/* Current eattr, initially NULL */
+	struct eattr *ea;	/* Current eattr, initially NULL */
 	u32 visited[4];		/* Bitfield, limiting max to 128 */
 };
 
@@ -528,10 +529,10 @@ int ea_get_int(struct ea_list *, unsigned ea, int def);
 void ea_dump(struct ea_list *);
 void ea_sort(struct ea_list *);	/* Sort entries in all sub-lists */
 unsigned ea_scan(struct ea_list *);	/* How many bytes do we need for merged struct ea_list */
-void ea_merge(struct ea_list * from, struct ea_list * to);	/* Merge sub-lists to allocated struct buffer */
-int ea_same(struct ea_list * x, struct ea_list * y);	/* Test whether two ea_lists are identical */
-uint ea_hash(struct ea_list * e);	/* Calculate 16-bit hash value */
-struct ea_list *ea_append(struct ea_list * to, struct ea_list * what);
+void ea_merge(struct ea_list *from, struct ea_list *to);	/* Merge sub-lists to allocated struct buffer */
+int ea_same(struct ea_list *x, struct ea_list *y);	/* Test whether two ea_lists are identical */
+uint ea_hash(struct ea_list *e);	/* Calculate 16-bit hash value */
+struct ea_list *ea_append(struct ea_list *to, struct ea_list *what);
 void ea_format_bitfield(struct eattr *a, byte * buf, int bufsize,
 			const char **names, int min, int max);
 
@@ -542,30 +543,30 @@ static inline int mpnh_same(struct mpnh *x, struct mpnh *y)
 }
 
 struct mpnh *mpnh_merge(struct mpnh *x, struct mpnh *y, int rx, int ry, int max,
-			struct linpool * lp);
+			struct linpool *lp);
 
 void rta_init(void);
-struct rta *rta_lookup(struct rta *);		/* Get struct rta equivalent to this one, uc++ */
-static inline int rta_is_cached(struct rta * r)
+struct rta *rta_lookup(struct rta *);	/* Get struct rta equivalent to this one, uc++ */
+static inline int rta_is_cached(struct rta *r)
 {
 	return r->aflags & RTAF_CACHED;
 }
 
-static inline struct rta *rta_clone(struct rta * r)
+static inline struct rta *rta_clone(struct rta *r)
 {
 	r->uc++;
 	return r;
 }
 
-void rta__free(struct rta * r);
-static inline void rta_free(struct rta * r)
+void rta__free(struct rta *r);
+static inline void rta_free(struct rta *r)
 {
 	if (r && !--r->uc)
 		rta__free(r);
 }
 
-struct rta *rta_do_cow(struct rta * o, struct linpool * lp);
-static inline struct rta *rta_cow(struct rta * r, struct linpool * lp)
+struct rta *rta_do_cow(struct rta *o, struct linpool *lp);
+static inline struct rta *rta_cow(struct rta *r, struct linpool *lp)
 {
 	return rta_is_cached(r) ? rta_do_cow(r, lp) : r;
 }
@@ -573,8 +574,8 @@ static inline struct rta *rta_cow(struct rta * r, struct linpool * lp)
 void rta_dump(struct rta *);
 void rta_dump_all(void);
 void rta_show(struct cli *, struct rta *, struct ea_list *);
-void rta_set_recursive_next_hop(struct rtable * dep, struct rta * a, struct rtable * tab,
-				ip_addr * gw, ip_addr * ll);
+void rta_set_recursive_next_hop(struct rtable *dep, struct rta *a,
+				struct rtable *tab, ip_addr * gw, ip_addr * ll);
 
 /*
  * rta_set_recursive_next_hop() acquires hostentry from hostcache and fills
@@ -643,7 +644,7 @@ struct roa_node {
 };
 
 struct roa_table {
-	struct node n;			/* Node in roa_table_list */
+	struct node n;		/* Node in roa_table_list */
 	struct fib fib;
 	char *name;		/* Name of this ROA table */
 	struct roa_table_config *cf;	/* Configuration of this ROA table */
@@ -657,7 +658,7 @@ struct roa_item_config {
 };
 
 struct roa_table_config {
-	struct node n;			/* Node in config->rpa_tables */
+	struct node n;		/* Node in config->rpa_tables */
 	char *name;		/* Name of this ROA table */
 	struct roa_table *table;
 

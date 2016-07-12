@@ -222,7 +222,7 @@ static inline void tm_insert_near(struct timer *t)
 	struct node *n = HEAD(near_timers);
 
 	while (n->next && (SKIP_BACK(struct timer, n, n)->expires < t->expires))
-		n = n->next;
+		 n = n->next;
 	insert_node(&t->n, n->prev);
 }
 
@@ -574,7 +574,7 @@ fail:
 #define INIT_MREQ6(maddr,ifa) \
   { .ipv6mr_multiaddr = ipa_to_in6(maddr), .ipv6mr_interface = ifa->index }
 
-static inline int sk_setup_multicast6(struct birdsock * s)
+static inline int sk_setup_multicast6(struct birdsock *s)
 {
 	int index = s->iface->index;
 	int ttl = s->ttl;
@@ -594,7 +594,7 @@ static inline int sk_setup_multicast6(struct birdsock * s)
 	return 0;
 }
 
-static inline int sk_join_group6(struct birdsock * s, ip_addr maddr)
+static inline int sk_join_group6(struct birdsock *s, ip_addr maddr)
 {
 	struct ipv6_mreq mr = INIT_MREQ6(maddr, s->iface);
 
@@ -604,7 +604,7 @@ static inline int sk_join_group6(struct birdsock * s, ip_addr maddr)
 	return 0;
 }
 
-static inline int sk_leave_group6(struct birdsock * s, ip_addr maddr)
+static inline int sk_leave_group6(struct birdsock *s, ip_addr maddr)
 {
 	struct ipv6_mreq mr = INIT_MREQ6(maddr, s->iface);
 
@@ -639,7 +639,7 @@ static inline int sk_leave_group6(struct birdsock * s, ip_addr maddr)
 #define CMSG6_SPACE_PKTINFO CMSG_SPACE(sizeof(struct in6_pktinfo))
 #define CMSG6_SPACE_TTL CMSG_SPACE(sizeof(int))
 
-static inline int sk_request_cmsg6_pktinfo(struct birdsock * s)
+static inline int sk_request_cmsg6_pktinfo(struct birdsock *s)
 {
 	int y = 1;
 
@@ -649,7 +649,7 @@ static inline int sk_request_cmsg6_pktinfo(struct birdsock * s)
 	return 0;
 }
 
-static inline int sk_request_cmsg6_ttl(struct birdsock * s)
+static inline int sk_request_cmsg6_ttl(struct birdsock *s)
 {
 	int y = 1;
 
@@ -659,7 +659,8 @@ static inline int sk_request_cmsg6_ttl(struct birdsock * s)
 	return 0;
 }
 
-static inline void sk_process_cmsg6_pktinfo(struct birdsock * s, struct cmsghdr *cm)
+static inline void sk_process_cmsg6_pktinfo(struct birdsock *s,
+					    struct cmsghdr *cm)
 {
 	if (cm->cmsg_type == IPV6_PKTINFO) {
 		struct in6_pktinfo *pi = (struct in6_pktinfo *)CMSG_DATA(cm);
@@ -668,14 +669,15 @@ static inline void sk_process_cmsg6_pktinfo(struct birdsock * s, struct cmsghdr 
 	}
 }
 
-static inline void sk_process_cmsg6_ttl(struct birdsock * s, struct cmsghdr *cm)
+static inline void sk_process_cmsg6_ttl(struct birdsock *s, struct cmsghdr *cm)
 {
 	if (cm->cmsg_type == IPV6_HOPLIMIT)
 		s->rcv_ttl = *(int *)CMSG_DATA(cm);
 }
 
 static inline void
-sk_prepare_cmsgs6(struct birdsock * s, struct msghdr *msg, void *cbuf, size_t cbuflen)
+sk_prepare_cmsgs6(struct birdsock *s, struct msghdr *msg, void *cbuf,
+		  size_t cbuflen)
 {
 	struct cmsghdr *cm;
 	struct in6_pktinfo *pi;
@@ -701,7 +703,7 @@ sk_prepare_cmsgs6(struct birdsock * s, struct msghdr *msg, void *cbuf, size_t cb
  *	Miscellaneous socket syscalls
  */
 
-static inline int sk_set_ttl4(struct birdsock * s, int ttl)
+static inline int sk_set_ttl4(struct birdsock *s, int ttl)
 {
 	if (setsockopt(s->fd, SOL_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
 		ERR("IP_TTL");
@@ -709,7 +711,7 @@ static inline int sk_set_ttl4(struct birdsock * s, int ttl)
 	return 0;
 }
 
-static inline int sk_set_ttl6(struct birdsock * s, int ttl)
+static inline int sk_set_ttl6(struct birdsock *s, int ttl)
 {
 	if (setsockopt(s->fd, SOL_IPV6, IPV6_UNICAST_HOPS, &ttl, sizeof(ttl)) <
 	    0)
@@ -718,7 +720,7 @@ static inline int sk_set_ttl6(struct birdsock * s, int ttl)
 	return 0;
 }
 
-static inline int sk_set_tos4(struct birdsock * s, int tos)
+static inline int sk_set_tos4(struct birdsock *s, int tos)
 {
 	if (setsockopt(s->fd, SOL_IP, IP_TOS, &tos, sizeof(tos)) < 0)
 		ERR("IP_TOS");
@@ -726,7 +728,7 @@ static inline int sk_set_tos4(struct birdsock * s, int tos)
 	return 0;
 }
 
-static inline int sk_set_tos6(struct birdsock * s, int tos)
+static inline int sk_set_tos6(struct birdsock *s, int tos)
 {
 	if (setsockopt(s->fd, SOL_IPV6, IPV6_TCLASS, &tos, sizeof(tos)) < 0)
 		ERR("IPV6_TCLASS");
@@ -734,7 +736,7 @@ static inline int sk_set_tos6(struct birdsock * s, int tos)
 	return 0;
 }
 
-static inline int sk_set_high_port(struct birdsock * s)
+static inline int sk_set_high_port(struct birdsock *s)
 {
 	/* Port range setting is optional, ignore it if not supported */
 
@@ -795,7 +797,7 @@ byte *sk_rx_buffer(struct birdsock * s, int *len)
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_setup_multicast(struct birdsock * s)
+int sk_setup_multicast(struct birdsock *s)
 {
 	ASSERT(s->iface);
 
@@ -816,7 +818,7 @@ int sk_setup_multicast(struct birdsock * s)
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_join_group(struct birdsock * s, ip_addr maddr)
+int sk_join_group(struct birdsock *s, ip_addr maddr)
 {
 	if (sk_is_ipv4(s))
 		return sk_join_group4(s, maddr);
@@ -835,7 +837,7 @@ int sk_join_group(struct birdsock * s, ip_addr maddr)
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_leave_group(struct birdsock * s, ip_addr maddr)
+int sk_leave_group(struct birdsock *s, ip_addr maddr)
 {
 	if (sk_is_ipv4(s))
 		return sk_leave_group4(s, maddr);
@@ -854,7 +856,7 @@ int sk_leave_group(struct birdsock * s, ip_addr maddr)
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_setup_broadcast(struct birdsock * s)
+int sk_setup_broadcast(struct birdsock *s)
 {
 	int y = 1;
 
@@ -875,7 +877,7 @@ int sk_setup_broadcast(struct birdsock * s)
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_set_ttl(struct birdsock * s, int ttl)
+int sk_set_ttl(struct birdsock *s, int ttl)
 {
 	s->ttl = ttl;
 
@@ -896,7 +898,7 @@ int sk_set_ttl(struct birdsock * s, int ttl)
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_set_min_ttl(struct birdsock * s, int ttl)
+int sk_set_min_ttl(struct birdsock *s, int ttl)
 {
 	if (sk_is_ipv4(s))
 		return sk_set_min_ttl4(s, ttl);
@@ -933,8 +935,8 @@ int sk_set_min_ttl(struct birdsock * s, int ttl)
  */
 
 int
-sk_set_md5_auth(struct birdsock * s, ip_addr local, ip_addr remote, struct iface *ifa,
-		char *passwd, int setkey)
+sk_set_md5_auth(struct birdsock *s, ip_addr local, ip_addr remote,
+		struct iface *ifa, char *passwd, int setkey)
 {
 	DUMMY;
 }
@@ -953,7 +955,7 @@ sk_set_md5_auth(struct birdsock * s, ip_addr local, ip_addr remote, struct iface
  * Result: 0 for success, -1 for an error.
  */
 
-int sk_set_ipv6_checksum(struct birdsock * s, int offset)
+int sk_set_ipv6_checksum(struct birdsock *s, int offset)
 {
 	if (setsockopt(s->fd, SOL_IPV6, IPV6_CHECKSUM, &offset, sizeof(offset))
 	    < 0)
@@ -962,7 +964,7 @@ int sk_set_ipv6_checksum(struct birdsock * s, int offset)
 	return 0;
 }
 
-int sk_set_icmp6_filter(struct birdsock * s, int p1, int p2)
+int sk_set_icmp6_filter(struct birdsock *s, int p1, int p2)
 {
 	/* a bit of lame interface, but it is here only for Radv */
 	struct icmp6_filter f;
@@ -977,7 +979,7 @@ int sk_set_icmp6_filter(struct birdsock * s, int p1, int p2)
 	return 0;
 }
 
-void sk_log_error(struct birdsock * s, const char *p)
+void sk_log_error(struct birdsock *s, const char *p)
 {
 	log(L_ERR "%s: Socket error: %s%#m", p, s->err);
 }
@@ -990,7 +992,7 @@ static union list sock_list;
 static struct birdsock *current_sock;
 static struct birdsock *stored_sock;
 
-static inline struct birdsock *sk_next(struct birdsock * s)
+static inline struct birdsock *sk_next(struct birdsock *s)
 {
 	if (!s->n.next->next)
 		return NULL;
@@ -998,7 +1000,7 @@ static inline struct birdsock *sk_next(struct birdsock * s)
 		return SKIP_BACK(struct birdsock, n, s->n.next);
 }
 
-static void sk_alloc_bufs(struct birdsock * s)
+static void sk_alloc_bufs(struct birdsock *s)
 {
 	if (!s->rbuf && s->rbsize)
 		s->rbuf = s->rbuf_alloc = xmalloc(s->rbsize);
@@ -1008,7 +1010,7 @@ static void sk_alloc_bufs(struct birdsock * s)
 	s->tpos = s->ttx = s->tbuf;
 }
 
-static void sk_free_bufs(struct birdsock * s)
+static void sk_free_bufs(struct birdsock *s)
 {
 	if (s->rbuf_alloc) {
 		xfree(s->rbuf_alloc);
@@ -1022,7 +1024,7 @@ static void sk_free_bufs(struct birdsock * s)
 
 static void sk_free(struct resource *r)
 {
-	struct birdsock *s = (struct birdsock *) r;
+	struct birdsock *s = (struct birdsock *)r;
 
 	sk_free_bufs(s);
 	if (s->fd >= 0) {
@@ -1040,7 +1042,7 @@ static void sk_free(struct resource *r)
 	}
 }
 
-void sk_set_rbsize(struct birdsock * s, uint val)
+void sk_set_rbsize(struct birdsock *s, uint val)
 {
 	ASSERT(s->rbuf_alloc == s->rbuf);
 
@@ -1053,7 +1055,7 @@ void sk_set_rbsize(struct birdsock * s, uint val)
 	s->rpos = s->rbuf = s->rbuf_alloc;
 }
 
-void sk_set_tbsize(struct birdsock * s, uint val)
+void sk_set_tbsize(struct birdsock *s, uint val)
 {
 	ASSERT(s->tbuf_alloc == s->tbuf);
 
@@ -1068,13 +1070,13 @@ void sk_set_tbsize(struct birdsock * s, uint val)
 	s->ttx = s->tbuf + (s->ttx - old_tbuf);
 }
 
-void sk_set_tbuf(struct birdsock * s, void *tbuf)
+void sk_set_tbuf(struct birdsock *s, void *tbuf)
 {
 	s->tbuf = tbuf ? : s->tbuf_alloc;
 	s->ttx = s->tpos = s->tbuf;
 }
 
-void sk_reallocate(struct birdsock * s)
+void sk_reallocate(struct birdsock *s)
 {
 	sk_free_bufs(s);
 	sk_alloc_bufs(s);
@@ -1082,10 +1084,11 @@ void sk_reallocate(struct birdsock * s)
 
 static void sk_dump(struct resource *r)
 {
-	struct birdsock *s = (struct birdsock *) r;
+	struct birdsock *s = (struct birdsock *)r;
 	static char *sk_type_names[] =
 	    { "TCP<", "TCP>", "TCP", "UDP", NULL, "IP", NULL, "MAGIC", "UNIX<",
-"UNIX", "DEL!" };
+		"UNIX", "DEL!"
+	};
 
 	debug
 	    ("(%s, ud=%p, sa=%I, sp=%d, da=%I, dp=%d, tos=%d, ttl=%d, if=%s)\n",
@@ -1123,7 +1126,7 @@ struct birdsock *sock_new(struct pool *p)
 	return s;
 }
 
-static int sk_setup(struct birdsock * s)
+static int sk_setup(struct birdsock *s)
 {
 	int y = 1;
 	int fd = s->fd;
@@ -1218,12 +1221,12 @@ static int sk_setup(struct birdsock * s)
 	return 0;
 }
 
-static void sk_insert(struct birdsock * s)
+static void sk_insert(struct birdsock *s)
 {
 	add_tail(&sock_list, &s->n);
 }
 
-static void sk_tcp_connected(struct birdsock * s)
+static void sk_tcp_connected(struct birdsock *s)
 {
 	sockaddr sa;
 	int sa_len = sizeof(sa);
@@ -1237,7 +1240,7 @@ static void sk_tcp_connected(struct birdsock * s)
 	s->tx_hook(s);
 }
 
-static int sk_passive_connected(struct birdsock * s, int type)
+static int sk_passive_connected(struct birdsock *s, int type)
 {
 	sockaddr loc_sa, rem_sa;
 	int loc_sa_len = sizeof(loc_sa);
@@ -1300,7 +1303,7 @@ static int sk_passive_connected(struct birdsock * s, int type)
  *
  * Result: 0 for success, -1 for an error.
  */
-int sk_open(struct birdsock * s)
+int sk_open(struct birdsock *s)
 {
 	int af = BIRD_AF;
 	int fd = -1;
@@ -1340,7 +1343,8 @@ int sk_open(struct birdsock * s)
 		break;
 
 	default:
-		bug("sk_open() called for invalid struct birdsock type %d", s->type);
+		bug("sk_open() called for invalid struct birdsock type %d",
+		    s->type);
 	}
 
 	if (fd < 0)
@@ -1417,7 +1421,7 @@ err:
 	return -1;
 }
 
-int sk_open_unix(struct birdsock * s, char *name)
+int sk_open_unix(struct birdsock *s, char *name)
 {
 	struct sockaddr_un sa;
 	int fd;
@@ -1451,7 +1455,8 @@ int sk_open_unix(struct birdsock * s, char *name)
 #define CMSG_TX_SPACE MAX(CMSG4_SPACE_PKTINFO,CMSG6_SPACE_PKTINFO)
 
 static void
-sk_prepare_cmsgs(struct birdsock * s, struct msghdr *msg, void *cbuf, size_t cbuflen)
+sk_prepare_cmsgs(struct birdsock *s, struct msghdr *msg, void *cbuf,
+		 size_t cbuflen)
 {
 	if (sk_is_ipv4(s))
 		sk_prepare_cmsgs4(s, msg, cbuf, cbuflen);
@@ -1459,7 +1464,7 @@ sk_prepare_cmsgs(struct birdsock * s, struct msghdr *msg, void *cbuf, size_t cbu
 		sk_prepare_cmsgs6(s, msg, cbuf, cbuflen);
 }
 
-static void sk_process_cmsgs(struct birdsock * s, struct msghdr *msg)
+static void sk_process_cmsgs(struct birdsock *s, struct msghdr *msg)
 {
 	struct cmsghdr *cm;
 
@@ -1480,7 +1485,7 @@ static void sk_process_cmsgs(struct birdsock * s, struct msghdr *msg)
 	}
 }
 
-static inline int sk_sendmsg(struct birdsock * s)
+static inline int sk_sendmsg(struct birdsock *s)
 {
 	struct iovec iov = { s->tbuf, s->tpos - s->tbuf };
 	byte cmsg_buf[CMSG_TX_SPACE];
@@ -1512,7 +1517,7 @@ static inline int sk_sendmsg(struct birdsock * s)
 	return sendmsg(s->fd, &msg, 0);
 }
 
-static inline int sk_recvmsg(struct birdsock * s)
+static inline int sk_recvmsg(struct birdsock *s)
 {
 	struct iovec iov = { s->rbuf, s->rbsize };
 	byte cmsg_buf[CMSG_RX_SPACE];
@@ -1548,12 +1553,12 @@ static inline int sk_recvmsg(struct birdsock * s)
 	return rv;
 }
 
-static inline void reset_tx_buffer(struct birdsock * s)
+static inline void reset_tx_buffer(struct birdsock *s)
 {
 	s->ttx = s->tpos = s->tbuf;
 }
 
-static int sk_maybe_write(struct birdsock * s)
+static int sk_maybe_write(struct birdsock *s)
 {
 	int e;
 
@@ -1607,7 +1612,7 @@ static int sk_maybe_write(struct birdsock * s)
 	}
 }
 
-int sk_rx_ready(struct birdsock * s)
+int sk_rx_ready(struct birdsock *s)
 {
 	int rv;
 	struct pollfd pfd = {.fd = s->fd };
@@ -1634,7 +1639,7 @@ redo:
  * and calls the @tx_hook of the socket when the tranmission
  * takes place.
  */
-int sk_send(struct birdsock * s, unsigned len)
+int sk_send(struct birdsock *s, unsigned len)
 {
 	s->ttx = s->tbuf;
 	s->tpos = s->tbuf + len;
@@ -1652,7 +1657,7 @@ int sk_send(struct birdsock * s, unsigned len)
  * which allows destination of the packet to be chosen dynamically.
  * Raw IP sockets should use 0 for @port.
  */
-int sk_send_to(struct birdsock * s, unsigned len, ip_addr addr, unsigned port)
+int sk_send_to(struct birdsock *s, unsigned len, ip_addr addr, unsigned port)
 {
 	s->daddr = addr;
 	if (port)
@@ -1680,7 +1685,7 @@ sk_send_full(struct birdsock *s, unsigned len, struct iface *ifa,
 
  /* sk_read() and sk_write() are called from BFD's struct event loop */
 
-int sk_read(struct birdsock * s, int revents)
+int sk_read(struct birdsock *s, int revents)
 {
 	switch (s->type) {
 	case SK_TCP_PASSIVE:
@@ -1738,7 +1743,7 @@ int sk_read(struct birdsock * s, int revents)
 	}
 }
 
-int sk_write(struct birdsock * s)
+int sk_write(struct birdsock *s)
 {
 	switch (s->type) {
 	case SK_TCP_ACTIVE:
@@ -1765,7 +1770,7 @@ int sk_write(struct birdsock * s)
 	}
 }
 
-void sk_err(struct birdsock * s, int revents)
+void sk_err(struct birdsock *s, int revents)
 {
 	int se = 0, sse = sizeof(se);
 	if (revents & POLLERR)
@@ -2047,7 +2052,8 @@ timers:
 		}
 		if (pout) {
 			/* guaranteed to be non-empty */
-			current_sock = SKIP_BACK(struct birdsock, n, HEAD(sock_list));
+			current_sock =
+			    SKIP_BACK(struct birdsock, n, HEAD(sock_list));
 
 			while (current_sock) {
 				struct birdsock *s = current_sock;
@@ -2068,8 +2074,8 @@ timers:
 						io_log_event(s->rx_hook,
 							     s->data);
 						e = sk_read(s,
-							    pfd[s->index].
-							    revents);
+							    pfd[s->
+								index].revents);
 						if (s != current_sock)
 							goto next;
 					}
@@ -2100,7 +2106,8 @@ next:				;
 			current_sock = stored_sock;
 			if (current_sock == NULL)
 				current_sock =
-				    SKIP_BACK(struct birdsock, n, HEAD(sock_list));
+				    SKIP_BACK(struct birdsock, n,
+					      HEAD(sock_list));
 
 			while (current_sock && count < MAX_RX_STEPS) {
 				struct birdsock *s = current_sock;
