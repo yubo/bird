@@ -4,6 +4,7 @@
  *	(c) 1999--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -367,7 +368,7 @@ ospf_receive_dbdes(struct ospf_packet *pkt, struct ospf_iface *ifa,
 			ospf_neigh_sm(n, INM_NEGDONE);
 			/* Continue to the NEIGHBOR_EXCHANGE case */
 		} else {
-			DBG("%s: Nothing happend to %I (imms=%d)\n", p->name,
+			DBG("%s: Nothing happend to %I (imms=%d)\n", p->p.name,
 			    n->ip, rcv_imms);
 			break;
 		}

@@ -4,6 +4,7 @@
  *	(c) 1999--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2015 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2015 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -164,7 +165,7 @@ u16 lsa_verify_checksum(const void *lsa_n, int lsa_len)
 {
 	struct fletcher16_context ctx;
 
-	/* The whole LSA is at lsa_n in net order, we just skip initial age field */
+	/* The whole LSA is at lsa_n in struct network order, we just skip initial age field */
 
 	fletcher16_init(&ctx);
 	fletcher16_update(&ctx, (u8 *) lsa_n + 2, lsa_len - 2);

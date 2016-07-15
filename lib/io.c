@@ -514,7 +514,7 @@ sockaddr_fill6(struct sockaddr_in6 *sa, ip_addr a, struct iface *ifa, uint port)
 }
 
 void
-sockaddr_fill(sockaddr * sa, int af, ip_addr a, struct iface *ifa, uint port)
+sockaddr_fill(struct sockaddr_bird * sa, int af, ip_addr a, struct iface *ifa, uint port)
 {
 	if (af == AF_INET)
 		sockaddr_fill4((struct sockaddr_in *)sa, a, ifa, port);
@@ -544,7 +544,7 @@ sockaddr_read6(struct sockaddr_in6 *sa, ip_addr * a, struct iface **ifa,
 }
 
 int
-sockaddr_read(sockaddr * sa, int af, ip_addr * a, struct iface **ifa,
+sockaddr_read(struct sockaddr_bird * sa, int af, ip_addr * a, struct iface **ifa,
 	      uint * port)
 {
 	if (sa->sa.sa_family != af)
@@ -1228,7 +1228,7 @@ static void sk_insert(struct birdsock *s)
 
 static void sk_tcp_connected(struct birdsock *s)
 {
-	sockaddr sa;
+	struct sockaddr_bird sa;
 	int sa_len = sizeof(sa);
 
 	if ((getsockname(s->fd, &sa.sa, &sa_len) < 0) ||
@@ -1242,7 +1242,7 @@ static void sk_tcp_connected(struct birdsock *s)
 
 static int sk_passive_connected(struct birdsock *s, int type)
 {
-	sockaddr loc_sa, rem_sa;
+	struct sockaddr_bird loc_sa, rem_sa;
 	int loc_sa_len = sizeof(loc_sa);
 	int rem_sa_len = sizeof(rem_sa);
 
@@ -1310,7 +1310,7 @@ int sk_open(struct birdsock *s)
 	int do_bind = 0;
 	int bind_port = 0;
 	ip_addr bind_addr = IPA_NONE;
-	sockaddr sa;
+	struct sockaddr_bird sa;
 
 	switch (s->type) {
 	case SK_TCP_ACTIVE:
@@ -1489,7 +1489,7 @@ static inline int sk_sendmsg(struct birdsock *s)
 {
 	struct iovec iov = { s->tbuf, s->tpos - s->tbuf };
 	byte cmsg_buf[CMSG_TX_SPACE];
-	sockaddr dst;
+	struct sockaddr_bird dst;
 
 	sockaddr_fill(&dst, s->af, s->daddr, s->iface, s->dport);
 
@@ -1521,7 +1521,7 @@ static inline int sk_recvmsg(struct birdsock *s)
 {
 	struct iovec iov = { s->rbuf, s->rbsize };
 	byte cmsg_buf[CMSG_RX_SPACE];
-	sockaddr src;
+	struct sockaddr_bird src;
 
 	struct msghdr msg = {
 		.msg_name = &src.sa,
@@ -1687,6 +1687,8 @@ sk_send_full(struct birdsock *s, unsigned len, struct iface *ifa,
 
 int sk_read(struct birdsock *s, int revents)
 {
+	int c;
+
 	switch (s->type) {
 	case SK_TCP_PASSIVE:
 		return sk_passive_connected(s, SK_TCP);
@@ -1696,69 +1698,62 @@ int sk_read(struct birdsock *s, int revents)
 
 	case SK_TCP:
 	case SK_UNIX:
-		{
-			int c =
-			    read(s->fd, s->rpos, s->rbuf + s->rbsize - s->rpos);
+		c = read(s->fd, s->rpos, s->rbuf + s->rbsize - s->rpos);
 
-			if (c < 0) {
-				if (errno != EINTR && errno != EAGAIN)
-					s->err_hook(s, errno);
-				else if (errno == EAGAIN && !(revents & POLLIN)) {
-					log(L_ERR
-					    "Got EAGAIN from read when revents=%x (without POLLIN)",
-					    revents);
-					s->err_hook(s, 0);
-				}
-			} else if (!c)
+		if (c < 0) {
+			if (errno != EINTR && errno != EAGAIN)
+				s->err_hook(s, errno);
+			else if (errno == EAGAIN && !(revents & POLLIN)) {
+				log(L_ERR
+				    "Got EAGAIN from read when revents=%x (without POLLIN)",
+				    revents);
 				s->err_hook(s, 0);
-			else {
-				s->rpos += c;
-				if (s->rx_hook(s, s->rpos - s->rbuf)) {
-					/* We need to be careful since the socket could have been deleted by the hook */
-					if (current_sock == s)
-						s->rpos = s->rbuf;
-				}
-				return 1;
 			}
-			return 0;
+		} else if (!c)
+			s->err_hook(s, 0);
+		else {
+			s->rpos += c;
+			if (s->rx_hook(s, s->rpos - s->rbuf)) {
+				/* We need to be careful since the socket could have been deleted by the hook */
+				if (current_sock == s)
+					s->rpos = s->rbuf;
+			}
+			return 1;
 		}
+		return 0;
 
 	case SK_MAGIC:
 		return s->rx_hook(s, 0);
 
 	default:
-		{
-			int e = sk_recvmsg(s);
+		c = sk_recvmsg(s);
 
-			if (e < 0) {
-				if (errno != EINTR && errno != EAGAIN)
-					s->err_hook(s, errno);
-				return 0;
-			}
-
-			s->rpos = s->rbuf + e;
-			s->rx_hook(s, e);
-			return 1;
+		if (c < 0) {
+			if (errno != EINTR && errno != EAGAIN)
+				s->err_hook(s, errno);
+			return 0;
 		}
+
+		s->rpos = s->rbuf + c;
+		s->rx_hook(s, c);
+		return 1;
 	}
 }
 
 int sk_write(struct birdsock *s)
 {
+	struct sockaddr_bird sa;
 	switch (s->type) {
 	case SK_TCP_ACTIVE:
-		{
-			sockaddr sa;
-			sockaddr_fill(&sa, s->af, s->daddr, s->iface, s->dport);
+		sockaddr_fill(&sa, s->af, s->daddr, s->iface, s->dport);
 
-			if (connect(s->fd, &sa.sa, SA_LEN(sa)) >= 0
-			    || errno == EISCONN)
-				sk_tcp_connected(s);
-			else if (errno != EINTR && errno != EAGAIN
-				 && errno != EINPROGRESS)
-				s->err_hook(s, errno);
-			return 0;
-		}
+		if (connect(s->fd, &sa.sa, SA_LEN(sa)) >= 0
+		    || errno == EISCONN)
+			sk_tcp_connected(s);
+		else if (errno != EINTR && errno != EAGAIN
+			 && errno != EINPROGRESS)
+			s->err_hook(s, errno);
+		return 0;
 
 	default:
 		if (s->ttx != s->tpos && sk_maybe_write(s) > 0) {
@@ -1883,12 +1878,12 @@ static inline void io_close_event(void)
 
 void io_log_dump(void)
 {
+	struct event_log_entry *en;
 	int i;
 
 	log(L_DEBUG "Event log:");
 	for (i = 0; i < EVENT_LOG_LENGTH; i++) {
-		struct event_log_entry *en =
-		    event_log + (event_log_pos + i) % EVENT_LOG_LENGTH;
+		en = event_log + (event_log_pos + i) % EVENT_LOG_LENGTH;
 		if (en->hook)
 			log(L_DEBUG "  Event 0x%p 0x%p at %8d for %d ms",
 			    en->hook, en->data,

@@ -9,6 +9,7 @@
 #ifndef _BIRD_BIRDLIB_H_
 #define _BIRD_BIRDLIB_H_
 
+#include <execinfo.h>
 #include "timer.h"
 #include "alloca.h"
 
@@ -125,13 +126,31 @@ struct buffer {
   STACK_BUFFER_INIT(buf, LOG_BUFFER_SIZE)
 
 #define LOG_BUFFER_SIZE 1024
+#define log(msg, args...)                                     \
+do {                                                          \
+	_log_msg("%s:%d:" msg, __FILE__, __LINE__, ## args ); \
+}while(0)
 
-#define log log_msg
+#define log_rl(rl, msg, args...)                                 \
+do {                                                             \
+	_log_rl(rl, "%s:%d:" msg, __FILE__, __LINE__, ## args ); \
+}while(0)
+
+#define die(msg, args...)                                 \
+do {                                                      \
+	_die("%s:%d:" msg, __FILE__, __LINE__, ## args ); \
+}while(0)
+
+#define bug(msg, args...)                                     \
+do {                                                          \
+	_bug("%s:%d:" msg, __FILE__, __LINE__, ## args ); \
+}while(0)
+
 void log_commit(int class, struct buffer *buf);
-void log_msg(const char *msg, ...);
-void log_rl(struct tbf *rl, const char *msg, ...);
-void die(const char *msg, ...) NORET;
-void bug(const char *msg, ...) NORET;
+void _log_msg(const char *msg, ...);
+void _log_rl(struct tbf *rl, const char *msg, ...);
+void _die(const char *msg, ...) NORET;
+void _bug(const char *msg, ...) NORET;
 
 #define L_DEBUG "\001"		/* Debugging messages */
 #define L_TRACE "\002"		/* Protocol tracing */
@@ -148,7 +167,7 @@ void debug(const char *msg, ...);	/* Printf to debug output */
 /* Debugging */
 
 #if defined(LOCAL_DEBUG) || defined(GLOBAL_DEBUG)
-#define DBG(x, y...) debug(x, ##y)
+#define DBG(x, y...) debug("%s:%d:" x, __FILE__, __LINE__, ##y)
 #else
 #define DBG(x, y...) do { } while(0)
 #endif
@@ -162,5 +181,22 @@ void debug(const char *msg, ...);	/* Printf to debug output */
 /* Pseudorandom numbers */
 
 u32 random_u32(void);
+
+#define BACKTRACE_SIZE 256
+inline static void dump_stack(void)
+{
+	void *func[BACKTRACE_SIZE];
+	char **symb = NULL;
+	int size;
+
+	size = backtrace(func, BACKTRACE_SIZE);
+	symb = backtrace_symbols(func, size);
+	while (size > 0) {
+		log("%d: [%s]\n", size, symb[size - 1]);
+		size--;
+	}
+}
+
+
 
 #endif

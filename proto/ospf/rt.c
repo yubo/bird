@@ -4,6 +4,7 @@
  *	(c) 2000--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -1905,7 +1906,7 @@ again1:
 			}
 
 			if (reload || ort_changed(nf, &a0)) {
-				net *ne =
+				struct network *ne =
 				    net_get(p->p.table, nf->fn.prefix,
 					    nf->fn.pxlen);
 				struct rta *a = rta_lookup(&a0);
@@ -1931,7 +1932,7 @@ again1:
 			rta_free(nf->old_rta);
 			nf->old_rta = NULL;
 
-			net *ne =
+			struct network *ne =
 			    net_get(p->p.table, nf->fn.prefix, nf->fn.pxlen);
 			rte_update(&p->p, ne, NULL);
 		}

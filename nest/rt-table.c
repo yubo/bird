@@ -52,7 +52,7 @@ static union list routing_tables;
 
 static void rt_format_via(struct rte *e, byte * via);
 static void rt_free_hostcache(struct rtable *tab);
-static void rt_notify_hostcache(struct rtable *tab, net * net);
+static void rt_notify_hostcache(struct rtable *tab, struct network * net);
 static void rt_update_hostcache(struct rtable *tab);
 static void rt_next_hop_update(struct rtable *tab);
 static inline int rt_prune_table(struct rtable *tab);
@@ -67,11 +67,11 @@ static inline struct ea_list *make_tmp_attrs(struct rte *rt,
 	return mta ? mta(rt, rte_update_pool) : NULL;
 }
 
-/* Like fib_route(), but skips empty net entries */
-static net *net_route(struct rtable *tab, ip_addr a, int len)
+/* Like fib_route(), but skips empty struct network entries */
+static struct network *net_route(struct rtable *tab, ip_addr a, int len)
 {
 	ip_addr a0;
-	net *n;
+	struct network *n;
 
 	while (len >= 0) {
 		a0 = ipa_and(a, ipa_mkmask(len));
@@ -85,7 +85,7 @@ static net *net_route(struct rtable *tab, ip_addr a, int len)
 
 static void rte_init(struct fib_node *N)
 {
-	net *n = (net *) N;
+	struct network *n = (struct network *) N;
 
 	N->flags = 0;
 	n->routes = NULL;
@@ -99,7 +99,7 @@ static void rte_init(struct fib_node *N)
  * The rte_find() function returns a route for destination @net
  * which is from route source @src.
  */
-struct rte *rte_find(net * net, struct rte_src *src)
+struct rte *rte_find(struct network * net, struct rte_src *src)
 {
 	struct rte *e = net->routes;
 
@@ -303,7 +303,7 @@ reject:
 }
 
 static void
-do_rt_notify(struct announce_hook *ah, net * net, struct rte *new,
+do_rt_notify(struct announce_hook *ah, struct network * net, struct rte *new,
 	     struct rte *old, struct ea_list *tmpa, int refeed)
 {
 	struct proto *p = ah->proto;
@@ -386,7 +386,7 @@ do_rt_notify(struct announce_hook *ah, net * net, struct rte *new,
 }
 
 static void
-rt_notify_basic(struct announce_hook *ah, net * net, struct rte *new0,
+rt_notify_basic(struct announce_hook *ah, struct network * net, struct rte *new0,
 		struct rte *old0, int refeed)
 {
 	struct proto *p = ah->proto;
@@ -460,7 +460,7 @@ rt_notify_basic(struct announce_hook *ah, net * net, struct rte *new0,
 }
 
 static void
-rt_notify_accepted(struct announce_hook *ah, net * net, struct rte *new_changed,
+rt_notify_accepted(struct announce_hook *ah, struct network * net, struct rte *new_changed,
 		   struct rte *old_changed, struct rte *before_old, int feed)
 {
 	// struct proto *p = ah->proto;
@@ -583,7 +583,7 @@ static struct mpnh *mpnh_merge_rta(struct mpnh *nhs, struct rta *a, int max)
 	return mpnh_merge(nhs, nh2, 1, 0, max, rte_update_pool);
 }
 
-struct rte *rt_export_merged(struct announce_hook *ah, net * net,
+struct rte *rt_export_merged(struct announce_hook *ah, struct network * net,
 			     struct rte **rt_free, struct ea_list **tmpa,
 			     int silent)
 {
@@ -637,7 +637,7 @@ struct rte *rt_export_merged(struct announce_hook *ah, net * net,
 }
 
 static void
-rt_notify_merged(struct announce_hook *ah, net * net, struct rte *new_changed,
+rt_notify_merged(struct announce_hook *ah, struct network * net, struct rte *new_changed,
 		 struct rte *old_changed, struct rte *new_best,
 		 struct rte *old_best, int refeed)
 {
@@ -730,7 +730,7 @@ rt_notify_merged(struct announce_hook *ah, net * net, struct rte *new_changed,
  * the protocol gets called.
  */
 static void
-rte_announce(struct rtable *tab, unsigned type, net * net, struct rte *new,
+rte_announce(struct rtable *tab, unsigned type, struct network * net, struct rte *new,
 	     struct rte *old, struct rte *new_best, struct rte *old_best,
 	     struct rte *before_old)
 {
@@ -777,7 +777,7 @@ rte_announce(struct rtable *tab, unsigned type, net * net, struct rte *new,
 static inline int rte_validate(struct rte *e)
 {
 	int c;
-	net *n = e->net;
+	struct network *n = e->net;
 
 	if ((n->n.pxlen > BITS_PER_IP_ADDRESS)
 	    || !ip_is_prefix(n->n.prefix, n->n.pxlen)) {
@@ -833,7 +833,7 @@ static inline int rte_is_ok(struct rte *e)
 }
 
 static void
-rte_recalculate(struct announce_hook *ah, net * net, struct rte *new,
+rte_recalculate(struct announce_hook *ah, struct network * net, struct rte *new,
 		struct rte_src *src)
 {
 	struct proto *p = ah->proto;
@@ -1094,7 +1094,7 @@ static inline void rte_update_unlock(void)
 		lp_flush(rte_update_pool);
 }
 
-static inline void rte_hide_dummy_routes(net * net, struct rte **dummy)
+static inline void rte_hide_dummy_routes(struct network * net, struct rte **dummy)
 {
 	if (net->routes && net->routes->attrs->source == RTS_DUMMY) {
 		*dummy = net->routes;
@@ -1102,7 +1102,7 @@ static inline void rte_hide_dummy_routes(net * net, struct rte **dummy)
 	}
 }
 
-static inline void rte_unhide_dummy_routes(net * net, struct rte **dummy)
+static inline void rte_unhide_dummy_routes(struct network * net, struct rte **dummy)
 {
 	if (*dummy) {
 		(*dummy)->next = net->routes;
@@ -1153,7 +1153,7 @@ static inline void rte_unhide_dummy_routes(net * net, struct rte **dummy)
  */
 
 void
-rte_update2(struct announce_hook *ah, net * net, struct rte *new,
+rte_update2(struct announce_hook *ah, struct network * net, struct rte *new,
 	    struct rte_src *src)
 {
 	struct proto *p = ah->proto;
@@ -1233,7 +1233,7 @@ drop:
 /* Independent call to rte_announce(), used from next hop
    recalculation, outside of rte_update(). new must be non-NULL */
 static inline void
-rte_announce_i(struct rtable *tab, unsigned type, net * net, struct rte *new,
+rte_announce_i(struct rtable *tab, unsigned type, struct network * net, struct rte *new,
 	       struct rte *old, struct rte *new_best, struct rte *old_best)
 {
 	rte_update_lock();
@@ -1248,12 +1248,12 @@ void rte_discard(struct rtable *t, struct rte *old)
 	rte_update_unlock();
 }
 
-/* Check struct rtable for best route to given net whether it would be exported do p */
+/* Check struct rtable for best route to given struct network whether it would be exported do p */
 int
 rt_examine(struct rtable *t, ip_addr prefix, int pxlen, struct proto *p,
 	   struct filter *filter)
 {
-	net *n = net_find(t, prefix, pxlen);
+	struct network *n = net_find(t, prefix, pxlen);
 	struct rte *rt = n ? n->routes : NULL;
 
 	if (!rte_is_valid(rt))
@@ -1296,11 +1296,11 @@ rt_examine(struct rtable *t, ip_addr prefix, int pxlen, struct proto *p,
  */
 void rt_refresh_begin(struct rtable *t, struct announce_hook *ah)
 {
-	net *n;
+	struct network *n;
 	struct rte *e;
 
 	FIB_WALK(&t->fib, fn) {
-		n = (net *) fn;
+		n = (struct network *) fn;
 		for (e = n->routes; e; e = e->next)
 			if (e->sender == ah)
 				e->flags |= REF_STALE;
@@ -1319,11 +1319,11 @@ void rt_refresh_begin(struct rtable *t, struct announce_hook *ah)
 void rt_refresh_end(struct rtable *t, struct announce_hook *ah)
 {
 	int prune = 0;
-	net *n;
+	struct network *n;
 	struct rte *e;
 
 	FIB_WALK(&t->fib, fn) {
-		n = (net *) fn;
+		n = (struct network *) fn;
 		for (e = n->routes; e; e = e->next)
 			if ((e->sender == ah) && (e->flags & REF_STALE)) {
 				e->flags |= REF_DISCARD;
@@ -1344,7 +1344,7 @@ void rt_refresh_end(struct rtable *t, struct announce_hook *ah)
  */
 void rte_dump(struct rte *e)
 {
-	net *n = e->net;
+	struct network *n = e->net;
 	debug("%-1I/%2d ", n->n.prefix, n->n.pxlen);
 	debug("KF=%02x PF=%02x pref=%d lm=%d ", n->n.flags, e->pflags, e->pref,
 	      now - e->lastmod);
@@ -1363,7 +1363,7 @@ void rte_dump(struct rte *e)
 void rt_dump(struct rtable *t)
 {
 	struct rte *e;
-	net *n;
+	struct network *n;
 	struct announce_hook *a;
 
 	debug("Dump of routing table <%s>\n", t->name);
@@ -1371,7 +1371,7 @@ void rt_dump(struct rtable *t)
 	fib_check(&t->fib);
 #endif
 	FIB_WALK(&t->fib, fn) {
-		n = (net *) fn;
+		n = (struct network *) fn;
 		for (e = n->routes; e; e = e->next)
 			rte_dump(e);
 	}
@@ -1439,7 +1439,7 @@ static void rt_prune_nets(struct rtable *tab)
 	FIB_ITERATE_INIT(&fit, &tab->fib);
 again:
 	FIB_ITERATE_START(&tab->fib, &fit, f) {
-		net *n = (net *) f;
+		struct network *n = (struct network *) f;
 		ncnt++;
 		if (!n->routes) {	/* Orphaned FIB entry */
 			FIB_ITERATE_PUT(&fit, f);
@@ -1483,7 +1483,7 @@ void
 rt_setup(struct pool *p, struct rtable *t, char *name, struct rtable_config *cf)
 {
 	bzero(t, sizeof(*t));
-	fib_init(&t->fib, p, sizeof(net), 0, rte_init);
+	fib_init(&t->fib, p, sizeof(struct network), 0, rte_init);
 	t->name = name;
 	t->config = cf;
 	init_list(&t->hooks);
@@ -1529,7 +1529,7 @@ static int rt_prune_step(struct rtable *tab, int *limit)
 
 again:
 	FIB_ITERATE_START(&tab->fib, fit, fn) {
-		net *n = (net *) fn;
+		struct network *n = (struct network *) fn;
 		struct rte *e;
 
 rescan:
@@ -1654,7 +1654,7 @@ static inline struct rte *rt_next_hop_update_rte(struct rtable *tab,
 	return e;
 }
 
-static inline int rt_next_hop_update_net(struct rtable *tab, net * n)
+static inline int rt_next_hop_update_net(struct rtable *tab, struct network * n)
 {
 	struct rte **k, *e, *new, *old_best, **new_best;
 	int count = 0;
@@ -1742,7 +1742,7 @@ static void rt_next_hop_update(struct rtable *tab)
 			ev_schedule(tab->rt_event);
 			return;
 		}
-		max_feed -= rt_next_hop_update_net(tab, (net *) fn);
+		max_feed -= rt_next_hop_update_net(tab, (struct network *) fn);
 	}
 	FIB_ITERATE_END(fn);
 
@@ -1863,7 +1863,7 @@ void rt_commit(struct config *new, struct config *old)
 }
 
 static inline void
-do_feed_baby(struct proto *p, int type, struct announce_hook *h, net * n,
+do_feed_baby(struct proto *p, int type, struct announce_hook *h, struct network * n,
 	     struct rte *e)
 {
 	rte_update_lock();
@@ -1906,7 +1906,7 @@ int rt_feed_baby(struct proto *p)
 again:
 	h = p->feed_ahook;
 	FIB_ITERATE_START(&h->table->fib, fit, fn) {
-		net *n = (net *) fn;
+		struct network *n = (struct network *) fn;
 		struct rte *e = n->routes;
 		if (max_feed <= 0) {
 			FIB_ITERATE_PUT(fit, fn);
@@ -2104,7 +2104,7 @@ static void rt_free_hostcache(struct rtable *tab)
 	mb_free(hc);
 }
 
-static void rt_notify_hostcache(struct rtable *tab, net * net)
+static void rt_notify_hostcache(struct rtable *tab, struct network * net)
 {
 	struct hostcache *hc = tab->hostcache;
 
@@ -2164,7 +2164,7 @@ static int rt_update_hostentry(struct rtable *tab, struct hostentry *he)
 	he->dest = RTD_UNREACHABLE;
 	he->igp_metric = 0;
 
-	net *n = net_route(tab, he->addr, MAX_PREFIX_LENGTH);
+	struct network *n = net_route(tab, he->addr, MAX_PREFIX_LENGTH);
 	if (n) {
 		struct rte *e = n->routes;
 		struct rta *a = e->attrs;
@@ -2335,7 +2335,7 @@ rt_show_rte(struct cli *c, byte * ia, struct rte *e, struct rt_show_data *d,
 		rta_show(c, a, tmpa);
 }
 
-static void rt_show_net(struct cli *c, net * n, struct rt_show_data *d)
+static void rt_show_net(struct cli *c, struct network * n, struct rt_show_data *d)
 {
 	struct rte *e, *ee;
 	byte ia[STD_ADDRESS_P_LENGTH + 8];
@@ -2455,7 +2455,7 @@ static void rt_show_cont(struct cli *c)
 	struct fib_iterator *it = &d->fit;
 
 	FIB_ITERATE_START(fib, it, f) {
-		net *n = (net *) f;
+		struct network *n = (struct network *) f;
 		if (d->running_on_config && d->running_on_config != config) {
 			cli_printf(c, 8004, "Stopped due to reconfiguration");
 			goto done;
@@ -2491,7 +2491,7 @@ static void rt_show_cleanup(struct cli *c)
 
 void rt_show(struct rt_show_data *d)
 {
-	net *n;
+	struct network *n;
 
 	/* Default is either a master table or a table related to a respective protocol */
 	if (!d->table && d->export_protocol)
@@ -2541,7 +2541,7 @@ void rt_show(struct rt_show_data *d)
  * returns a pointer to its &net entry or %NULL if no such network
  * exists.
  */
-static inline net *net_find(struct rtable *tab, ip_addr addr, unsigned len)
+static inline struct network *net_find(struct rtable *tab, ip_addr addr, unsigned len)
 {
 	DUMMY;
 }
@@ -2556,7 +2556,7 @@ static inline net *net_find(struct rtable *tab, ip_addr addr, unsigned len)
  * returns a pointer to its &net entry. If no such entry exists, it's
  * created.
  */
-static inline net *net_get(struct rtable *tab, ip_addr addr, unsigned len)
+static inline struct network *net_get(struct rtable *tab, ip_addr addr, unsigned len)
 {
 	DUMMY;
 }

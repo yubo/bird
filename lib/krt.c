@@ -345,10 +345,10 @@ krt_uptodate(struct rte *a, struct rte *b)
 static void
 krt_learn_announce_update(struct krt_proto *p, struct rte *e)
 {
-  net *n = e->net;
+  struct network *n = e->net;
   struct rta *aa = rta_clone(e->attrs);
   struct rte *ee = rte_get_temp(aa);
-  net *nn = net_get(p->p.table, n->n.prefix, n->n.pxlen);
+  struct network *nn = net_get(p->p.table, n->n.prefix, n->n.pxlen);
   ee->net = nn;
   ee->pflags = 0;
   ee->pref = p->p.preference;
@@ -357,7 +357,7 @@ krt_learn_announce_update(struct krt_proto *p, struct rte *e)
 }
 
 static void
-krt_learn_announce_delete(struct krt_proto *p, net *n)
+krt_learn_announce_delete(struct krt_proto *p, struct network *n)
 {
   n = net_find(p->p.table, n->n.prefix, n->n.pxlen);
   rte_update(&p->p, n, NULL);
@@ -367,8 +367,8 @@ krt_learn_announce_delete(struct krt_proto *p, net *n)
 static void
 krt_learn_scan(struct krt_proto *p, struct rte *e)
 {
-  net *n0 = e->net;
-  net *n = net_get(&p->krt_table, n0->n.prefix, n0->n.pxlen);
+  struct network *n0 = e->net;
+  struct network *n = net_get(&p->krt_table, n0->n.prefix, n0->n.pxlen);
   struct rte *m, **mm;
 
   e->attrs = rta_lookup(e->attrs);
@@ -414,7 +414,7 @@ krt_learn_prune(struct krt_proto *p)
 again:
   FIB_ITERATE_START(fib, &fit, f)
     {
-      net *n = (net *) f;
+      struct network *n = (struct network *) f;
       struct rte *e, **ee, *best, **pbest, *old_best;
 
       /*
@@ -481,8 +481,8 @@ again:
 static void
 krt_learn_async(struct krt_proto *p, struct rte *e, int new)
 {
-  net *n0 = e->net;
-  net *n = net_get(&p->krt_table, n0->n.prefix, n0->n.pxlen);
+  struct network *n0 = e->net;
+  struct network *n = net_get(&p->krt_table, n0->n.prefix, n0->n.pxlen);
   struct rte *g, **gg, *best, **bestp, *old_best;
 
   e->attrs = rta_lookup(e->attrs);
@@ -593,7 +593,7 @@ krt_flush_routes(struct krt_proto *p)
   KRT_TRACE(p, D_EVENTS, "Flushing kernel routes");
   FIB_WALK(&t->fib, f)
     {
-      net *n = (net *) f;
+      struct network *n = (struct network *) f;
       struct rte *e = n->routes;
       if (rte_is_valid(e) && (n->n.flags & KRF_INSTALLED))
 	{
@@ -606,7 +606,7 @@ krt_flush_routes(struct krt_proto *p)
 }
 
 static struct rte *
-krt_export_net(struct krt_proto *p, net *net, struct rte **rt_free, struct ea_list **tmpa)
+krt_export_net(struct krt_proto *p, struct network *net, struct rte **rt_free, struct ea_list **tmpa)
 {
   struct announce_hook *ah = p->p.main_ahook;
   struct filter *filter = ah->out_filter;
@@ -675,7 +675,7 @@ krt_same_dest(struct rte *k, struct rte *e)
 void
 krt_got_route(struct krt_proto *p, struct rte *e)
 {
-  net *net = e->net;
+  struct network *net = e->net;
   int verdict;
 
 #ifdef KRT_ALLOW_LEARN
@@ -765,7 +765,7 @@ krt_prune(struct krt_proto *p)
   KRT_TRACE(p, D_EVENTS, "Pruning table %s", t->name);
   FIB_WALK(&t->fib, f)
     {
-      net *n = (net *) f;
+      struct network *n = (struct network *) f;
       int verdict = f->flags & KRF_VERDICT_MASK;
       struct rte *new, *old, *rt_free = NULL;
       struct ea_list *tmpa = NULL;
@@ -838,7 +838,7 @@ krt_prune(struct krt_proto *p)
 void
 krt_got_route_async(struct krt_proto *p, struct rte *e, int new)
 {
-  net *net = e->net;
+  struct network *net = e->net;
 
   switch (e->u.krt.src)
     {
@@ -1033,7 +1033,7 @@ krt_import_control(struct proto *P, struct rte **new, struct ea_list **attrs, st
 }
 
 static void
-krt_rt_notify(struct proto *P, struct rtable *table UNUSED, net *net,
+krt_rt_notify(struct proto *P, struct rtable *table UNUSED, struct network *net,
 	      struct rte *new, struct rte *old, struct ea_list *eattrs)
 {
   struct krt_proto *p = (struct krt_proto *) P;

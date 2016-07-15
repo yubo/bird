@@ -537,7 +537,7 @@ void sysdep_shutdown_done(void)
 {
 	unlink_pid_file();
 	unlink(path_control_socket);
-	log_msg(L_FATAL "Shutdown completed");
+	log(L_FATAL "Shutdown completed");
 	exit(0);
 }
 

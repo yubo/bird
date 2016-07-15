@@ -47,7 +47,7 @@ struct tcp_md5sig {
 
 
 /* Linux does not care if sa_len is larger than needed */
-#define SA_LEN(x) sizeof(sockaddr)
+#define SA_LEN(x) sizeof(struct sockaddr_bird)
 
 
 /*
@@ -184,7 +184,7 @@ sk_set_md5_auth(struct birdsock *s, ip_addr local UNUSED, ip_addr remote, struct
   struct tcp_md5sig md5;
 
   memset(&md5, 0, sizeof(md5));
-  sockaddr_fill((sockaddr *) &md5.tcpm_addr, s->af, remote, ifa, 0);
+  sockaddr_fill((struct sockaddr_bird *) &md5.tcpm_addr, s->af, remote, ifa, 0);
 
   if (passwd)
   {

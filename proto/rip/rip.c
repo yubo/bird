@@ -152,7 +152,7 @@ rip_announce_rte(struct rip_proto *p, struct rip_entry *en)
   if (rt)
   {
     /* Update */
-    net *n = net_get(p->p.table, en->n.prefix, en->n.pxlen);
+    struct network *n = net_get(p->p.table, en->n.prefix, en->n.pxlen);
 
     struct rta a0 = {
       .src = p->p.main_source,
@@ -221,7 +221,7 @@ rip_announce_rte(struct rip_proto *p, struct rip_entry *en)
   else
   {
     /* Withdraw */
-    net *n = net_find(p->p.table, en->n.prefix, en->n.pxlen);
+    struct network *n = net_find(p->p.table, en->n.prefix, en->n.pxlen);
     rte_update(&p->p, n, NULL);
   }
 }

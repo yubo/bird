@@ -249,8 +249,8 @@ struct rta *bgp_decode_attrs(struct bgp_conn *conn, byte *a, uint len, struct li
 int bgp_get_attr(struct eattr *e, byte *buf, int buflen);
 int bgp_rte_better(struct rte *, struct rte *);
 int bgp_rte_mergable(struct rte *pri, struct rte *sec);
-int bgp_rte_recalculate(struct rtable *table, net *net, struct rte *new, struct rte *old, struct rte *old_best);
-void bgp_rt_notify(struct proto *P, struct rtable *tbl UNUSED, net *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs);
+int bgp_rte_recalculate(struct rtable *table, struct network *net, struct rte *new, struct rte *old, struct rte *old_best);
+void bgp_rt_notify(struct proto *P, struct rtable *tbl UNUSED, struct network *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs);
 int bgp_import_control(struct proto *, struct rte **, struct ea_list **, struct linpool *);
 void bgp_init_bucket_table(struct bgp_proto *);
 void bgp_free_bucket(struct bgp_proto *p, struct bgp_bucket *buck);

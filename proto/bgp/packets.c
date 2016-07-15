@@ -1116,7 +1116,7 @@ bgp_rte_update(struct bgp_proto *p, ip_addr prefix, int pxlen,
       a0->eattrs = ea;
     }
 
-  net *n = net_get(p->p.table, prefix, pxlen);
+  struct network *n = net_get(p->p.table, prefix, pxlen);
   struct rte *e = rte_get_temp(rta_clone(*a));
   e->net = n;
   e->pflags = 0;
@@ -1134,7 +1134,7 @@ bgp_rte_withdraw(struct bgp_proto *p, ip_addr prefix, int pxlen,
       *last_id = path_id;
     }
 
-  net *n = net_find(p->p.table, prefix, pxlen);
+  struct network *n = net_find(p->p.table, prefix, pxlen);
   rte_update2( p->p.main_ahook, n, NULL, *src);
 }
 

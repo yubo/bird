@@ -159,10 +159,10 @@ struct rtable {
 #define RPS_SCHEDULED	1
 #define RPS_RUNNING	2
 
-typedef struct network {
+struct network {
 	struct fib_node n;	/* FIB flags reserved for kernel syncer */
 	struct rte *routes;	/* Available routes for this network */
-} net;
+};
 
 struct hostcache {
 	struct slab *slab;	/* Slab holding all hostentries */
@@ -193,7 +193,7 @@ struct hostentry {
 
 struct rte {
 	struct rte *next;
-	net *net;		/* Network this RTE belongs to */
+	struct network *net;		/* Network this RTE belongs to */
 	struct announce_hook *sender;	/* Announce hook used to send the route to the routing table */
 	struct rta *attrs;	/* Attributes of this route */
 	byte flags;		/* Flags (REF_...) */
@@ -273,21 +273,21 @@ void rt_commit(struct config *new, struct config *old);
 void rt_lock_table(struct rtable *);
 void rt_unlock_table(struct rtable *);
 void rt_setup(struct pool *, struct rtable *, char *, struct rtable_config *);
-static inline net *net_find(struct rtable *tab, ip_addr addr, unsigned len)
+static inline struct network *net_find(struct rtable *tab, ip_addr addr, unsigned len)
 {
-	return (net *) fib_find(&tab->fib, &addr, len);
+	return (struct network *) fib_find(&tab->fib, &addr, len);
 }
 
-static inline net *net_get(struct rtable *tab, ip_addr addr, unsigned len)
+static inline struct network *net_get(struct rtable *tab, ip_addr addr, unsigned len)
 {
-	return (net *) fib_get(&tab->fib, &addr, len);
+	return (struct network *) fib_get(&tab->fib, &addr, len);
 }
 
-struct rte *rte_find(net * net, struct rte_src *src);
+struct rte *rte_find(struct network * net, struct rte_src *src);
 struct rte *rte_get_temp(struct rta *);
-void rte_update2(struct announce_hook *ah, net * net, struct rte *new,
+void rte_update2(struct announce_hook *ah, struct network * net, struct rte *new,
 		 struct rte_src *src);
-static inline void rte_update(struct proto *p, net * net, struct rte *new)
+static inline void rte_update(struct proto *p, struct network * net, struct rte *new)
 {
 	rte_update2(p->main_ahook, net, new, p->main_source);
 }
@@ -295,7 +295,7 @@ static inline void rte_update(struct proto *p, net * net, struct rte *new)
 void rte_discard(struct rtable *tab, struct rte *old);
 int rt_examine(struct rtable *t, ip_addr prefix, int pxlen, struct proto *p,
 	       struct filter *filter);
-struct rte *rt_export_merged(struct announce_hook *ah, net * net,
+struct rte *rt_export_merged(struct announce_hook *ah, struct network * net,
 			     struct rte **rt_free, struct ea_list **tmpa,
 			     int silent);
 void rt_refresh_begin(struct rtable *t, struct announce_hook *ah);

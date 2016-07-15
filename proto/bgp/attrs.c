@@ -768,7 +768,7 @@ bgp_new_bucket(struct bgp_proto *p, struct ea_list *new, unsigned hash)
 }
 
 static struct bgp_bucket *
-bgp_get_bucket(struct bgp_proto *p, net *n, struct ea_list *attrs, int originate)
+bgp_get_bucket(struct bgp_proto *p, struct network *n, struct ea_list *attrs, int originate)
 {
   struct ea_list *new;
   unsigned i, cnt, hash, code;
@@ -925,7 +925,7 @@ bgp_free_prefix(struct bgp_proto *p, struct bgp_prefix *bp)
 
 
 void
-bgp_rt_notify(struct proto *P, struct rtable *tbl UNUSED, net *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs)
+bgp_rt_notify(struct proto *P, struct rtable *tbl UNUSED, struct network *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs)
 {
   struct bgp_proto *p = (struct bgp_proto *) P;
   struct bgp_bucket *buck;
@@ -1404,7 +1404,7 @@ use_deterministic_med(struct rte *r)
 }
 
 int
-bgp_rte_recalculate(struct rtable *table, net *net, struct rte *new, struct rte *old, struct rte *old_best)
+bgp_rte_recalculate(struct rtable *table, struct network *net, struct rte *new, struct rte *old, struct rte *old_best)
 {
   struct rte *r, *s;
   struct rte *key = new ? new : old;

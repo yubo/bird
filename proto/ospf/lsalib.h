@@ -4,6 +4,7 @@
  *      (c) 1999--2000 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *      Can be freely distributed and used under the terms of the GNU GPL.
  */

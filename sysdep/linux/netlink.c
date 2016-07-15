@@ -713,7 +713,7 @@ nl_parse_addr(struct nlmsghdr *h, int scan)
     }
   ifa.scope = scope & IADDR_SCOPE_MASK;
 
-  DBG("KIF: IF%d(%s): %s IPA %I, flg %x, net %I/%d, brd %I, opp %I\n",
+  DBG("KIF: IF%d(%s): %s IPA %I, flg %x, struct network %I/%d, brd %I, opp %I\n",
       ifi->index, ifi->name,
       new ? "added" : "removed",
       ifa.ip, ifa.flags, ifa.prefix, ifa.pxlen, ifa.brd, ifa.opposite);
@@ -811,7 +811,7 @@ static int
 nl_send_route(struct krt_proto *p, struct rte *e, struct ea_list *eattrs, int new)
 {
   struct eattr *ea;
-  net *net = e->net;
+  struct network *net = e->net;
   struct rta *a = e->attrs;
   struct {
     struct nlmsghdr h;
@@ -902,7 +902,7 @@ nl_send_route(struct krt_proto *p, struct rte *e, struct ea_list *eattrs, int ne
 }
 
 void
-krt_replace_rte(struct krt_proto *p, net *n, struct rte *new, struct rte *old, struct ea_list *eattrs)
+krt_replace_rte(struct krt_proto *p, struct network *n, struct rte *new, struct rte *old, struct ea_list *eattrs)
 {
   int err = 0;
 
@@ -1025,7 +1025,7 @@ nl_parse_route(struct nlmsghdr *h, int scan)
       src = KRT_SRC_ALIEN;
     }
 
-  net *net = net_get(p->p.table, dst, i->rtm_dst_len);
+  struct network *net = net_get(p->p.table, dst, i->rtm_dst_len);
 
   struct rta ra = {
     .src= p->p.main_source,

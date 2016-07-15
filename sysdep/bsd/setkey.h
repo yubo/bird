@@ -63,7 +63,7 @@ setkey_send(struct sadb_msg *msg, uint len)
  * operations to implement replace.
  */
 static int
-setkey_md5(sockaddr *src, sockaddr *dst, char *passwd, uint type)
+setkey_md5(struct sockaddr_bird *src, struct sockaddr_bird *dst, char *passwd, uint type)
 {
   uint passwd_len = passwd ? strlen(passwd) : 0;
 
@@ -148,7 +148,7 @@ setkey_md5(sockaddr *src, sockaddr *dst, char *passwd, uint type)
 static int
 sk_set_md5_in_sasp_db(struct birdsock *s, ip_addr local, ip_addr remote, struct iface *ifa, char *passwd)
 {
-  sockaddr src, dst;
+  struct sockaddr_bird src, dst;
   sockaddr_fill(&src, s->af, local, ifa, 0);
   sockaddr_fill(&dst, s->af, remote, ifa, 0);
 

@@ -4,6 +4,7 @@
  *	(c) 1999--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -197,7 +198,7 @@ void ospf_originate_ext_lsa(struct ospf_proto *p, struct ospf_area *oa,
 			    struct ort * nf, u8 mode, u32 metric, u32 ebit,
 			    ip_addr fwaddr, u32 tag, int pbit);
 
-void ospf_rt_notify(struct proto *P, struct rtable * tbl, net * n, struct rte * new,
+void ospf_rt_notify(struct proto *P, struct rtable * tbl, struct network * n, struct rte * new,
 		    struct rte * old, struct ea_list * attrs);
 void ospf_update_topology(struct ospf_proto *p);
 

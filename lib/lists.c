@@ -36,15 +36,14 @@
  *
  * add_tail() takes a struct node @n and appends it at the end of the union list @l.
  */
-LIST_INLINE void
-add_tail(union list *l, struct node *n)
+LIST_INLINE void add_tail(union list *l, struct node *n)
 {
-  struct node *z = l->tail;
+	struct node *z = l->tail;
 
-  n->next = &l->tail_node;
-  n->prev = z;
-  z->next = n;
-  l->tail = n;
+	n->next = &l->tail_node;
+	n->prev = z;
+	z->next = n;
+	l->tail = n;
 }
 
 /**
@@ -54,15 +53,14 @@ add_tail(union list *l, struct node *n)
  *
  * add_head() takes a struct node @n and prepends it at the start of the union list @l.
  */
-LIST_INLINE void
-add_head(union list *l, struct node *n)
+LIST_INLINE void add_head(union list *l, struct node *n)
 {
-  struct node *z = l->head;
+	struct node *z = l->head;
 
-  n->next = z;
-  n->prev = &l->head_node;
-  z->prev = n;
-  l->head = n;
+	n->next = z;
+	n->prev = &l->head_node;
+	z->prev = n;
+	l->head = n;
 }
 
 /**
@@ -73,15 +71,14 @@ add_head(union list *l, struct node *n)
  * Inserts a struct node @n to a linked union list after an already inserted
  * struct node @after.
  */
-LIST_INLINE void
-insert_node(struct node *n, struct node *after)
+LIST_INLINE void insert_node(struct node *n, struct node *after)
 {
-  struct node *z = after->next;
+	struct node *z = after->next;
 
-  n->next = z;
-  n->prev = after;
-  after->next = n;
-  z->prev = n;
+	n->next = z;
+	n->prev = after;
+	after->next = n;
+	z->prev = n;
 }
 
 /**
@@ -90,16 +87,15 @@ insert_node(struct node *n, struct node *after)
  *
  * Removes a struct node @n from the union list it's linked in. Afterwards, struct node @n is cleared.
  */
-LIST_INLINE void
-rem_node(struct node *n)
+LIST_INLINE void rem_node(struct node *n)
 {
-  struct node *z = n->prev;
-  struct node *x = n->next;
+	struct node *z = n->prev;
+	struct node *x = n->next;
 
-  z->next = x;
-  x->prev = z;
-  n->next = NULL;
-  n->prev = NULL;
+	z->next = x;
+	x->prev = z;
+	n->next = NULL;
+	n->prev = NULL;
 }
 
 /**
@@ -113,14 +109,13 @@ rem_node(struct node *n)
  * which just fixes neighbors' pointers in the case that the node
  * was reallocated.
  */
-LIST_INLINE void
-replace_node(struct node *old, struct node *new)
+LIST_INLINE void replace_node(struct node *old, struct node *new)
 {
-  old->next->prev = new;
-  old->prev->next = new;
+	old->next->prev = new;
+	old->prev->next = new;
 
-  new->prev = old->prev;
-  new->next = old->next;
+	new->prev = old->prev;
+	new->next = old->next;
 }
 
 /**
@@ -130,12 +125,11 @@ replace_node(struct node *old, struct node *new)
  * init_list() takes a &list structure and initializes its
  * fields, so that it represents an empty list.
  */
-LIST_INLINE void
-init_list(union list *l)
+LIST_INLINE void init_list(union list *l)
 {
-  l->head = &l->tail_node;
-  l->null = NULL;
-  l->tail = &l->head_node;
+	l->head = &l->tail_node;
+	l->null = NULL;
+	l->tail = &l->head_node;
 }
 
 /**
@@ -146,15 +140,14 @@ init_list(union list *l)
  * This function appends all elements of the union list @l to
  * the union list @to in constant time.
  */
-LIST_INLINE void
-add_tail_list(union list *to, union list *l)
+LIST_INLINE void add_tail_list(union list *to, union list *l)
 {
-  struct node *p = to->tail;
-  struct node *q = l->head;
+	struct node *p = to->tail;
+	struct node *q = l->head;
 
-  p->next = q;
-  q->prev = p;
-  q = l->tail;
-  q->next = &to->tail_node;
-  to->tail = q;
+	p->next = q;
+	q->prev = p;
+	q = l->tail;
+	q->next = &to->tail_node;
+	to->tail = q;
 }

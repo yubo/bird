@@ -4,6 +4,7 @@
  *	(c) 2000--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -251,7 +252,9 @@ ospf_flood_lsa(struct ospf_proto *p, struct top_hash_entry *en,
 		if (!lsa_flooding_allowed(en->lsa_type, en->domain, ifa))
 			continue;
 
-		DBG("Wanted to flood LSA: Type: %u, ID: %R, RT: %R, SN: 0x%x, Age %u\n", hh->type, hh->id, hh->rt, hh->sn, hh->age);
+		DBG("Wanted to flood LSA: Type: %u, ID: %R, RT: %R, SN: 0x%x, Age %u\n",
+				en->lsa.type_raw, en->lsa.id, en->lsa.rt, en->lsa.sn,
+				en->lsa.age);
 
 		int used = 0;
 		WALK_LIST(n, ifa->neigh_list) {

@@ -539,7 +539,7 @@ sockaddr_fill6(struct sockaddr_in6 *sa, ip_addr a, struct iface *ifa, uint port)
 }
 
 void
-sockaddr_fill(sockaddr *sa, int af, ip_addr a, struct iface *ifa, uint port)
+sockaddr_fill(struct sockaddr_bird *sa, int af, ip_addr a, struct iface *ifa, uint port)
 {
   if (af == AF_INET)
     sockaddr_fill4((struct sockaddr_in *) sa, a, ifa, port);
@@ -567,7 +567,7 @@ sockaddr_read6(struct sockaddr_in6 *sa, ip_addr *a, struct iface **ifa, uint *po
 }
 
 int
-sockaddr_read(sockaddr *sa, int af, ip_addr *a, struct iface **ifa, uint *port)
+sockaddr_read(struct sockaddr_bird *sa, int af, ip_addr *a, struct iface **ifa, uint *port)
 {
   if (sa->sa.sa_family != af)
     goto fail;
@@ -1290,7 +1290,7 @@ sk_insert(struct birdsock *s)
 static void
 sk_tcp_connected(struct birdsock *s)
 {
-  sockaddr sa;
+  struct sockaddr_bird sa;
   int sa_len = sizeof(sa);
 
   if ((getsockname(s->fd, &sa.sa, &sa_len) < 0) ||
@@ -1305,7 +1305,7 @@ sk_tcp_connected(struct birdsock *s)
 static int
 sk_passive_connected(struct birdsock *s, int type)
 {
-  sockaddr loc_sa, rem_sa;
+  struct sockaddr_bird loc_sa, rem_sa;
   int loc_sa_len = sizeof(loc_sa);
   int rem_sa_len = sizeof(rem_sa);
 
@@ -1372,7 +1372,7 @@ sk_open(struct birdsock *s)
   int do_bind = 0;
   int bind_port = 0;
   ip_addr bind_addr = IPA_NONE;
-  sockaddr sa;
+  struct sockaddr_bird sa;
 
   switch (s->type)
   {
@@ -1558,7 +1558,7 @@ sk_sendmsg(struct birdsock *s)
 {
   struct iovec iov = {s->tbuf, s->tpos - s->tbuf};
   byte cmsg_buf[CMSG_TX_SPACE];
-  sockaddr dst;
+  struct sockaddr_bird dst;
 
   sockaddr_fill(&dst, s->af, s->daddr, s->iface, s->dport);
 
@@ -1592,7 +1592,7 @@ sk_recvmsg(struct birdsock *s)
 {
   struct iovec iov = {s->rbuf, s->rbsize};
   byte cmsg_buf[CMSG_RX_SPACE];
-  sockaddr src;
+  struct sockaddr_bird src;
 
   struct msghdr msg = {
     .msg_name = &src.sa,
@@ -1832,7 +1832,7 @@ sk_write(struct birdsock *s)
   {
   case SK_TCP_ACTIVE:
     {
-      sockaddr sa;
+      struct sockaddr_bird sa;
       sockaddr_fill(&sa, s->af, s->daddr, s->iface, s->dport);
 
       if (connect(s->fd, &sa.sa, SA_LEN(sa)) >= 0 || errno == EISCONN)

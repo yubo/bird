@@ -42,7 +42,7 @@ dev_ifa_notify(struct proto *p, unsigned c, struct ifa *ad)
 
   if (c & IF_CHANGE_DOWN)
     {
-      net *n;
+      struct network *n;
 
       DBG("dev_if_notify: %s:%I going down\n", ad->iface->name, ad->ip);
       n = net_find(p->table, ad->prefix, ad->pxlen);
@@ -59,7 +59,7 @@ dev_ifa_notify(struct proto *p, unsigned c, struct ifa *ad)
   else if (c & IF_CHANGE_UP)
     {
       struct rta *a;
-      net *n;
+      struct network *n;
       struct rte *e;
 
       DBG("dev_if_notify: %s:%I going up\n", ad->iface->name, ad->ip);

@@ -181,7 +181,7 @@ static void vlog(int class, const char *msg, va_list args)
  * formatted as a full line, no need to include |\n| inside.
  * It is essentially a sequence of log_reset(), logn() and log_commit().
  */
-void log_msg(const char *msg, ...)
+void _log_msg(const char *msg, ...)
 {
 	int class = 1;
 	va_list args;
@@ -193,7 +193,7 @@ void log_msg(const char *msg, ...)
 	va_end(args);
 }
 
-void log_rl(struct tbf *f, const char *msg, ...)
+void _log_rl(struct tbf *f, const char *msg, ...)
 {
 	int last_hit = f->mark;
 	int class = 1;
@@ -218,7 +218,7 @@ void log_rl(struct tbf *f, const char *msg, ...)
  * This function logs an internal error and aborts execution
  * of the program.
  */
-void bug(const char *msg, ...)
+void _bug(const char *msg, ...)
 {
 	va_list args;
 
@@ -235,7 +235,7 @@ void bug(const char *msg, ...)
  * This function logs a fatal error and aborts execution
  * of the program.
  */
-void die(const char *msg, ...)
+void _die(const char *msg, ...)
 {
 	va_list args;
 

@@ -24,34 +24,29 @@
 
 event_list global_event_list;
 
-inline void
-ev_postpone(struct event *e)
+inline void ev_postpone(struct event *e)
 {
-  if (ev_active(e))
-    {
-      rem_node(&e->n);
-      e->n.next = NULL;
-    }
+	if (ev_active(e)) {
+		rem_node(&e->n);
+		e->n.next = NULL;
+	}
 }
 
-static void
-ev_dump(struct resource *r)
+static void ev_dump(struct resource *r)
 {
-  struct event *e = (struct event *) r;
+	struct event *e = (struct event *)r;
 
-  debug("(code %p, data %p, %s)\n",
-	e->hook,
-	e->data,
-	e->n.next ? "scheduled" : "inactive");
+	debug("(code %p, data %p, %s)\n",
+	      e->hook, e->data, e->n.next ? "scheduled" : "inactive");
 }
 
 static struct resclass ev_class = {
-  "Event",
-  sizeof(struct event),
-  (void (*)(struct resource *)) ev_postpone,
-  ev_dump,
-  NULL,
-  NULL
+	"Event",
+	sizeof(struct event),
+	(void (*)(struct resource *))ev_postpone,
+	ev_dump,
+	NULL,
+	NULL
 };
 
 /**
@@ -61,11 +56,10 @@ static struct resclass ev_class = {
  * This function creates a new struct event resource. To use it,
  * you need to fill the structure fields and call ev_schedule().
  */
-struct event *
-ev_new(struct pool *p)
+struct event *ev_new(struct pool *p)
 {
-  struct event *e = ralloc(p, &ev_class);
-  return e;
+	struct event *e = ralloc(p, &ev_class);
+	return e;
 }
 
 /**
@@ -78,11 +72,10 @@ ev_new(struct pool *p)
  * From the hook function, you can call ev_enqueue() or ev_schedule()
  * to re-add the event.
  */
-inline void
-ev_run(struct event *e)
+inline void ev_run(struct event *e)
 {
-  ev_postpone(e);
-  e->hook(e->data);
+	ev_postpone(e);
+	e->hook(e->data);
 }
 
 /**
@@ -93,11 +86,10 @@ ev_run(struct event *e)
  * ev_enqueue() stores the struct event @e to the specified event
  * union list @l which can be run by calling ev_run_list().
  */
-inline void
-ev_enqueue(event_list *l, struct event *e)
+inline void ev_enqueue(event_list * l, struct event *e)
 {
-  ev_postpone(e);
-  add_tail(l, &e->n);
+	ev_postpone(e);
+	add_tail(l, &e->n);
 }
 
 /**
@@ -108,10 +100,9 @@ ev_enqueue(event_list *l, struct event *e)
  * struct event union list which is run by the platform dependent code whenever
  * appropriate.
  */
-void
-ev_schedule(struct event *e)
+void ev_schedule(struct event *e)
 {
-  ev_enqueue(&global_event_list, e);
+	ev_enqueue(&global_event_list, e);
 }
 
 void io_log_event(void *hook, void *data);
@@ -122,24 +113,22 @@ void io_log_event(void *hook, void *data);
  *
  * This function calls ev_run() for all events enqueued in the union list @l.
  */
-int
-ev_run_list(event_list *l)
+int ev_run_list(event_list * l)
 {
-  struct node *n;
-  union list tmp_list;
+	struct node *n;
+	union list tmp_list;
 
-  init_list(&tmp_list);
-  add_tail_list(&tmp_list, l);
-  init_list(l);
-  WALK_LIST_FIRST(n, tmp_list)
-    {
-      struct event *e = SKIP_BACK(struct event, n, n);
+	init_list(&tmp_list);
+	add_tail_list(&tmp_list, l);
+	init_list(l);
+	WALK_LIST_FIRST(n, tmp_list) {
+		struct event *e = SKIP_BACK(struct event, n, n);
 
-      /* This is ugly hack, we want to log just events executed from the main I/O loop */
-      if (l == &global_event_list)
-	io_log_event(e->hook, e->data);
+		/* This is ugly hack, we want to log just events executed from the main I/O loop */
+		if (l == &global_event_list)
+			io_log_event(e->hook, e->data);
 
-      ev_run(e);
-    }
-  return !EMPTY_LIST(*l);
+		ev_run(e);
+	}
+	return !EMPTY_LIST(*l);
 }

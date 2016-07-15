@@ -44,14 +44,14 @@
 #include "pipe.h"
 
 static void
-pipe_rt_notify(struct proto *P, struct rtable *src_table, net *n, struct rte *new, struct rte *old, struct ea_list *attrs)
+pipe_rt_notify(struct proto *P, struct rtable *src_table, struct network *n, struct rte *new, struct rte *old, struct ea_list *attrs)
 {
   struct pipe_proto *p = (struct pipe_proto *) P;
   struct announce_hook *ah = (src_table == P->table) ? p->peer_ahook : P->main_ahook;
   struct rtable *dst_table = ah->table;
   struct rte_src *src;
 
-  net *nn;
+  struct network *nn;
   struct rte *e;
   struct rta a;
 

@@ -386,7 +386,11 @@ void proto_notify_state(struct proto *p, unsigned state);
 
 #ifndef PARSER
 #define TRACE(flags, msg, args...) \
-  do { if (p->p.debug & flags) log(L_TRACE "%s: " msg, p->p.name , ## args ); } while(0)
+do { \
+	if (p->p.debug & flags) \
+		log(L_TRACE "%s:%d:%s: " msg, __FILE__, __LINE__,\
+				p->p.name , ## args ); \
+} while(0)
 #endif
 
 

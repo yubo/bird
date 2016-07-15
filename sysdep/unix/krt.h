@@ -77,7 +77,8 @@ extern struct pool *krt_pool;
 #define KRT_TRACE(pr, fl, msg, args...) do {	\
   DBG("KRT: " msg "\n" , ## args);		\
   if (pr->p.debug & fl)				\
-    { log(L_TRACE "%s: " msg, pr->p.name , ## args); } } while(0)
+    { log(L_TRACE "%s:%d:%s: " msg, __FILE__, __LINE__,\
+		    pr->p.name , ## args); } } while(0)
 
 struct proto_config * kif_init_config(int class);
 void kif_request_scan(void);
@@ -134,7 +135,7 @@ void krt_sys_copy_config(struct krt_config *, struct krt_config *);
 
 int  krt_capable(struct rte *e);
 void krt_do_scan(struct krt_proto *);
-void krt_replace_rte(struct krt_proto *p, net *n, struct rte *new, struct rte *old, struct ea_list *eattrs);
+void krt_replace_rte(struct krt_proto *p, struct network *n, struct rte *new, struct rte *old, struct ea_list *eattrs);
 int krt_sys_get_attr(struct eattr *a, byte *buf, int buflen);
 
 

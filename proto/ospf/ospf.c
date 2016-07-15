@@ -4,6 +4,7 @@
  *	(c) 1999--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -28,7 +29,7 @@
  * receiving of link-state updates and also the flooding algorithm. Source
  * |topology.c| is a place where routines for searching LSAs in the link-state
  * database, adding and deleting them reside, there also are functions for
- * originating of various types of LSAs (router LSA, net LSA, external LSA).
+ * originating of various types of LSAs (router LSA, struct network LSA, external LSA).
  * File |rt.c| contains routines for calculating the routing table. |lsalib.c|
  * is a set of various functions for working with the LSAs (endianity
  * conversions, calculation of checksum etc.).

@@ -213,7 +213,7 @@ void ifa_notify(struct proto *p, unsigned flags, struct ifa *a)
  * @p->accept_ra_types specifies which kind of route announcements
  * protocol wants to receive.
  */
-void rt_notify(struct proto *p, net *net, struct rte *new, struct rte *old, struct ea_list *attrs)
+void rt_notify(struct proto *p, struct network *net, struct rte *new, struct rte *old, struct ea_list *attrs)
 { DUMMY; }
 
 /**
@@ -339,7 +339,7 @@ int rte_same(struct rte *e1, struct rte *e2)
  *
  * Please avoid using this function in new protocols.
  */
-void rte_insert(net *n, struct rte *e)
+void rte_insert(struct network *n, struct rte *e)
 { DUMMY; }
 
 /**
@@ -352,5 +352,5 @@ void rte_insert(net *n, struct rte *e)
  *
  * Please avoid using this function in new protocols.
  */
-void rte_remove(net *n, struct rte *e)
+void rte_remove(struct network *n, struct rte *e)
 { DUMMY; }

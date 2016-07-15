@@ -519,7 +519,7 @@ break_loop:
 void
 rip_send_table(struct rip_proto *p, struct rip_iface *ifa, ip_addr addr, bird_clock_t changed)
 {
-  DBG("RIP: Opening TX session to %I on %s\n", dst, ifa->iface->name);
+  DBG("RIP: Opening TX session to %s\n", ifa->iface->name);
 
   rip_reset_tx_session(p, ifa);
 

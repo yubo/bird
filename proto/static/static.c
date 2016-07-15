@@ -60,7 +60,7 @@ p_igp_table(struct proto *p)
 static void
 static_install(struct proto *p, struct static_route *r, struct iface *ifa)
 {
-  net *n;
+  struct network *n;
   struct rta a;
   struct rte *e;
 
@@ -130,7 +130,7 @@ static_install(struct proto *p, struct static_route *r, struct iface *ifa)
 static void
 static_remove(struct proto *p, struct static_route *r)
 {
-  net *n;
+  struct network *n;
 
   if (!r->installed)
     return;

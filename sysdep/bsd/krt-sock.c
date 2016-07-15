@@ -188,14 +188,14 @@ struct ks_msg
 static int
 krt_send_route(struct krt_proto *p, int cmd, struct rte *e)
 {
-  net *net = e->net;
+  struct network *net = e->net;
   struct rta *a = e->attrs;
   static int msg_seq;
   struct iface *j, *i = a->iface;
   int l;
   struct ks_msg msg;
   char *body = (char *)msg.buf;
-  sockaddr gate, mask, dst;
+  struct sockaddr_bird gate, mask, dst;
   ip_addr gw;
 
   DBG("krt-sock: send %I/%d via %I\n", net->n.prefix, net->n.pxlen, a->gw);
@@ -307,7 +307,7 @@ krt_send_route(struct krt_proto *p, int cmd, struct rte *e)
 }
 
 void
-krt_replace_rte(struct krt_proto *p, net *n, struct rte *new, struct rte *old,
+krt_replace_rte(struct krt_proto *p, struct network *n, struct rte *new, struct rte *old,
 		struct ea_list *eattrs UNUSED)
 {
   int err = 0;
@@ -332,8 +332,8 @@ krt_read_route(struct ks_msg *msg, struct krt_proto *p, int scan)
   /* p is NULL iff KRT_SHARED_SOCKET and !scan */
 
   struct rte *e;
-  net *net;
-  sockaddr dst, gate, mask;
+  struct network *net;
+  struct sockaddr_bird dst, gate, mask;
   ip_addr idst, igate, imask;
   void *body = (char *)msg->buf;
   int new = (msg->rtm.rtm_type != RTM_DELETE);
@@ -426,7 +426,7 @@ krt_read_route(struct ks_msg *msg, struct krt_proto *p, int scan)
   else
     src = KRT_SRC_KERNEL;
 
-  net = net_get(p->p.table, idst, pxlen);
+  struct network = net_get(p->p.table, idst, pxlen);
 
   struct rta a = {
     .src = p->p.main_source,
@@ -615,7 +615,7 @@ krt_read_addr(struct ks_msg *msg, int scan)
 {
   struct ifa_msghdr *ifam = (struct ifa_msghdr *)&msg->rtm;
   void *body = (void *)(ifam + 1);
-  sockaddr addr, mask, brd;
+  struct sockaddr_bird addr, mask, brd;
   struct iface *iface = NULL;
   struct ifa ifa;
   struct sockaddr null;

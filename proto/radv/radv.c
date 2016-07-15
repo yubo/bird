@@ -256,7 +256,7 @@ radv_ifa_notify(struct proto *p, unsigned flags, struct ifa *a)
     radv_iface_notify(ifa, RA_EV_CHANGE);
 }
 
-static inline int radv_net_match_trigger(struct radv_config *cf, net *n)
+static inline int radv_net_match_trigger(struct radv_config *cf, struct network *n)
 {
   return cf->trigger_valid &&
     (n->n.pxlen == cf->trigger_pxlen) &&
@@ -276,7 +276,7 @@ radv_import_control(struct proto *p, struct rte **new, struct ea_list **attrs UN
 }
 
 static void
-radv_rt_notify(struct proto *p, struct rtable *tbl UNUSED, net *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs UNUSED)
+radv_rt_notify(struct proto *p, struct rtable *tbl UNUSED, struct network *n, struct rte *new, struct rte *old UNUSED, struct ea_list *attrs UNUSED)
 {
   struct proto_radv *ra = (struct proto_radv *) p;
   struct radv_config *cf = (struct radv_config *) (p->cf);

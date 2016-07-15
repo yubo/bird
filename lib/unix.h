@@ -41,10 +41,10 @@ void cmd_shutdown(void);
 
 #define SOCKADDR_SIZE 32
 
-typedef struct sockaddr_bird {
+struct sockaddr_bird {
   struct sockaddr sa;
   char padding[SOCKADDR_SIZE - sizeof(struct sockaddr)];
-} sockaddr;
+};
 
 
 #ifdef IPV6
@@ -69,10 +69,10 @@ static inline ip_addr ipa_from_in4(struct in_addr a)
 static inline ip_addr ipa_from_in6(struct in6_addr a)
 { return ipa_build6(ntohl(a.s6_addr32[0]), ntohl(a.s6_addr32[1]), ntohl(a.s6_addr32[2]), ntohl(a.s6_addr32[3])); }
 
-static inline ip_addr ipa_from_sa4(sockaddr *sa)
+static inline ip_addr ipa_from_sa4(struct sockaddr_bird *sa)
 { return ipa_from_in4(((struct sockaddr_in *) sa)->sin_addr); }
 
-static inline ip_addr ipa_from_sa6(sockaddr *sa)
+static inline ip_addr ipa_from_sa6(struct sockaddr_bird *sa)
 { return ipa_from_in6(((struct sockaddr_in6 *) sa)->sin6_addr); }
 
 static inline struct in_addr ipa_to_in4(ip_addr a)
@@ -87,8 +87,8 @@ static inline struct in6_addr ipa_to_in6(ip_addr a)
 { return (struct in6_addr) { .s6_addr32 = { 0, 0, 0, 0 } }; }
 #endif
 
-void sockaddr_fill(sockaddr *sa, int af, ip_addr a, struct iface *ifa, uint port);
-int sockaddr_read(sockaddr *sa, int af, ip_addr *a, struct iface **ifa, uint *port);
+void sockaddr_fill(struct sockaddr_bird *sa, int af, ip_addr a, struct iface *ifa, uint port);
+int sockaddr_read(struct sockaddr_bird *sa, int af, ip_addr *a, struct iface **ifa, uint *port);
 
 
 #ifndef SUN_LEN

@@ -42,115 +42,114 @@
  */
 
 /* For internal usage. */
-#define HEAP_BUBBLE_DOWN_J(heap,num,less,swap)						\
-  for (;;)										\
-    {											\
-      _l = 2*_j;									\
-      if (_l > num)									\
-	break;										\
-      if (less(heap[_j],heap[_l]) && (_l == num || less(heap[_j],heap[_l+1])))		\
-	break;										\
-      if (_l != num && less(heap[_l+1],heap[_l]))					\
-	_l++;										\
-      swap(heap,_j,_l,x);								\
-      _j = _l;										\
-    }
+#define HEAP_BUBBLE_DOWN_J(heap,num,less,swap)              \
+for (;;) {                                                  \
+	_l = 2 * _j;                                        \
+	if (_l > num)                                       \
+		break;                                      \
+	if (less(heap[_j], heap[_l])                        \
+	    && (_l == num || less(heap[_j], heap[_l + 1]))) \
+		break;                                      \
+	if (_l != num && less(heap[_l + 1], heap[_l]))      \
+		_l++;                                       \
+	swap(heap, _j, _l, x);                              \
+	_j = _l;                                            \
+}
 
 /* For internal usage. */
-#define HEAP_BUBBLE_UP_J(heap,num,less,swap)						\
-  while (_j > 1)									\
-    {											\
-      _u = _j/2;									\
-      if (less(heap[_u], heap[_j]))							\
-	break;										\
-      swap(heap,_u,_j,x);								\
-      _j = _u;										\
-    }
+#define HEAP_BUBBLE_UP_J(heap,num,less,swap)               \
+while (_j > 1) {                                           \
+	_u = _j / 2;                                       \
+	if (less(heap[_u], heap[_j]))                      \
+		break;                                     \
+	swap(heap, _u, _j, x);                             \
+	_j = _u;                                           \
+}
 
 /**
  * Shuffle the unordered array @heap of @num elements to become a valid heap. The time complexity is linear.
  **/
-#define HEAP_INIT(heap,num,type,less,swap)						\
-  do {											\
-    uint _i = num;									\
-    uint _j, _l;										\
-    type x;										\
-    while (_i >= 1)									\
-      {											\
-	_j = _i;									\
-        HEAP_BUBBLE_DOWN_J(heap,num,less,swap)						\
-	_i--;										\
-      }											\
-  } while(0)
+#define HEAP_INIT(heap,num,type,less,swap)                 \
+do {                                                       \
+	uint _i = num;                                     \
+	uint _j, _l;                                       \
+	type x;                                            \
+	while (_i >= 1) {                                  \
+		_j = _i;                                   \
+		HEAP_BUBBLE_DOWN_J(heap, num, less, swap)  \
+		    _i--;                                  \
+	}                                                  \
+} while (0)
 
 /**
  * Delete the minimum element `heap[1]` in `O(log(n))` time.
  * The removed value is moved just after the resulting heap (`heap[num + 1]`).
  **/
-#define HEAP_DELMIN(heap,num,type,less,swap)						\
-  do {											\
-    uint _j, _l;										\
-    type x;										\
-    swap(heap,1,num,x);									\
-    num--;										\
-    _j = 1;										\
-    HEAP_BUBBLE_DOWN_J(heap,num,less,swap);						\
-  } while(0)
+#define HEAP_DELMIN(heap,num,type,less,swap)            \
+do {                                                    \
+	uint _j, _l;                                    \
+	type x;                                         \
+	swap(heap, 1, num, x);                          \
+	num--;                                          \
+	_j = 1;                                         \
+	HEAP_BUBBLE_DOWN_J(heap, num, less, swap);      \
+} while (0)
 
 /**
  * Insert `heap[num]` in `O(log(n))` time. The value of @num must be increased before.
  **/
-#define HEAP_INSERT(heap,num,type,less,swap)						\
-  do {											\
-    uint _j, _u;										\
-    type x;										\
-    _j = num;										\
-    HEAP_BUBBLE_UP_J(heap,num,less,swap);						\
-  } while(0)
+#define HEAP_INSERT(heap,num,type,less,swap)            \
+do {                                                    \
+	uint _j, _u;                                    \
+	type x;                                         \
+	_j = num;                                       \
+	HEAP_BUBBLE_UP_J(heap, num, less, swap);        \
+} while (0)
 
 /**
  * If you need to increase the value of `heap[pos]`, just do it and then call this macro to rebuild the heap.
  * Only `heap[pos]` can be changed, the rest of the array must form a valid heap.
  * The time complexity is `O(log(n))`.
  **/
-#define HEAP_INCREASE(heap,num,type,less,swap,pos)					\
-  do {											\
-    uint _j, _l;										\
-    type x;										\
-    _j = pos;										\
-    HEAP_BUBBLE_DOWN_J(heap,num,less,swap);						\
-  } while(0)
+#define HEAP_INCREASE(heap,num,type,less,swap,pos)     \
+do {                                                   \
+	uint _j, _l;                                   \
+	type x;                                        \
+	_j = pos;                                      \
+	HEAP_BUBBLE_DOWN_J(heap, num, less, swap);     \
+} while (0)
 
 /**
  * If you need to decrease the value of `heap[pos]`, just do it and then call this macro to rebuild the heap.
  * Only `heap[pos]` can be changed, the rest of the array must form a valid heap.
  * The time complexity is `O(log(n))`.
  **/
-#define HEAP_DECREASE(heap,num,type,less,swap,pos)					\
-  do {											\
-    uint _j, _u;										\
-    type x;										\
-    _j = pos;										\
-    HEAP_BUBBLE_UP_J(heap,num,less,swap);						\
-  } while(0)
+#define HEAP_DECREASE(heap,num,type,less,swap,pos)    \
+do {                                                  \
+	uint _j, _u;                                  \
+	type x;                                       \
+	_j = pos;                                     \
+	HEAP_BUBBLE_UP_J(heap, num, less, swap);      \
+} while (0)
 
 /**
  * Delete `heap[pos]` in `O(log(n))` time.
  **/
-#define HEAP_DELETE(heap,num,type,less,swap,pos)					\
-  do {											\
-    uint _j, _l, _u;									\
-    type x;										\
-    _j = pos;										\
-    swap(heap,_j,num,x);								\
-    num--;										\
-    if (less(heap[_j], heap[num+1]))							\
-      HEAP_BUBBLE_UP_J(heap,num,less,swap)						\
-    else										\
-      HEAP_BUBBLE_DOWN_J(heap,num,less,swap);						\
-  } while(0)
+#define HEAP_DELETE(heap,num,type,less,swap,pos)          \
+do {                                                      \
+	uint _j, _l, _u;                                  \
+	type x;                                           \
+	_j = pos;                                         \
+	swap(heap, _j, num, x);                           \
+	num--;                                            \
+	if (less(heap[_j], heap[num + 1]))                \
+		HEAP_BUBBLE_UP_J(heap, num, less, swap)   \
+	else                                              \
+		HEAP_BUBBLE_DOWN_J(heap, num, less, swap);\
+} while (0)
 
 /**
- * Default swapping macro.
+ * Default swindent: Standard input:156: Error:Unexpected end of file
+apping macro.
  **/
 #define HEAP_SWAP(heap,a,b,t) (t=heap[a], heap[a]=heap[b], heap[b]=t)

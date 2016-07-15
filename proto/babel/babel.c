@@ -476,7 +476,7 @@ babel_announce_rte(struct babel_proto *p, struct babel_entry *e)
 
   if (r)
   {
-    net *n = net_get(p->p.table, e->n.prefix, e->n.pxlen);
+    struct network *n = net_get(p->p.table, e->n.prefix, e->n.pxlen);
     struct rta A = {
       .src = p->p.main_source,
       .source = RTS_BABEL,
@@ -503,7 +503,7 @@ babel_announce_rte(struct babel_proto *p, struct babel_entry *e)
   else
   {
     /* Retraction */
-    net *n = net_find(p->p.table, e->n.prefix, e->n.pxlen);
+    struct network *n = net_find(p->p.table, e->n.prefix, e->n.pxlen);
     rte_update(&p->p, n, NULL);
   }
 }

@@ -5,6 +5,7 @@
  *	(c) 1999--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -1233,7 +1234,7 @@ find_surrogate_fwaddr(struct ospf_proto *p, struct ospf_area *oa)
 }
 
 void
-ospf_rt_notify(struct proto *P, struct rtable * tbl UNUSED, net * n, struct rte * new,
+ospf_rt_notify(struct proto *P, struct rtable * tbl UNUSED, struct network * n, struct rte * new,
 	       struct rte * old UNUSED, struct ea_list * ea)
 {
 	struct ospf_proto *p = (struct ospf_proto *)P;
@@ -1704,15 +1705,8 @@ ospf_top_hash(struct top_graph *f, u32 domain, u32 lsaid, u32 rtrid, u32 type)
 	   In both cases, there is (usually) just one (or small number)
 	   appropriate LSA, so we just clear unknown part of key. */
 
-	return (((f->ospf2
-		  && (type ==
-		      LSA_T_NET)) ? 0 : ospf_top_hash_u32(rtrid)) + ((!f->ospf2
-								      && (type
-									  ==
-									  LSA_T_RT))
-								     ? 0 :
-								     ospf_top_hash_u32
-								     (lsaid)) +
+	return (((f->ospf2 && (type == LSA_T_NET)) ? 0 : ospf_top_hash_u32(rtrid)) +
+			((!f->ospf2 && (type == LSA_T_RT)) ? 0 : ospf_top_hash_u32(lsaid)) +
 		type + domain) & f->hash_mask;
 
 	/*

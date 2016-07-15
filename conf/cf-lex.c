@@ -172,13 +172,7 @@ typedef unsigned int flex_uint32_t;
  */
 #define YY_STATE_BUF_SIZE   ((YY_BUF_SIZE + 2) * sizeof(yy_state_type))
 
-#ifndef YY_TYPEDEF_YY_BUFFER_STATE
-#define YY_TYPEDEF_YY_BUFFER_STATE
-typedef struct yy_buffer_state *YY_BUFFER_STATE;
-#endif
-
 extern int cf_leng;
-
 extern FILE *cf_in, *cf_out;
 
 #define EOB_ACT_CONTINUE_SCAN 0
@@ -277,7 +271,7 @@ struct yy_buffer_state {
 /* Stack of input buffers. */
 static size_t yy_buffer_stack_top = 0; /**< index of top of stack. */
 static size_t yy_buffer_stack_max = 0; /**< capacity of stack. */
-static YY_BUFFER_STATE *yy_buffer_stack = 0;  /**< Stack as an array. */
+static struct yy_buffer_state **yy_buffer_stack = 0;  /**< Stack as an array. */
 
 /* We provide macros for accessing struct buffer states in case in the
  * future we want to put the struct buffer states in a more general
@@ -310,22 +304,22 @@ static int yy_start = 0;	/* start state number */
 static int yy_did_buffer_switch_on_eof;
 
 void cf_restart(FILE * input_file);
-void cf__switch_to_buffer(YY_BUFFER_STATE new_buffer);
-YY_BUFFER_STATE cf__create_buffer(FILE * file, int size);
-void cf__delete_buffer(YY_BUFFER_STATE b);
-void cf__flush_buffer(YY_BUFFER_STATE b);
-void cf_push_buffer_state(YY_BUFFER_STATE new_buffer);
+void cf__switch_to_buffer(struct yy_buffer_state *new_buffer);
+struct yy_buffer_state * cf__create_buffer(FILE * file, int size);
+void cf__delete_buffer(struct yy_buffer_state *b);
+void cf__flush_buffer(struct yy_buffer_state *b);
+void cf_push_buffer_state(struct yy_buffer_state *new_buffer);
 void cf_pop_buffer_state(void);
 
 static void cf_ensure_buffer_stack(void);
 static void cf__load_buffer_state(void);
-static void cf__init_buffer(YY_BUFFER_STATE b, FILE * file);
+static void cf__init_buffer(struct yy_buffer_state *b, FILE * file);
 
 #define YY_FLUSH_BUFFER cf__flush_buffer(YY_CURRENT_BUFFER )
 
-YY_BUFFER_STATE cf__scan_buffer(char *base, yy_size_t size);
-YY_BUFFER_STATE cf__scan_string(yyconst char *yy_str);
-YY_BUFFER_STATE cf__scan_bytes(yyconst char *bytes, int len);
+struct yy_buffer_state *cf__scan_buffer(char *base, yy_size_t size);
+struct yy_buffer_state *cf__scan_string(yyconst char *yy_str);
+struct yy_buffer_state *cf__scan_bytes(yyconst char *bytes, int len);
 
 void *cf_alloc(yy_size_t);
 void *cf_realloc(void *, yy_size_t);
@@ -1287,7 +1281,7 @@ static int yy_get_next_buffer(void)
 		while (num_to_read <= 0) {	/* Not enough room in the struct buffer - grow it. */
 
 			/* just a shorter name for the current struct buffer */
-			YY_BUFFER_STATE b = YY_CURRENT_BUFFER;
+			struct yy_buffer_state *b = YY_CURRENT_BUFFER;
 
 			int yy_c_buf_p_offset =
 			    (int)((yy_c_buf_p) - b->yy_ch_buf);
@@ -1519,7 +1513,7 @@ void cf_restart(FILE * input_file)
  * @param new_buffer The new input buffer.
  * 
  */
-void cf__switch_to_buffer(YY_BUFFER_STATE new_buffer)
+void cf__switch_to_buffer(struct yy_buffer_state *new_buffer)
 {
 
 	/* TODO. We should be able to replace this entire function body
@@ -1563,11 +1557,11 @@ static void cf__load_buffer_state(void)
  * 
  * @return the allocated struct buffer state.
  */
-YY_BUFFER_STATE cf__create_buffer(FILE * file, int size)
+struct yy_buffer_state *cf__create_buffer(FILE * file, int size)
 {
-	YY_BUFFER_STATE b;
+	struct yy_buffer_state *b;
 
-	b = (YY_BUFFER_STATE) cf_alloc(sizeof(struct yy_buffer_state));
+	b = (struct yy_buffer_state *) cf_alloc(sizeof(struct yy_buffer_state));
 	if (!b)
 		YY_FATAL_ERROR("out of dynamic memory in cf__create_buffer()");
 
@@ -1591,14 +1585,14 @@ YY_BUFFER_STATE cf__create_buffer(FILE * file, int size)
  * @param b a struct buffer created with cf__create_buffer()
  * 
  */
-void cf__delete_buffer(YY_BUFFER_STATE b)
+void cf__delete_buffer(struct yy_buffer_state *b)
 {
 
 	if (!b)
 		return;
 
 	if (b == YY_CURRENT_BUFFER)	/* Not sure if we should pop here. */
-		YY_CURRENT_BUFFER_LVALUE = (YY_BUFFER_STATE) 0;
+		YY_CURRENT_BUFFER_LVALUE = (struct yy_buffer_state *) 0;
 
 	if (b->yy_is_our_buffer)
 		cf_free((void *)b->yy_ch_buf);
@@ -1614,7 +1608,7 @@ extern int isatty(int);
  * This function is sometimes called more than once on the same buffer,
  * such as during a cf_restart() or at EOF.
  */
-static void cf__init_buffer(YY_BUFFER_STATE b, FILE * file)
+static void cf__init_buffer(struct yy_buffer_state *b, FILE * file)
 {
 	int oerrno = errno;
 
@@ -1641,7 +1635,7 @@ static void cf__init_buffer(YY_BUFFER_STATE b, FILE * file)
  * @param b the struct buffer state to be flushed, usually @c YY_CURRENT_BUFFER.
  * 
  */
-void cf__flush_buffer(YY_BUFFER_STATE b)
+void cf__flush_buffer(struct yy_buffer_state *b)
 {
 	if (!b)
 		return;
@@ -1670,7 +1664,7 @@ void cf__flush_buffer(YY_BUFFER_STATE b)
  *  @param new_buffer The new state.
  *  
  */
-void cf_push_buffer_state(YY_BUFFER_STATE new_buffer)
+void cf_push_buffer_state(struct yy_buffer_state *new_buffer)
 {
 	if (new_buffer == NULL)
 		return;
@@ -1771,9 +1765,9 @@ static void cf_ensure_buffer_stack(void)
  * 
  * @return the newly allocated struct buffer state object. 
  */
-YY_BUFFER_STATE cf__scan_buffer(char *base, yy_size_t size)
+struct yy_buffer_state * cf__scan_buffer(char *base, yy_size_t size)
 {
-	YY_BUFFER_STATE b;
+	struct yy_buffer_state * b;
 
 	if (size < 2 ||
 	    base[size - 2] != YY_END_OF_BUFFER_CHAR ||
@@ -1781,7 +1775,7 @@ YY_BUFFER_STATE cf__scan_buffer(char *base, yy_size_t size)
 		/* They forgot to leave room for the EOB's. */
 		return 0;
 
-	b = (YY_BUFFER_STATE) cf_alloc(sizeof(struct yy_buffer_state));
+	b = (struct yy_buffer_state *) cf_alloc(sizeof(struct yy_buffer_state));
 	if (!b)
 		YY_FATAL_ERROR("out of dynamic memory in cf__scan_buffer()");
 
@@ -1808,7 +1802,7 @@ YY_BUFFER_STATE cf__scan_buffer(char *base, yy_size_t size)
  * @note If you want to scan bytes that may contain NUL values, then use
  *       cf__scan_bytes() instead.
  */
-YY_BUFFER_STATE cf__scan_string(yyconst char *yystr)
+struct yy_buffer_state * cf__scan_string(yyconst char *yystr)
 {
 
 	return cf__scan_bytes(yystr, strlen(yystr));
@@ -1821,9 +1815,9 @@ YY_BUFFER_STATE cf__scan_string(yyconst char *yystr)
  * 
  * @return the newly allocated struct buffer state object.
  */
-YY_BUFFER_STATE cf__scan_bytes(yyconst char *yybytes, int _yybytes_len)
+struct yy_buffer_state * cf__scan_bytes(yyconst char *yybytes, int _yybytes_len)
 {
-	YY_BUFFER_STATE b;
+	struct yy_buffer_state * b;
 	char *buf;
 	yy_size_t n;
 	int i;

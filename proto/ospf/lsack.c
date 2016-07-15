@@ -4,6 +4,7 @@
  *	(c) 2000--2004 Ondrej Filip <feela@network.cz>
  *	(c) 2009--2014 Ondrej Zajicek <santiago@crfreenet.org>
  *	(c) 2009--2014 CZ.NIC z.s.p.o.
+ *	(c) 2016--2016 Yu Bo <yubo@yubo.org
  *
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
@@ -49,9 +50,8 @@ static void ospf_dump_lsack(struct ospf_proto *p, struct ospf_packet *pkt)
 		ospf_dump_lsahdr(p, lsas + i);
 }
 
-void
-ospf_enqueue_lsack(struct ospf_neighbor *n, struct ospf_lsa_header *h_n,
-		   int queue)
+void ospf_enqueue_lsack(struct ospf_neighbor *n,
+		struct ospf_lsa_header *h_n, int queue)
 {
 	/* Note that h_n is in network endianity */
 	struct lsa_node *no = mb_alloc(n->pool, sizeof(struct lsa_node));
@@ -59,7 +59,7 @@ ospf_enqueue_lsack(struct ospf_neighbor *n, struct ospf_lsa_header *h_n,
 	add_tail(&n->ackl[queue], NODE no);
 	DBG("Adding %s ack for %R, ID: %R, RT: %R, Type: %u\n",
 	    (queue == ACKL_DIRECT) ? "direct" : "delayed",
-	    n->rid, ntohl(h_n->id), ntohl(h_n->rt), h_n->type);
+	    n->rid, ntohl(h_n->id), ntohl(h_n->rt), h_n->type_raw);
 }
 
 void ospf_reset_lsack_queue(struct ospf_neighbor *n)
@@ -91,7 +91,7 @@ ospf_send_lsack_(struct ospf_proto *p, struct ospf_neighbor *n, int queue)
 		no = (struct lsa_node *)HEAD(n->ackl[queue]);
 		memcpy(&lsas[i], &no->lsa, sizeof(struct ospf_lsa_header));
 		DBG("Iter %u ID: %R, RT: %R, Type: %04x\n",
-		    i, ntohl(lsas[i].id), ntohl(lsas[i].rt), lsas[i].type);
+		    i, ntohl(lsas[i].id), ntohl(lsas[i].rt), lsas[i].type_raw);
 		rem_node(NODE no);
 		mb_free(no);
 	}
@@ -149,9 +149,8 @@ ospf_receive_lsack(struct ospf_packet *pkt, struct ospf_iface *ifa,
 		lsa_ntoh_hdr(&lsas[i], &lsa);
 		lsa_get_type_domain(&lsa, n->ifa, &lsa_type, &lsa_domain);
 
-		ret =
-		    ospf_hash_find(n->lsrth, lsa_domain, lsa.id, lsa.rt,
-				   lsa_type);
+		ret = ospf_hash_find(n->lsrth, lsa_domain, lsa.id, lsa.rt,
+				     lsa_type);
 		if (!ret)
 			continue;
 

@@ -16,42 +16,39 @@
 
 /* Client versions of logging functions */
 
-static void
-vlog(const char *msg, va_list args)
+static void vlog(const char *msg, va_list args)
 {
-  char buf[1024];
+	char buf[1024];
 
-  int n = vsnprintf(buf, sizeof(buf), msg, args);
-  if (n < 0)
-    snprintf(buf, sizeof(buf), "???");
-  if (n >= sizeof(buf))
-    snprintf(buf + sizeof(buf) - 100, 100, " ... <too long>");
-  fputs(buf, stderr);
-  fputc('\n', stderr);
+	int n = vsnprintf(buf, sizeof(buf), msg, args);
+	if (n < 0)
+		snprintf(buf, sizeof(buf), "???");
+	if (n >= sizeof(buf))
+		snprintf(buf + sizeof(buf) - 100, 100, " ... <too long>");
+	fputs(buf, stderr);
+	fputc('\n', stderr);
 }
 
-void
-bug(const char *msg, ...)
+void _bug(const char *msg, ...)
 {
-  va_list args;
+	va_list args;
 
-  va_start(args, msg);
-  cleanup();
-  fputs("Internal error: ", stderr);
-  vlog(msg, args);
-  vfprintf(stderr, msg, args);
-  va_end(args);
-  exit(1);
+	va_start(args, msg);
+	cleanup();
+	fputs("Internal error: ", stderr);
+	vlog(msg, args);
+	vfprintf(stderr, msg, args);
+	va_end(args);
+	exit(1);
 }
 
-void
-die(const char *msg, ...)
+void _die(const char *msg, ...)
 {
-  va_list args;
+	va_list args;
 
-  va_start(args, msg);
-  cleanup();
-  vlog(msg, args);
-  va_end(args);
-  exit(1);
+	va_start(args, msg);
+	cleanup();
+	vlog(msg, args);
+	va_end(args);
+	exit(1);
 }

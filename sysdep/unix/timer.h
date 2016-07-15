@@ -15,7 +15,7 @@
 
 typedef time_t bird_clock_t;		/* Use instead of time_t */
 
-typedef struct timer {
+struct timer {
   struct resource r;
   void (*hook)(struct timer *);
   void *data;
@@ -23,7 +23,7 @@ typedef struct timer {
   unsigned recurrent;			/* Timer recurrence */
   struct node n;				/* Internal link */
   bird_clock_t expires;			/* 0=inactive */
-} timer;
+};
 
 struct timer *tm_new(struct pool *);
 void tm_start(struct timer *, unsigned after);
