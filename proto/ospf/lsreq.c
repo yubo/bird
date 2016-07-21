@@ -57,14 +57,14 @@ void ospf_send_lsreq(struct ospf_proto *p, struct ospf_neighbor *n)
 
 	/* RFC 2328 10.9 */
 
-	/* ASSERT((n->state >= NEIGHBOR_EXCHANGE) && !EMPTY_SLIST(n->lsrql)); */
+	/* ASSERT((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(n->lsrql)); */
 
 	pkt = ospf_tx_buffer(ifa);
 	ospf_pkt_fill_hdr(ifa, pkt, LSREQ_P);
 	ospf_lsreq_body(p, pkt, &lsrs, &lsr_max);
 
 	i = 0;
-	WALK_SLIST(req, n->lsrql) {
+	list_for_each_entry(req, &n->lsrql, n) {
 		if (i == lsr_max)
 			break;
 

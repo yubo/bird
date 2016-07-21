@@ -25,9 +25,9 @@
  * key, hence if we keep the total number of buckets to be a power of two,
  * re-hashing of the structure keeps the relative order of the nodes.
  *
- * To get the asynchronous reading consistent over struct node deletions, we need to
- * keep a union list of readers for each node. When a struct node gets deleted, its readers
- * are automatically moved to the next struct node in the table.
+ * To get the asynchronous reading consistent over struct list_head deletions, we need to
+ * keep a struct list_head of readers for each node. When a struct list_head gets deleted, its readers
+ * are automatically moved to the next struct list_head in the table.
  *
  * Basic FIB operations are performed by functions defined by this module,
  * enumerating of FIB contents is accomplished by using the FIB_WALK() macro
@@ -84,7 +84,7 @@ static void fib_dummy_init(struct fib_node *dummy UNUSED)
  * fib_init - initialize a new FIB
  * @f: the FIB to be initialized (the structure itself being allocated by the caller)
  * @p: struct pool to allocate the nodes in
- * @node_size: struct node size to be used (each struct node consists of a standard header &fib_node
+ * @node_size: struct list_head size to be used (each struct list_head consists of a standard header &fib_node
  * followed by user data)
  * @hash_order: initial hash order (a binary logarithm of hash table size), 0 to use default order
  * (recommended)
@@ -147,13 +147,13 @@ static void fib_rehash(struct fib *f, int step)
 }
 
 /**
- * fib_find - search for FIB struct node by prefix
+ * fib_find - search for FIB struct list_head by prefix
  * @f: FIB to search in
  * @a: pointer to IP address of the prefix
  * @len: prefix length
  *
- * Search for a FIB struct node corresponding to the given prefix, return
- * a pointer to it or %NULL if no such struct node exists.
+ * Search for a FIB struct list_head corresponding to the given prefix, return
+ * a pointer to it or %NULL if no such struct list_head exists.
  */
 void *fib_find(struct fib *f, ip_addr * a, int len)
 {
@@ -192,8 +192,8 @@ fib_histogram(struct fib *f)
  * @a: pointer to IP address of the prefix
  * @len: prefix length
  *
- * Search for a FIB struct node corresponding to the given prefix and
- * return a pointer to it. If no such struct node exists, create it.
+ * Search for a FIB struct list_head corresponding to the given prefix and
+ * return a pointer to it. If no such struct list_head exists, create it.
  */
 void *fib_get(struct fib *f, ip_addr * a, int len)
 {
@@ -243,8 +243,8 @@ void *fib_get(struct fib *f, ip_addr * a, int len)
  * @a: pointer to IP address of the prefix
  * @len: prefix length
  *
- * Search for a FIB struct node with longest prefix matching the given
- * network, that is a struct node which a CIDR router would use for routing
+ * Search for a FIB struct list_head with longest prefix matching the given
+ * network, that is a struct list_head which a CIDR router would use for routing
  * that network.
  */
 void *fib_route(struct fib *f, ip_addr a, int len)
@@ -296,7 +296,7 @@ fib_merge_readers(struct fib_iterator *i, struct fib_node *to)
  *
  * This function removes the given entry from the FIB,
  * taking care of all the asynchronous readers by shifting
- * them to the next struct node in the canonical reading order.
+ * them to the next struct list_head in the canonical reading order.
  */
 void fib_delete(struct fib *f, void *E)
 {
@@ -373,7 +373,7 @@ struct fib_node *fit_get(struct fib *f, struct fib_iterator *i)
 		return NULL;
 	}
 	if (!(n = i->node)) {
-		/* No struct node info available, we are a victim of merging. Try harder. */
+		/* No struct list_head info available, we are a victim of merging. Try harder. */
 		j = i;
 		while (j->efef == 0xff)
 			j = j->prev;

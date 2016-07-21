@@ -11,7 +11,7 @@
 
 #include "ospf.h"
 
-static void add_cand(union list * l, struct top_hash_entry *en,
+static void add_cand(struct list_head * l, struct top_hash_entry *en,
 		     struct top_hash_entry *par, u32 dist,
 		     struct ospf_area *oa, int i);
 static void rt_sync(struct ospf_proto *p);
@@ -72,8 +72,8 @@ static struct mpnh *fix_device_nexthops(struct ospf_proto *p,
 	if (!p->ecmp)
 		return new_nexthop(p, gw, n->iface, n->weight);
 
-	/* This is a bit tricky. We cannot just copy the union list and update n->gw,
-	   because the union list should stay sorted, so we create two lists, one with new
+	/* This is a bit tricky. We cannot just copy the struct list_head and update n->gw,
+	   because the struct list_head should stay sorted, so we create two lists, one with new
 	   gateways and one with old ones, and then merge them. */
 
 	for (; n; n = n->next) {
@@ -369,7 +369,7 @@ static inline struct ospf_iface *rt_pos_to_ifa(struct ospf_area *oa, int pos)
 {
 	struct ospf_iface *ifa;
 
-	WALK_LIST(ifa, oa->po->iface_list)
+	list_for_each_entry(ifa, &oa->po->iface_list, n)
 	    if (ifa->oa == oa && pos >= ifa->rt_pos_beg
 		&& pos < ifa->rt_pos_end)
 		return ifa;
@@ -381,7 +381,7 @@ static inline struct ospf_iface *px_pos_to_ifa(struct ospf_area *oa, int pos)
 {
 	struct ospf_iface *ifa;
 
-	WALK_LIST(ifa, oa->po->iface_list)
+	list_for_each_entry(ifa, &oa->po->iface_list, n)
 	    if (ifa->oa == oa && pos >= ifa->px_pos_beg
 		&& pos < ifa->px_pos_end)
 		return ifa;
@@ -545,7 +545,8 @@ spfa_process_prefixes(struct ospf_proto *p, struct ospf_area *oa)
 	u32 *buf;
 	int i;
 
-	WALK_SLIST(en, p->lsal) {
+	/*WALK_SLIST(en, p->lsal) {*/
+	list_for_each_entry(en, &p->lsal, n) {
 		if (en->lsa_type != LSA_T_PREFIX)
 			continue;
 
@@ -598,7 +599,7 @@ static void ospf_rt_spfa(struct ospf_area *oa)
 {
 	struct ospf_proto *p = oa->po;
 	struct top_hash_entry *act;
-	struct node *n;
+	struct list_head *n;
 
 	if (oa->rt == NULL)
 		return;
@@ -609,21 +610,21 @@ static void ospf_rt_spfa(struct ospf_area *oa)
 		   oa->areaid);
 
 	/* 16.1. (1) */
-	init_list(&oa->cand);	/* Empty union list of candidates */
+	INIT_LIST_HEAD(&oa->cand);	/* Empty struct list_head of candidates */
 	oa->trcap = 0;
 
 	DBG("LSA db prepared, adding me into candidate list.\n");
 
 	oa->rt->dist = 0;
 	oa->rt->color = CANDIDATE;
-	add_head(&oa->cand, &oa->rt->cn);
+	list_add(&oa->rt->cn, &oa->cand);
 	DBG("RT LSA: rt: %R, id: %R, type: %u\n",
 	    oa->rt->lsa.rt, oa->rt->lsa.id, oa->rt->lsa_type);
 
-	while (!EMPTY_LIST(oa->cand)) {
-		n = HEAD(oa->cand);
-		act = SKIP_BACK(struct top_hash_entry, cn, n);
-		rem_node(n);
+	while (!list_empty(&oa->cand)) {
+		n = (void *)oa->cand.next;
+		act = container_of(n, struct top_hash_entry, cn);
+		list_del_init(n);
 
 		DBG("Working on LSA: rt: %R, id: %R, type: %u\n",
 		    act->lsa.rt, act->lsa.id, act->lsa_type);
@@ -743,7 +744,8 @@ static void ospf_rt_sum(struct ospf_area *oa)
 		   "Starting routing table calculation for inter-area (area %R)",
 		   oa->areaid);
 
-	WALK_SLIST(en, p->lsal) {
+	/*WALK_SLIST(en, p->lsal) {*/
+	list_for_each_entry(en, &p->lsal, n) {
 		if ((en->lsa_type != LSA_T_SUM_RT)
 		    && (en->lsa_type != LSA_T_SUM_NET))
 			continue;
@@ -842,7 +844,7 @@ static void ospf_rt_sum_tr(struct ospf_area *oa)
 	if (!bb)
 		return;
 
-	WALK_SLIST(en, p->lsal) {
+	list_for_each_entry(en, &p->lsal, n) {
 		if ((en->lsa_type != LSA_T_SUM_RT)
 		    && (en->lsa_type != LSA_T_SUM_NET))
 			continue;
@@ -1008,7 +1010,7 @@ static inline void check_sum_net_lsa(struct ospf_proto *p, struct ort * nf)
 			return;
 
 		/* Find that area network */
-		WALK_LIST(anet_oa, p->area_list) {
+		list_for_each_entry(anet_oa, &p->area_list, n) {
 			anet =
 			    (struct area_net *)fib_find(&anet_oa->net_fib,
 							&nf->fn.prefix,
@@ -1019,7 +1021,7 @@ static inline void check_sum_net_lsa(struct ospf_proto *p, struct ort * nf)
 	}
 
 	struct ospf_area *oa;
-	WALK_LIST(oa, p->area_list) {
+	list_for_each_entry(oa, &p->area_list, n) {
 		if (anet && decide_anet_lsa(oa, anet, anet_oa))
 			ospf_originate_sum_net_lsa(p, oa, nf, anet->metric);
 		else if (decide_sum_lsa(oa, nf, ORT_NET))
@@ -1030,7 +1032,7 @@ static inline void check_sum_net_lsa(struct ospf_proto *p, struct ort * nf)
 static inline void check_sum_rt_lsa(struct ospf_proto *p, struct ort * nf)
 {
 	struct ospf_area *oa;
-	WALK_LIST(oa, p->area_list)
+	list_for_each_entry(oa, &p->area_list, n)
 	    if (decide_sum_lsa(oa, nf, ORT_ROUTER))
 		ospf_originate_sum_rt_lsa(p, oa, nf, nf->n.metric1,
 					  nf->n.options);
@@ -1077,7 +1079,7 @@ static inline void check_nssa_lsa(struct ospf_proto *p, struct ort * nf)
 
 	if (nf->area_net) {
 		/* Find that area network */
-		WALK_LIST(oa, p->area_list) {
+		list_for_each_entry(oa, &p->area_list, n) {
 			anet =
 			    (struct area_net *)fib_find(&oa->enet_fib,
 							&nf->fn.prefix,
@@ -1103,7 +1105,7 @@ static inline void check_nssa_lsa(struct ospf_proto *p, struct ort * nf)
 static void ospf_check_vlinks(struct ospf_proto *p)
 {
 	struct ospf_iface *ifa;
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if (ifa->type == OSPF_IT_VLINK) {
 			struct top_hash_entry *tmp;
 			tmp =
@@ -1202,7 +1204,7 @@ static void ospf_rt_abr1(struct ospf_proto *p)
 	default_nf->area_net = 1;
 
 	struct ospf_area *oa;
-	WALK_LIST(oa, p->area_list) {
+	list_for_each_entry(oa, &p->area_list, n) {
 
 		/* 12.4.3.1. - originate or flush default route for stub/NSSA areas */
 		if (oa_is_stub(oa) || (oa_is_nssa(oa) && !oa->ac->summary))
@@ -1266,7 +1268,7 @@ static void ospf_rt_abr2(struct ospf_proto *p)
 
 	/* RFC 3103 3.1 - type-7 translator election */
 	struct ospf_area *bb = p->backbone;
-	WALK_LIST(oa, p->area_list)
+	list_for_each_entry(oa, &p->area_list, n)
 	    if (oa_is_nssa(oa)) {
 		int translate = 1;
 
@@ -1390,7 +1392,7 @@ static void ospf_ext_spf(struct ospf_proto *p)
 	OSPF_TRACE(D_EVENTS,
 		   "Starting routing table calculation for ext routes");
 
-	WALK_SLIST(en, p->lsal) {
+	list_for_each_entry(en, &p->lsal, n) {
 		/* 16.4. (1) */
 		if ((en->lsa_type != LSA_T_EXT) && (en->lsa_type != LSA_T_NSSA))
 			continue;
@@ -1535,7 +1537,7 @@ void ospf_rt_reset(struct ospf_proto *p)
 	FIB_WALK_END;
 
 	/* Reset SPF data in LSA db */
-	WALK_SLIST(en, p->lsal) {
+	list_for_each_entry(en, &p->lsal, n) {
 		en->color = OUTSPF;
 		en->dist = LSINFINITY;
 		en->nhs = NULL;
@@ -1545,7 +1547,7 @@ void ospf_rt_reset(struct ospf_proto *p)
 			en->mode = LSA_M_STALE;
 	}
 
-	WALK_LIST(oa, p->area_list) {
+	list_for_each_entry(oa, &p->area_list, n) {
 		/* Reset ASBR routing tables */
 		FIB_WALK(&oa->rtr, nftmp) {
 			ri = (struct ort *) nftmp;
@@ -1593,14 +1595,14 @@ void ospf_rt_spf(struct ospf_proto *p)
 	ospf_rt_reset(p);
 
 	/* 16. (2) */
-	WALK_LIST(oa, p->area_list)
+	list_for_each_entry(oa, &p->area_list, n)
 	    ospf_rt_spfa(oa);
 
 	/* 16. (3) */
 	ospf_rt_sum(ospf_main_area(p));
 
 	/* 16. (4) */
-	WALK_LIST(oa, p->area_list)
+	list_for_each_entry(oa, &p->area_list, n)
 	    if (oa->trcap && (oa->areaid != 0))
 		ospf_rt_sum_tr(oa);
 
@@ -1719,13 +1721,13 @@ bad:
 	return NULL;
 }
 
-/* Add LSA into union list of candidates in Dijkstra's algorithm */
+/* Add LSA into struct list_head of candidates in Dijkstra's algorithm */
 static void
-add_cand(union list * l, struct top_hash_entry *en, struct top_hash_entry *par,
+add_cand(struct list_head * l, struct top_hash_entry *en, struct top_hash_entry *par,
 	 u32 dist, struct ospf_area *oa, int pos)
 {
 	struct ospf_proto *p = oa->po;
-	struct node *prev, *n;
+	struct list_head *prev, *n;
 	int added = 0;
 	struct top_hash_entry *act;
 
@@ -1774,7 +1776,7 @@ add_cand(union list * l, struct top_hash_entry *en, struct top_hash_entry *par,
 		 * previous steps (that is stored in nhs_reuse, i.e. created by merging or
 		 * allocated in calc_next_hop()).
 		 *
-		 * Generally, a struct node first inherits shared nexthops from its parent and
+		 * Generally, a struct list_head first inherits shared nexthops from its parent and
 		 * later possibly gets reusable (private) copy during merging. This is more
 		 * or less same for both top_hash_entry nodes and struct orta nodes.
 		 *
@@ -1802,7 +1804,7 @@ add_cand(union list * l, struct top_hash_entry *en, struct top_hash_entry *par,
 	    en->lsa.rt, en->lsa.id, en->lsa_type);
 
 	if (en->color == CANDIDATE) {	/* We found a shorter path */
-		rem_node(&en->cn);
+		list_del_init(&en->cn);
 	}
 	en->nhs = nhs;
 	en->dist = dist;
@@ -1811,18 +1813,18 @@ add_cand(union list * l, struct top_hash_entry *en, struct top_hash_entry *par,
 
 	prev = NULL;
 
-	if (EMPTY_LIST(*l)) {
-		add_head(l, &en->cn);
+	if (list_empty(l)) {
+		list_add(&en->cn, l);
 	} else {
-		WALK_LIST(n, *l) {
-			act = SKIP_BACK(struct top_hash_entry, cn, n);
+		list_for_each(n, l) {
+			act = container_of(n,struct top_hash_entry, cn);
 			if ((act->dist > dist) ||
 			    ((act->dist == dist)
 			     && (act->lsa_type == LSA_T_RT))) {
 				if (prev == NULL)
-					add_head(l, &en->cn);
+					list_add(&en->cn, l);
 				else
-					insert_node(&en->cn, prev);
+					list_add(&en->cn, prev);
 				added = 1;
 				break;
 			}
@@ -1830,7 +1832,7 @@ add_cand(union list * l, struct top_hash_entry *en, struct top_hash_entry *par,
 		}
 
 		if (!added) {
-			add_tail(l, &en->cn);
+			list_add_tail( &en->cn,l);
 		}
 	}
 }
@@ -1946,7 +1948,7 @@ again1:
 	}
 	FIB_ITERATE_END(nftmp);
 
-	WALK_LIST(oa, p->area_list) {
+	list_for_each_entry(oa, &p->area_list, n) {
 		/* Cleanup ASBR hash tables */
 		FIB_ITERATE_INIT(&fit, &oa->rtr);
 again2:
@@ -1963,7 +1965,7 @@ again2:
 	}
 
 	/* Cleanup stale LSAs */
-	WALK_SLIST(en, p->lsal)
+	list_for_each_entry(en, &p->lsal, n)
 	    if (en->mode == LSA_M_STALE)
 		ospf_flush_lsa(p, en);
 }

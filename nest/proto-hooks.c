@@ -248,11 +248,11 @@ struct ea_list *make_tmp_attrs(struct rte *e, struct linpool *pool)
  * @attrs: temporary attributes to be converted
  *
  * This hook is an exact opposite of make_tmp_attrs() -- it takes
- * a union list of extended attributes and converts them to attributes
+ * a struct list_head of extended attributes and converts them to attributes
  * embedded in the &rte corresponding to this protocol.
  *
  * You must be prepared for any of the attributes being missing
- * from the union list and use default values instead.
+ * from the struct list_head and use default values instead.
  */
 void store_tmp_attrs(struct rte *e, struct ea_list *attrs)
 { DUMMY; }

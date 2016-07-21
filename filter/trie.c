@@ -36,8 +36,8 @@
  * that information from nodes to their ascendants.
  *
  * Suppose that we have two masks (M1 and M2) for a node. Mask M1
- * represents accepted prefix lengths by just the struct node and mask M2
- * represents accepted prefix lengths by the struct node or any of its
+ * represents accepted prefix lengths by just the struct list_head and mask M2
+ * represents accepted prefix lengths by the struct list_head or any of its
  * descendants. Therefore M2 is a bitwise or of M1 and children's
  * M2 and this is a maintained invariant during trie building.
  * Basically, when we want to match a prefix, we walk through the trie,
@@ -46,7 +46,7 @@
  *
  * There are two differences in the real implementation. First,
  * we use a compressed trie so there is a case that we skip our
- * final struct node (if it is not in the trie) and we came to struct node that
+ * final struct list_head (if it is not in the trie) and we came to struct list_head that
  * is either extension of our prefix, or completely out of path
  * In the first case, we also have to check M2.
  *
@@ -61,7 +61,7 @@
  *
  * - we are in NULL
  * - we are out of path (prefixes are inconsistent)
- * - we are in the wanted (final) struct node (node length == &plen)
+ * - we are in the wanted (final) struct list_head (node length == &plen)
  * - we are beyond the end of path (node length > &plen)
  * - we are still on path and keep walking (node length < &plen)
  *
@@ -77,7 +77,7 @@
 /**
  * f_new_trie - allocates and returns a new empty trie
  * @lp: linear struct pool to allocate items from
- * @node_size: struct node size to be used (&f_trie_node and user data)
+ * @node_size: struct list_head size to be used (&f_trie_node and user data)
  */
 struct f_trie *f_new_trie(struct linpool *lp, uint node_size)
 {
@@ -119,8 +119,8 @@ attach_node(struct f_trie_node *parent, struct f_trie_node *child)
  * 0 <= l, h <= 32 (128 for IPv6).
  *
  * Returns a pointer to the allocated node. The function can return a pointer to
- * an existing struct node if @px and @plen are the same. If px/plen == 0/0 (or ::/0),
- * a pointer to the root struct node is returned.
+ * an existing struct list_head if @px and @plen are the same. If px/plen == 0/0 (or ::/0),
+ * a pointer to the root struct list_head is returned.
  */
 
 void *trie_add_prefix(struct f_trie *t, ip_addr px, int plen, int l, int h)
@@ -143,14 +143,14 @@ void *trie_add_prefix(struct f_trie *t, ip_addr px, int plen, int l, int h)
 		ip_addr cmask = ipa_and(n->mask, pmask);
 
 		if (ipa_compare(ipa_and(paddr, cmask), ipa_and(n->addr, cmask))) {
-			/* We are out of path - we have to add branching struct node 'b'
-			   between struct node 'o' and struct node 'n', and attach new struct node 'a'
+			/* We are out of path - we have to add branching struct list_head 'b'
+			   between struct list_head 'o' and struct list_head 'n', and attach new struct list_head 'a'
 			   as the other child of 'b'. */
 			int blen = ipa_pxlen(paddr, n->addr);
 			ip_addr bmask = ipa_mkmask(blen);
 			ip_addr baddr = ipa_and(px, bmask);
 
-			/* Merge accept masks from children to get accept mask for struct node 'b' */
+			/* Merge accept masks from children to get accept mask for struct list_head 'b' */
 			ip_addr baccm =
 			    ipa_and(ipa_or(amask, n->accept), bmask);
 
@@ -165,7 +165,7 @@ void *trie_add_prefix(struct f_trie *t, ip_addr px, int plen, int l, int h)
 		}
 
 		if (plen < n->plen) {
-			/* We add new struct node 'a' between struct node 'o' and struct node 'n' */
+			/* We add new struct list_head 'a' between struct list_head 'o' and struct list_head 'n' */
 			amask = ipa_or(amask, ipa_and(n->accept, pmask));
 			struct f_trie_node *a =
 			    new_node(t, plen, paddr, pmask, amask);
@@ -175,7 +175,7 @@ void *trie_add_prefix(struct f_trie *t, ip_addr px, int plen, int l, int h)
 		}
 
 		if (plen == n->plen) {
-			/* We already found added struct node in trie. Just update accept mask */
+			/* We already found added struct list_head in trie. Just update accept mask */
 			n->accept = ipa_or(n->accept, amask);
 			return n;
 		}
@@ -188,7 +188,7 @@ void *trie_add_prefix(struct f_trie *t, ip_addr px, int plen, int l, int h)
 		n = n->c[ipa_getbit(paddr, n->plen) ? 1 : 0];
 	}
 
-	/* We add new tail struct node 'a' after struct node 'o' */
+	/* We add new tail struct list_head 'a' after struct list_head 'o' */
 	struct f_trie_node *a = new_node(t, plen, paddr, pmask, amask);
 	attach_node(o, a);
 

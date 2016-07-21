@@ -11,7 +11,7 @@
 #include "nest/bird.h"
 #include "nest/protocol.h"
 #include "lib/resource.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/event.h"
 #include "lib/string.h"
 #include "conf/conf.h"
@@ -22,15 +22,15 @@
 
 struct pool *proto_pool;
 
-static union list protocol_list;
-static union list proto_list;
+static struct list_head protocol_list;
+static struct list_head proto_list;
 
 #define PD(pr, msg, args...) do { if (pr->debug & D_STATES) { log(L_TRACE "%s: " msg, pr->name , ## args); } } while(0)
 
-union list active_proto_list;
-static union list inactive_proto_list;
-static union list initial_proto_list;
-static union list flush_proto_list;
+struct list_head active_proto_list;
+static struct list_head inactive_proto_list;
+static struct list_head initial_proto_list;
+static struct list_head flush_proto_list;
 static struct proto *initial_device_proto;
 
 static struct event *proto_flush_event;
@@ -57,7 +57,7 @@ static char *proto_state_name(struct proto *p);
 
 static void proto_relink(struct proto *p)
 {
-	union list *l = NULL;
+	struct list_head *l = NULL;
 
 	switch (p->core_state) {
 	case FS_HUNGRY:
@@ -73,8 +73,8 @@ static void proto_relink(struct proto *p)
 		ASSERT(0);
 	}
 
-	rem_node(&p->n);
-	add_tail(l, &p->n);
+	list_del(&p->n);
+	list_add_tail( &p->n,l);
 }
 
 static void proto_log_state_change(struct proto *p)
@@ -108,6 +108,8 @@ void *proto_new(struct proto_config *c, unsigned size)
 	struct protocol *pr = c->protocol;
 	struct proto *p = mb_allocz(proto_pool, size);
 
+	INIT_LIST_HEAD(&p->n);
+	INIT_LIST_HEAD(&p->glob_node);
 	p->cf = c;
 	p->debug = c->debug;
 	p->mrtdump = c->mrtdump;
@@ -166,6 +168,7 @@ struct announce_hook *proto_add_announce_hook(struct proto *p, struct rtable *t,
 	PD(p, "Connected to table %s", t->name);
 
 	h = mb_allocz(rt_table_pool, sizeof(struct announce_hook));
+	INIT_LIST_HEAD(&h->n);
 	h->table = t;
 	h->proto = p;
 	h->stats = stats;
@@ -174,7 +177,7 @@ struct announce_hook *proto_add_announce_hook(struct proto *p, struct rtable *t,
 	p->ahooks = h;
 
 	if (p->rt_notify && (p->export_state != ES_DOWN))
-		add_tail(&t->hooks, &h->n);
+		list_add_tail(&h->n, &t->hooks);
 	return h;
 }
 
@@ -203,7 +206,7 @@ static void proto_link_ahooks(struct proto *p)
 
 	if (p->rt_notify)
 		for (h = p->ahooks; h; h = h->next)
-			add_tail(&h->table->hooks, &h->n);
+			list_add_tail( &h->n,&h->table->hooks);
 }
 
 static void proto_unlink_ahooks(struct proto *p)
@@ -212,7 +215,7 @@ static void proto_unlink_ahooks(struct proto *p)
 
 	if (p->rt_notify)
 		for (h = p->ahooks; h; h = h->next)
-			rem_node(&h->n);
+			list_del(&h->n);
 }
 
 static void proto_free_ahooks(struct proto *p)
@@ -243,7 +246,7 @@ static void proto_free_ahooks(struct proto *p)
  *
  * The function is also used to create protocol templates (when class
  * SYM_TEMPLATE is specified), the only difference is that templates
- * are not added to the union list of protocol instances and therefore not
+ * are not added to the struct list_head of protocol instances and therefore not
  * initialized during protos_commit()).
  */
 void *proto_config_new(struct protocol *pr, int class)
@@ -251,7 +254,7 @@ void *proto_config_new(struct protocol *pr, int class)
 	struct proto_config *c = cfg_allocz(pr->config_size);
 
 	if (class == SYM_PROTO)
-		add_tail(&new_config->protos, &c->n);
+		list_add_tail(&c->n, &new_config->protos);
 	c->global = new_config;
 	c->protocol = pr;
 	c->name = pr->name;
@@ -272,12 +275,12 @@ void *proto_config_new(struct protocol *pr, int class)
  * Whenever a new instance of a routing protocol is created from the
  * template, proto_copy_config() is called to copy a content of
  * the source protocol configuration to the new protocol configuration.
- * Name, class and a struct node in protos union list of @dest are kept intact.
+ * Name, class and a struct list_head in protos struct list_head of @dest are kept intact.
  * copy_config() protocol hook is used to copy protocol-specific data.
  */
 void proto_copy_config(struct proto_config *dest, struct proto_config *src)
 {
-	struct node old_node;
+	struct list_head old_node;
 	int old_class;
 	char *old_name;
 
@@ -321,9 +324,9 @@ void protos_preconfig(struct config *c)
 {
 	struct protocol *p;
 
-	init_list(&c->protos);
+	INIT_LIST_HEAD(&c->protos);
 	DBG("Protocol preconfig:");
-	WALK_LIST(p, protocol_list) {
+	list_for_each_entry(p, &protocol_list, n) {
 		DBG(" %s", p->name);
 		p->name_counter = 0;
 		if (p->preconfig)
@@ -346,7 +349,7 @@ void protos_postconfig(struct config *c)
 	struct protocol *p;
 
 	DBG("Protocol postconfig:");
-	WALK_LIST(x, c->protos) {
+	list_for_each_entry(x, &c->protos, n) {
 		DBG(" %s", x->name);
 
 		p = x->protocol;
@@ -368,12 +371,12 @@ static struct proto *proto_init(struct proto_config *c)
 	q->export_state = ES_DOWN;
 	q->last_state_change = now;
 
-	add_tail(&initial_proto_list, &q->n);
+	list_add_tail(&q->n, &initial_proto_list);
 
 	if (p == &proto_unix_iface)
 		initial_device_proto = q;
 
-	add_tail(&proto_list, &q->glob_node);
+	list_add_tail( &q->glob_node,&proto_list);
 	PD(q, "Initializing%s", q->disabled ? " [disabled]" : "");
 	return q;
 }
@@ -497,7 +500,7 @@ protos_commit(struct config *new, struct config *old, int force_reconfig,
 
 	DBG("protos_commit:\n");
 	if (old) {
-		WALK_LIST(oc, old->protos) {
+		list_for_each_entry(oc, &old->protos, n) {
 			p = oc->proto;
 			sym = cf_find_symbol(new, oc->name);
 			if (sym && sym->class == SYM_PROTO && !new->shutdown) {
@@ -542,7 +545,7 @@ protos_commit(struct config *new, struct config *old, int force_reconfig,
 		}
 	}
 
-	WALK_LIST(nc, new->protos)
+	list_for_each_entry(nc, &new->protos, n)
 	    if (!nc->proto) {
 		if (old)	/* Not a first-time configuration */
 			log(L_INFO "Adding protocol %s", nc->name);
@@ -568,8 +571,8 @@ protos_commit(struct config *new, struct config *old, int force_reconfig,
 	}
 
 	/* Start all other protocols */
-	WALK_LIST_DELSAFE(p, n, initial_proto_list)
-	    proto_rethink_goal(p);
+	list_for_each_entry_safe(p, n, &initial_proto_list, n)
+		proto_rethink_goal(p);
 }
 
 static void proto_rethink_goal(struct proto *p)
@@ -583,8 +586,8 @@ static void proto_rethink_goal(struct proto *p)
 		DBG("%s has shut down for reconfiguration\n", p->name);
 		p->cf->proto = NULL;
 		config_del_obstacle(p->cf->global);
-		rem_node(&p->n);
-		rem_node(&p->glob_node);
+		list_del(&p->n);
+		list_del(&p->glob_node);
 		mb_free(p);
 		if (!nc)
 			return;
@@ -699,13 +702,12 @@ void graceful_restart_init(void)
  */
 static void graceful_restart_done(struct timer *t UNUSED)
 {
-	struct proto *p;
-	struct node *n;
+	struct proto *p, *n;
 
 	log(L_INFO "Graceful restart done");
 	graceful_restart_state = GRS_DONE;
 
-	WALK_LIST2(p, n, proto_list, glob_node) {
+	list_for_each_entry_safe(p, n, &proto_list, glob_node) {
 		if (!p->gr_recovery)
 			continue;
 
@@ -796,7 +798,7 @@ void protos_dump_all(void)
 
 	debug("Protocols:\n");
 
-	WALK_LIST(p, active_proto_list) {
+	list_for_each_entry(p, &active_proto_list, n) {
 		debug("  protocol %s state %s/%s\n", p->name,
 		      p_states[p->proto_state], c_states[p->core_state]);
 		for (a = p->ahooks; a; a = a->next) {
@@ -813,12 +815,12 @@ void protos_dump_all(void)
 		else if (p->proto->dump)
 			p->proto->dump(p);
 	}
-	WALK_LIST(p, inactive_proto_list)
+	list_for_each_entry(p, &inactive_proto_list, n)
 	    debug("  inactive %s: state %s/%s\n", p->name,
 		  p_states[p->proto_state], c_states[p->core_state]);
-	WALK_LIST(p, initial_proto_list)
+	list_for_each_entry(p, &initial_proto_list, n)
 	    debug("  initial %s\n", p->name);
-	WALK_LIST(p, flush_proto_list)
+	list_for_each_entry(p, &flush_proto_list, n)
 	    debug("  flushing %s\n", p->name);
 }
 
@@ -832,7 +834,7 @@ void protos_dump_all(void)
  */
 void proto_build(struct protocol *p)
 {
-	add_tail(&protocol_list, &p->n);
+	list_add_tail( &p->n,&protocol_list);
 	if (p->attr_class) {
 		ASSERT(!attr_class_to_protocol[p->attr_class]);
 		attr_class_to_protocol[p->attr_class] = p;
@@ -853,12 +855,12 @@ extern void bfd_init_all(void);
  */
 void protos_build(void)
 {
-	init_list(&protocol_list);
-	init_list(&proto_list);
-	init_list(&active_proto_list);
-	init_list(&inactive_proto_list);
-	init_list(&initial_proto_list);
-	init_list(&flush_proto_list);
+	INIT_LIST_HEAD(&protocol_list);
+	INIT_LIST_HEAD(&proto_list);
+	INIT_LIST_HEAD(&active_proto_list);
+	INIT_LIST_HEAD(&inactive_proto_list);
+	INIT_LIST_HEAD(&initial_proto_list);
+	INIT_LIST_HEAD(&flush_proto_list);
 	proto_build(&proto_device);
 #ifdef CONFIG_RADV
 	proto_build(&proto_radv);
@@ -961,7 +963,7 @@ static void proto_schedule_flush_loop(void)
 		return;
 	flush_loop_state = 1;
 
-	WALK_LIST(p, flush_proto_list) {
+	list_for_each_entry(p, &flush_proto_list, n) {
 		p->flushing = 1;
 		for (h = p->ahooks; h; h = h->next)
 			rt_mark_for_prune(h->table);
@@ -983,7 +985,7 @@ static void proto_flush_loop(void *unused UNUSED)
 	rt_prune_sources();
 
 again:
-	WALK_LIST(p, flush_proto_list)
+	list_for_each_entry(p, &flush_proto_list, n)
 	    if (p->flushing) {
 		/* This will flush interfaces in the same manner
 		   like rt_prune_all() flushes routes */
@@ -1002,7 +1004,7 @@ again:
 
 	/* This round finished, perhaps there will be another one */
 	flush_loop_state = 0;
-	if (!EMPTY_LIST(flush_proto_list))
+	if (!list_empty(&flush_proto_list))
 		proto_schedule_flush_loop();
 }
 
@@ -1013,15 +1015,16 @@ static void proto_shutdown_loop(struct timer *t UNUSED)
 {
 	struct proto *p, *p_next;
 
-	WALK_LIST_DELSAFE(p, p_next, active_proto_list)
-	    if (p->down_sched) {
-		proto_restart = (p->down_sched == PDS_RESTART);
+	list_for_each_entry_safe(p, p_next, &active_proto_list, n){
+		if (p->down_sched) {
+			proto_restart = (p->down_sched == PDS_RESTART);
 
-		p->disabled = 1;
-		proto_rethink_goal(p);
-		if (proto_restart) {
-			p->disabled = 0;
+			p->disabled = 1;
 			proto_rethink_goal(p);
+			if (proto_restart) {
+				p->disabled = 0;
+				proto_rethink_goal(p);
+			}
 		}
 	}
 }
@@ -1571,11 +1574,10 @@ static void
 proto_apply_cmd_patt(char *patt, void (*cmd) (struct proto *, uint, int),
 		     uint arg)
 {
+	struct proto *p;
 	int cnt = 0;
 
-	struct node *nn;
-	WALK_LIST(nn, proto_list) {
-		struct proto *p = SKIP_BACK(struct proto, glob_node, nn);
+	list_for_each_entry(p, &proto_list, glob_node) {
 
 		if (!patt || patmatch(patt, p->name))
 			cmd(p, arg, cnt++);
@@ -1612,13 +1614,14 @@ struct proto *proto_get_named(struct symbol *sym, struct protocol *pr)
 			cf_error("%s: Not a %s protocol", sym->name, pr->name);
 	} else {
 		p = NULL;
-		WALK_LIST(q, active_proto_list)
-		    if (q->proto == pr) {
-			if (p)
-				cf_error
-				    ("There are multiple %s protocols running",
-				     pr->name);
-			p = q;
+		list_for_each_entry(q, &active_proto_list, n){
+			if (q->proto == pr) {
+				if (p)
+					cf_error("There are multiple "
+							"%s protocols running",
+							pr->name);
+				p = q;
+			}
 		}
 		if (!p)
 			cf_error("There is no %s protocol running", pr->name);

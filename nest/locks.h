@@ -33,9 +33,9 @@ struct object_lock {
   void (*hook)(struct object_lock *);	/* Called when the lock succeeds */
   void *data;		/* User data */
   /* ... internal to lock manager, don't touch ... */
-  struct node n;		/* Node in union list of olocks */
+  struct list_head n;		/* Node in struct list_head of olocks */
   int state;		/* OLOCK_STATE_xxx */
-  union list waiters;		/* Locks waiting for the same struct resource */
+  struct list_head waiters;		/* Locks waiting for the same struct resource */
 };
 
 struct object_lock *olock_new(struct pool *);

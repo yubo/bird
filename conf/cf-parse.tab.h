@@ -429,8 +429,6 @@ enum yytokentype {
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE YYSTYPE;
 union YYSTYPE {
-#line 541 "cf-parse.y"		/* yacc.c:1909  */
-
 	int i;
 	u32 i32;
 	ip_addr a;
@@ -455,8 +453,6 @@ union YYSTYPE {
 	struct prefix px;
 	struct proto_spec ps;
 	struct timeformat *tf;
-
-#line 462 "cf-parse.tab.h"	/* yacc.c:1909  */
 };
 #define YYSTYPE_IS_TRIVIAL 1
 #define YYSTYPE_IS_DECLARED 1

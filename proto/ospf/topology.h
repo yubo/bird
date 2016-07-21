@@ -13,8 +13,9 @@
 #define _BIRD_OSPF_TOPOLOGY_H_
 
 struct top_hash_entry {		/* Index for fast mapping (type,rtrid,LSid)->vertex */
-	struct snode n;
-	struct node cn;		/* For adding into union list of candidates
+	struct list_head n;
+	struct list_head n_list;
+	struct list_head cn;		/* For adding into struct list_head of candidates
 				   in intra-area routing table calculation */
 	struct top_hash_entry *next;	/* Next in hash chain */
 	struct ospf_lsa_header lsa;

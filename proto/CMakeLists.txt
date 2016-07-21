@@ -14,6 +14,6 @@ set(STATIC_SOURCES ./static/static.c)
 set(OSPF_SOURCES ./ospf/iface.c ./ospf/lsreq.c ./ospf/dbdes.c ./ospf/ospf.c ./ospf/neighbor.c ./ospf/topology.c ./ospf/rt.c ./ospf/packet.c ./ospf/lsalib.c ./ospf/lsack.c ./ospf/lsupd.c ./ospf/hello.c)
 set(SOURCES ${BFD_SOURCES} ${BGP_SOURCES} ${PIPE_SOURCES} ${RIP_SOURCES} ${STATIC_SOURCES} ${OSPF_SOURCES})
 
-ADD_LIBRARY(proto-static STATIC ${SOURCES})
+ADD_LIBRARY(proto-static STATIC ${OSPF_SOURCES} ${STATIC_SOURCES})
 target_link_libraries(proto-static bird-static pthread)
 

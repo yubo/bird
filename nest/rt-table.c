@@ -17,8 +17,8 @@
  * number of secondary ones if requested by the configuration). Each table
  * is basically a FIB containing entries describing the individual
  * destination networks. For each network (represented by structure &net),
- * there is a one-way linked union list of route entries (&rte), the first entry
- * on the union list being the best one (i.e., the one we currently use
+ * there is a one-way linked struct list_head of route entries (&rte), the first entry
+ * on the struct list_head being the best one (i.e., the one we currently use
  * for routing), the order of the other ones is undetermined.
  *
  * The &rte contains information specific to the route (preference, protocol
@@ -48,7 +48,7 @@ struct pool *rt_table_pool;
 static struct slab *rte_slab;
 static struct linpool *rte_update_pool;
 
-static union list routing_tables;
+static struct list_head routing_tables;
 
 static void rt_format_via(struct rte *e, byte * via);
 static void rt_free_hostcache(struct rtable *tab);
@@ -389,7 +389,9 @@ static void
 rt_notify_basic(struct announce_hook *ah, struct network * net, struct rte *new0,
 		struct rte *old0, int refeed)
 {
+#ifdef CONFIG_PIPE
 	struct proto *p = ah->proto;
+#endif
 	struct proto_stats *stats = ah->stats;
 
 	struct rte *new = new0;
@@ -760,7 +762,7 @@ rte_announce(struct rtable *tab, unsigned type, struct network * net, struct rte
 	}
 
 	struct announce_hook *a;
-	WALK_LIST(a, tab->hooks) {
+	list_for_each_entry(a, &tab->hooks, n) {
 		ASSERT(a->proto->export_state != ES_DOWN);
 		if (a->proto->accept_ra_types == type)
 			if (type == RA_ACCEPTED)
@@ -999,13 +1001,13 @@ skip_stats1:
 			net->routes = new;
 		} else if (old == old_best) {
 			/* The second case - the old best route disappeared, we add the
-			   new route (if we have any) to the union list (we don't care about
+			   new route (if we have any) to the struct list_head (we don't care about
 			   position) and then we elect the new optimal route and relink
 			   that route at the first position and announce it. New optimal
 			   route might be NULL if there is no more routes */
 
 do_recalculate:
-			/* Add the new route to the union list */
+			/* Add the new route to the struct list_head */
 			if (new) {
 				new->next = net->routes;
 				net->routes = new;
@@ -1376,7 +1378,7 @@ void rt_dump(struct rtable *t)
 			rte_dump(e);
 	}
 	FIB_WALK_END;
-	WALK_LIST(a, t->hooks)
+	list_for_each_entry(a, &t->hooks, n)
 	    debug("\tAnnounces routes to protocol %s\n", a->proto->name);
 	debug("\n");
 }
@@ -1390,7 +1392,7 @@ void rt_dump_all(void)
 {
 	struct rtable *t;
 
-	WALK_LIST(t, routing_tables)
+	list_for_each_entry(t, &routing_tables, n)
 	    rt_dump(t);
 }
 
@@ -1486,7 +1488,7 @@ rt_setup(struct pool *p, struct rtable *t, char *name, struct rtable_config *cf)
 	fib_init(&t->fib, p, sizeof(struct network), 0, rte_init);
 	t->name = name;
 	t->config = cf;
-	init_list(&t->hooks);
+	INIT_LIST_HEAD(&t->hooks);
 	if (cf) {
 		t->rt_event = ev_new(p);
 		t->rt_event->hook = rt_event;
@@ -1507,7 +1509,7 @@ void rt_init(void)
 	rt_table_pool = rp_new(&root_pool, "Routing tables");
 	rte_update_pool = lp_new(rt_table_pool, 4080);
 	rte_slab = sl_new(rt_table_pool, sizeof(struct rte));
-	init_list(&routing_tables);
+	INIT_LIST_HEAD(&routing_tables);
 }
 
 static int rt_prune_step(struct rtable *tab, int *limit)
@@ -1594,7 +1596,7 @@ int rt_prune_loop(void)
 	int limit = 512;
 	struct rtable *t;
 
-	WALK_LIST(t, routing_tables)
+	list_for_each_entry(t, &routing_tables, n)
 	    if (!rt_prune_step(t, &limit))
 		return 0;
 
@@ -1605,7 +1607,7 @@ void rt_preconfig(struct config *c)
 {
 	struct symbol *s = cf_get_symbol("master");
 
-	init_list(&c->tables);
+	INIT_LIST_HEAD(&c->tables);
 	c->master_rtc = rt_new_table(s);
 }
 
@@ -1763,7 +1765,7 @@ struct rtable_config *rt_new_table(struct symbol *s)
 
 	cf_define_symbol(s, SYM_TABLE, c);
 	c->name = s->name;
-	add_tail(&new_config->tables, &c->n);
+	list_add_tail( &c->n,&new_config->tables);
 	c->gc_max_ops = 1000;
 	c->gc_min_time = 5;
 	return c;
@@ -1798,7 +1800,7 @@ void rt_unlock_table(struct rtable *r)
 		r->config->table = NULL;
 		if (r->hostcache)
 			rt_free_hostcache(r);
-		rem_node(&r->n);
+		list_del(&r->n);
 		fib_free(&r->fib);
 		rfree(r->rt_event);
 		mb_free(r);
@@ -1824,7 +1826,7 @@ void rt_commit(struct config *new, struct config *old)
 
 	DBG("rt_commit:\n");
 	if (old) {
-		WALK_LIST(o, old->tables) {
+		list_for_each_entry(o, &old->tables, n) {
 			struct rtable *ot = o->table;
 			if (!ot->deleted) {
 				struct symbol *sym =
@@ -1850,13 +1852,13 @@ void rt_commit(struct config *new, struct config *old)
 		}
 	}
 
-	WALK_LIST(r, new->tables)
+	list_for_each_entry(r, &new->tables, n)
 	    if (!r->table) {
 		struct rtable *t =
 		    mb_alloc(rt_table_pool, sizeof(struct rtable));
 		DBG("\t%s: created\n", r->name);
 		rt_setup(rt_table_pool, t, r->name, r);
-		add_tail(&routing_tables, &t->n);
+		list_add_tail( &t->n,&routing_tables);
 		r->table = t;
 	}
 	DBG("\tdone\n");
@@ -2045,7 +2047,7 @@ static struct hostentry *hc_new_hostentry(struct hostcache *hc, ip_addr a,
 	he->uc = 0;
 	he->src = NULL;
 
-	add_tail(&hc->hostentries, &he->ln);
+	list_add_tail( &he->ln,&hc->hostentries);
 	hc_insert(hc, he);
 
 	hc->hash_items++;
@@ -2059,7 +2061,7 @@ static void hc_delete_hostentry(struct hostcache *hc, struct hostentry *he)
 {
 	rta_free(he->src);
 
-	rem_node(&he->ln);
+	list_del(&he->ln);
 	hc_remove(hc, he);
 	sl_free(hc->slab, he);
 
@@ -2072,7 +2074,7 @@ static void rt_init_hostcache(struct rtable *tab)
 {
 	struct hostcache *hc =
 	    mb_allocz(rt_table_pool, sizeof(struct hostcache));
-	init_list(&hc->hostentries);
+	INIT_LIST_HEAD(&hc->hostentries);
 
 	hc->hash_items = 0;
 	hc_alloc_table(hc, HC_DEF_ORDER);
@@ -2086,11 +2088,10 @@ static void rt_init_hostcache(struct rtable *tab)
 
 static void rt_free_hostcache(struct rtable *tab)
 {
+	struct hostentry *he;
 	struct hostcache *hc = tab->hostcache;
 
-	struct node *n;
-	WALK_LIST(n, hc->hostentries) {
-		struct hostentry *he = SKIP_BACK(struct hostentry, ln, n);
+	list_for_each_entry(he, &hc->hostentries, ln) {
 		rta_free(he->src);
 
 		if (he->uc)
@@ -2119,7 +2120,7 @@ static int if_local_addr(ip_addr a, struct iface *i)
 {
 	struct ifa *b;
 
-	WALK_LIST(b, i->addrs)
+	list_for_each_entry(b, &i->addrs, n)
 	    if (ipa_equal(a, b->ip))
 		return 1;
 
@@ -2212,15 +2213,13 @@ done:
 static void rt_update_hostcache(struct rtable *tab)
 {
 	struct hostcache *hc = tab->hostcache;
-	struct hostentry *he;
-	struct node *n, *x;
+	struct hostentry *he, *x;
 
 	/* Reset the trie */
 	lp_flush(hc->lp);
 	hc->trie = f_new_trie(hc->lp, sizeof(struct f_trie_node));
 
-	WALK_LIST_DELSAFE(n, x, hc->hostentries) {
-		he = SKIP_BACK(struct hostentry, ln, n);
+	list_for_each_entry_safe(he, x, &hc->hostentries, ln) {
 		if (!he->uc) {
 			hc_delete_hostentry(hc, he);
 			continue;

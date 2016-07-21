@@ -2463,8 +2463,8 @@ char *cf_symbol_class_name(struct symbol *sym)
  * by various BIRD modules in order to provide information about syntax of their
  * configuration and their CLI commands. Each snipped consists of several
  * sections, each of them starting with a special keyword: |CF_HDR| for
- * a union list of |#include| directives needed by the C code, |CF_DEFINES|
- * for a union list of C declarations, |CF_DECLS| for |bison| declarations
+ * a struct list_head of |#include| directives needed by the C code, |CF_DEFINES|
+ * for a struct list_head of C declarations, |CF_DECLS| for |bison| declarations
  * including keyword definitions specified as |CF_KEYWORDS|, |CF_GRAMMAR|
  * for the grammar rules, |CF_CODE| for auxiliary C code and finally
  * |CF_END| at the end of the snippet.
@@ -2474,7 +2474,7 @@ char *cf_symbol_class_name(struct symbol *sym)
  * alternative to a multi-part rule.
  *
  * CLI commands are defined using a |CF_CLI| macro. Its parameters are:
- * the union list of keywords determining the command, the union list of parameters,
+ * the struct list_head of keywords determining the command, the struct list_head of parameters,
  * help text for the parameters and help text for the command.
  *
  * Values of |enum| filter types can be defined using |CF_ENUM| with

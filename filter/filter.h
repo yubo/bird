@@ -167,8 +167,8 @@ void val_format(struct f_val v, struct buffer *buf);
 #define T_STRING 0x22
 #define T_PATH_MASK 0x23	/* mask for BGP path */
 #define T_PATH 0x24		/* BGP path */
-#define T_CLIST 0x25		/* Community union list */
-#define T_ECLIST 0x26		/* Extended community union list */
+#define T_CLIST 0x25		/* Community struct list_head */
+#define T_ECLIST 0x26		/* Extended community struct list_head */
 #define T_EC 0x27		/* Extended community value, u64 */
 
 #define T_RETURN 0x40
@@ -206,7 +206,7 @@ struct f_trie
   struct linpool *lp;
   int zero;
   uint node_size;
-  struct f_trie_node root[0];		/* Root trie struct node follows */
+  struct f_trie_node root[0];		/* Root trie struct list_head follows */
 };
 
 #define NEW_F_VAL struct f_val * val; val = cfg_alloc(sizeof(struct f_val));

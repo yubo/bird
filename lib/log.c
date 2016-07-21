@@ -25,11 +25,11 @@
 #include "nest/cli.h"
 #include "nest/mrtdump.h"
 #include "lib/string.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/unix.h"
 
 static FILE *dbgf;
-static union list *current_log_list;
+static struct list_head *current_log_list;
 static char *current_syslog_name;	/* NULL -> syslog closed */
 
 #ifdef USE_PTHREADS
@@ -130,7 +130,7 @@ void log_commit(int class, struct buffer *buf)
 		strcpy(buf->end - 100, " ... <too long>");
 
 	log_lock();
-	WALK_LIST(l, *current_log_list) {
+	list_for_each_entry(l, current_log_list, n) {
 		if (!(l->mask & (1 << class)))
 			continue;
 		if (l->fh) {
@@ -266,16 +266,16 @@ void debug(const char *msg, ...)
 	va_end(args);
 }
 
-static union list *default_log_list(int debug, int init, char **syslog_name)
+static struct list_head *default_log_list(int debug, int init, char **syslog_name)
 {
-	static union list init_log_list;
-	init_list(&init_log_list);
+	static struct list_head init_log_list;
+	INIT_LIST_HEAD(&init_log_list);
 	*syslog_name = NULL;
 
 #ifdef HAVE_SYSLOG
 	if (!debug) {
 		static struct log_config lc_syslog = {.mask = ~0 };
-		add_tail(&init_log_list, &lc_syslog.n);
+		list_add_tail( &lc_syslog.n,&init_log_list);
 		*syslog_name = bird_name;
 		if (!init)
 			return &init_log_list;
@@ -284,13 +284,13 @@ static union list *default_log_list(int debug, int init, char **syslog_name)
 
 	static struct log_config lc_stderr = {.mask = ~0,.terminal_flag = 1 };
 	lc_stderr.fh = stderr;
-	add_tail(&init_log_list, &lc_stderr.n);
+	list_add_tail( &lc_stderr.n,&init_log_list);
 	return &init_log_list;
 }
 
-void log_switch(int debug, union list *l, char *new_syslog_name)
+void log_switch(int debug, struct list_head *l, char *new_syslog_name)
 {
-	if (!l || EMPTY_LIST(*l))
+	if (!l || list_empty(l))
 		l = default_log_list(debug, !l, &new_syslog_name);
 
 	current_log_list = l;

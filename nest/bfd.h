@@ -7,14 +7,14 @@
 #ifndef _BIRD_NBFD_H_
 #define _BIRD_NBFD_H_
 
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 
 struct bfd_session;
 
 struct bfd_request {
   struct resource r;
-  struct node n;
+  struct list_head n;
 
   ip_addr addr;
   ip_addr local;

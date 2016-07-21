@@ -103,13 +103,22 @@ static inline void
 ospf_lsa_lsrq_down(struct top_hash_entry *req, struct ospf_neighbor *n,
 		   struct ospf_neighbor *from)
 {
+	struct list_head *next = req->n.next;
 	if (req == n->lsrqi)
-		n->lsrqi = SNODE_NEXT(req);
+		n->lsrqi = (void *)(req->n.next);
 
-	s_rem_node(SNODE req);
+
+	//s_rem_node(SNODE en);
+	list_del_init(&req->n);
+	if (!list_empty(next)){
+		struct top_hash_entry *next_e;
+		next_e = container_of(next, struct top_hash_entry, n);
+		list_splice_init(&req->n_list, &next_e->n_list);
+	}
+
 	ospf_hash_delete(n->lsrqh, req);
 
-	if (EMPTY_SLIST(n->lsrql)) {
+	if (list_empty(&n->lsrql)) {
 		tm_stop(n->lsrq_timer);
 
 		if (n->state == NEIGHBOR_LOADING)
@@ -122,9 +131,11 @@ ospf_lsa_lsrt_up(struct top_hash_entry *en, struct ospf_neighbor *n)
 {
 	struct top_hash_entry *ret = ospf_hash_get_entry(n->lsrth, en);
 
-	if (!SNODE_VALID(ret)) {
+	if (list_empty(&ret->n)) {
 		en->ret_count++;
-		s_add_tail(&n->lsrtl, SNODE ret);
+		/*s_add_tail(&n->lsrtl, SNODE ret);*/
+		list_add_tail(&ret->n, &n->lsrtl);
+		list_del_init(&ret->n_list);
 	}
 
 	ret->lsa = en->lsa;
@@ -138,13 +149,20 @@ void
 ospf_lsa_lsrt_down_(struct top_hash_entry *en, struct ospf_neighbor *n,
 		    struct top_hash_entry *ret)
 {
+	struct list_head *next = ret->n.next;
 	if (en)
 		en->ret_count--;
 
-	s_rem_node(SNODE ret);
+	//s_rem_node(SNODE ret);
+	list_del_init(&ret->n);
+	if (!list_empty(next)){
+		struct top_hash_entry *next_e;
+		next_e = container_of(next, struct top_hash_entry, n);
+		list_splice_init(&ret->n_list, &next_e->n_list);
+	}
 	ospf_hash_delete(n->lsrth, ret);
 
-	if (EMPTY_SLIST(n->lsrtl))
+	if (list_empty(&n->lsrtl))
 		tm_stop(n->lsrt_timer);
 }
 
@@ -163,12 +181,13 @@ void ospf_add_flushed_to_lsrt(struct ospf_proto *p, struct ospf_neighbor *n)
 {
 	struct top_hash_entry *en;
 
-	WALK_SLIST(en, p->lsal)
+	list_for_each_entry(en, &p->lsal, n)
 	    if ((en->lsa.age == LSA_MAXAGE) && (en->lsa_body != NULL) &&
 		lsa_flooding_allowed(en->lsa_type, en->domain, n->ifa))
 		ospf_lsa_lsrt_up(en, n);
 
 	/* If we found any flushed LSA, we send them ASAP */
+OSPF_TRACE(D_EVENTS, "-----neighbor %x lsrt_timer %x", n,  n->lsrt_timer);
 	if (tm_active(n->lsrt_timer))
 		tm_start(n->lsrt_timer, 0);
 }
@@ -212,7 +231,7 @@ void ospf_flood_event(void *ptr)
 	struct ospf_iface *ifa;
 	int i, count;
 
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if (ifa->flood_queue_used == 0)
 			continue;
 
@@ -245,7 +264,7 @@ ospf_flood_lsa(struct ospf_proto *p, struct top_hash_entry *en,
 	/* RFC 2328 13.3 */
 
 	int back = 0;
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if (ifa->stub)
 			continue;
 
@@ -257,7 +276,7 @@ ospf_flood_lsa(struct ospf_proto *p, struct top_hash_entry *en,
 				en->lsa.age);
 
 		int used = 0;
-		WALK_LIST(n, ifa->neigh_list) {
+		list_for_each_entry(n, &ifa->neigh_list, n) {
 			/* 13.3 (1a) */
 			if (n->state < NEIGHBOR_EXCHANGE)
 				continue;
@@ -269,7 +288,7 @@ ospf_flood_lsa(struct ospf_proto *p, struct top_hash_entry *en,
 				if (req != NULL) {
 					int cmp = lsa_comp(&en->lsa, &req->lsa);
 
-					/* If same or newer, remove LSA from the link state request union list */
+					/* If same or newer, remove LSA from the link state request struct list_head */
 					if (cmp > CMP_OLDER)
 						ospf_lsa_lsrq_down(req, n,
 								   from);
@@ -288,7 +307,7 @@ ospf_flood_lsa(struct ospf_proto *p, struct top_hash_entry *en,
 			   that type of LSA (for LSA types with U-bit == 0). But as we do not support
 			   any optional LSA types, this is not needed yet */
 
-			/* 13.3 (1d) - add LSA to the link state retransmission union list */
+			/* 13.3 (1d) - add LSA to the link state retransmission struct list_head */
 			ospf_lsa_lsrt_up(en, n);
 
 			used = 1;
@@ -434,20 +453,27 @@ void ospf_rxmt_lsupd(struct ospf_proto *p, struct ospf_neighbor *n)
 	struct top_hash_entry *ret, *nxt, *en;
 	uint i = 0;
 
-	/* ASSERT((n->state >= NEIGHBOR_EXCHANGE) && !EMPTY_SLIST(n->lsrtl)); */
+	/* ASSERT((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(n->lsrtl)); */
 
-	WALK_SLIST_DELSAFE(ret, nxt, n->lsrtl) {
+	list_for_each_entry_safe(ret, nxt, &n->lsrtl, n) {
 		if (i == max)
 			break;
 
 		en = ospf_hash_find_entry(p->gr, ret);
 		if (!en) {
+			struct list_head *next = ret->n.next;
 			/* Probably flushed LSA, this should not happen */
 			log(L_WARN
 			    "%s: LSA disappeared (Type: %04x, Id: %R, Rt: %R)",
 			    p->p.name, ret->lsa_type, ret->lsa.id, ret->lsa.rt);
 
-			s_rem_node(SNODE ret);
+			//s_rem_node(SNODE ret);
+			list_del_init(&ret->n);
+			if (!list_empty(next)){
+				struct top_hash_entry *next_e;
+				next_e = container_of(next, struct top_hash_entry, n);
+				list_splice_init(&ret->n_list, &next_e->n_list);
+			}
 			ospf_hash_delete(n->lsrth, ret);
 
 			continue;
@@ -464,7 +490,7 @@ static inline int
 ospf_addr_is_local(struct ospf_proto *p, struct ospf_area *oa, ip_addr ip)
 {
 	struct ospf_iface *ifa;
-	WALK_LIST(ifa, p->iface_list)
+	list_for_each_entry(ifa, &p->iface_list, n)
 	    if ((ifa->oa == oa) && ifa->addr && ipa_equal(ifa->addr->ip, ip))
 		return 1;
 
@@ -602,7 +628,7 @@ ospf_receive_lsupd(struct ospf_packet *pkt, struct ospf_iface *ifa,
 
 			/* 13. (5c) - remove old LSA from all retransmission lists
 			 *
-			 * We only need to remove it from the retransmission union list of the neighbor
+			 * We only need to remove it from the retransmission struct list_head of the neighbor
 			 * that send us the new LSA. The old LSA is automatically replaced in
 			 * retransmission lists by the new LSA.
 			 */
@@ -617,8 +643,8 @@ ospf_receive_lsupd(struct ospf_packet *pkt, struct ospf_iface *ifa,
 			struct ospf_iface *ifi;
 			struct ospf_neighbor *ni;
 
-			WALK_LIST(ifi, p->iface_list)
-			    WALK_LIST(ni, ifi->neigh_list)
+			list_for_each_entry(ifi, &p->iface_list, n)
+			    list_for_each_entry(ni, &ifi->neigh_list, n)
 			    if (ni->state > NEIGHBOR_EXSTART)
 				ospf_lsa_lsrt_down(en, ni);
 #endif
@@ -646,7 +672,7 @@ ospf_receive_lsupd(struct ospf_packet *pkt, struct ospf_iface *ifa,
 			continue;
 		}
 
-		/* 13. (6) - received LSA is in Link state request union list (but not newer) */
+		/* 13. (6) - received LSA is in Link state request struct list_head (but not newer) */
 		if (ospf_hash_find_entry(n->lsrqh, en) != NULL)
 			DROP1("error in LSA database exchange");
 
@@ -701,9 +727,10 @@ skip:
 	 * During loading, we should ask for another batch of LSAs. This is only
 	 * vaguely mentioned in RFC 2328. We send a new LSREQ if all requests sent in
 	 * the last packet were already answered and/or removed from the LS request
-	 * union list and therefore lsrqi is pointing to the first struct node of the list.
+	 * struct list_head and therefore lsrqi is pointing to the first struct list_head of the list.
 	 */
-	if (!EMPTY_SLIST(n->lsrql) && (n->lsrqi == SHEAD(n->lsrql))) {
+	if (!list_empty(&n->lsrql) &&
+			((void *)n->lsrqi == (void *)n->lsrql.next)) {
 		ospf_send_lsreq(p, n);
 		tm_start(n->lsrq_timer, n->ifa->rxmtint);
 	}

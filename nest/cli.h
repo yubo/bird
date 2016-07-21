@@ -26,7 +26,7 @@ struct cli_out {
 };
 
 struct cli {
-	struct node n;		/* Node in union list of all log hooks */
+	struct list_head n;		/* Node in struct list_head of all log hooks */
 	struct pool *pool;
 	void *priv;		/* Private to sysdep layer */
 	byte *rx_buf, *rx_pos, *rx_aux;	/* sysdep */

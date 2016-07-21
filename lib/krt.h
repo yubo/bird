@@ -64,7 +64,7 @@ struct krt_proto {
   struct timer *scan_timer;
 #endif
 
-  struct node krt_node;		/* Node in krt_proto_list */
+  struct list_head krt_node;		/* Node in krt_proto_list */
   byte ready;			/* Initial feed has been finished */
   byte initialized;		/* First scan has been finished */
   byte reload;			/* Next scan is doing reload */
@@ -95,7 +95,7 @@ void krt_got_route_async(struct krt_proto *p, struct rte *e, int new);
 extern struct protocol proto_unix_iface;
 
 struct kif_primary_item {
-  struct node n;
+  struct list_head n;
   byte *pattern;
   ip_addr prefix;
   int pxlen;
@@ -105,7 +105,7 @@ struct kif_config {
   struct proto_config c;
   struct kif_params sys;	/* Sysdep params */
   int scan_time;		/* How often we re-scan interfaces */
-  union list primary;			/* Preferences for primary addresses (struct kif_primary_item) */
+  struct list_head primary;			/* Preferences for primary addresses (struct kif_primary_item) */
 };
 
 struct kif_proto {

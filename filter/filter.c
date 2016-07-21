@@ -34,7 +34,7 @@
 #undef LOCAL_DEBUG
 
 #include "nest/bird.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 #include "lib/socket.h"
 #include "lib/string.h"
@@ -1177,7 +1177,7 @@ interpret(struct f_inst *what)
     res.val.ad = as_path_prepend(f_pool, v1.val.ad, v2.val.i);
     break;
 
-  case P('C','a'):	/* (Extended) Community union list add or delete */
+  case P('C','a'):	/* (Extended) Community struct list_head add or delete */
     TWOARGS;
     if (v1.type == T_PATH)
     {
@@ -1208,7 +1208,7 @@ interpret(struct f_inst *what)
     }
     else if (v1.type == T_CLIST)
     {
-      /* Community (or cluster) union list */
+      /* Community (or cluster) struct list_head */
       struct f_val dummy;
       int arg_set = 0;
       uint n = 0;
@@ -1258,7 +1258,7 @@ interpret(struct f_inst *what)
     }
     else if (v1.type == T_ECLIST)
     {
-      /* Extended community union list */
+      /* Extended community struct list_head */
       int arg_set = 0;
 
       /* v2.val is either EC or EC-set */
@@ -1569,7 +1569,7 @@ f_eval_rte(struct f_inst *expr, struct rte **rte, struct linpool *tmp_pool)
   /* Note that in this function we assume that rte->attrs is private / uncached */
   struct f_val res = interpret(expr);
 
-  /* Hack to include EAF_TEMP attributes to the main union list */
+  /* Hack to include EAF_TEMP attributes to the main struct list_head */
   (*rte)->attrs->eattrs = ea_append(tmp_attrs, (*rte)->attrs->eattrs);
 
   return res;

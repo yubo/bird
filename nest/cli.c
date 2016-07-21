@@ -49,7 +49,7 @@
  * not entered using the @cont hook.
  *
  * TX struct buffer management works as follows: At cli.tx_buf there is a
- * union list of TX buffers (struct cli_out), cli.tx_write is the buffer
+ * struct list_head of TX buffers (struct cli_out), cli.tx_write is the buffer
  * currently used by the producer (cli_printf(), cli_alloc_out()) and
  * cli.tx_pos is the struct buffer currently used by the consumer
  * (cli_write(), in system dependent code). The producer uses
@@ -70,32 +70,30 @@
 
 struct pool *cli_pool;
 
-static byte *
-cli_alloc_out(struct cli *c, int size)
+static byte *cli_alloc_out(struct cli *c, int size)
 {
-  struct cli_out *o;
+	struct cli_out *o;
 
-  if (!(o = c->tx_write) || o->wpos + size > o->end)
-    {
-      if (!o && c->tx_buf)
-	o = c->tx_buf;
-      else
-	{
-	  o = mb_alloc(c->pool, sizeof(struct cli_out) + CLI_TX_BUF_SIZE);
-	  if (c->tx_write)
-	    c->tx_write->next = o;
-	  else
-	    c->tx_buf = o;
-	  o->wpos = o->outpos = o->buf;
-	  o->end = o->buf + CLI_TX_BUF_SIZE;
+	if (!(o = c->tx_write) || o->wpos + size > o->end) {
+		if (!o && c->tx_buf)
+			o = c->tx_buf;
+		else {
+			o = mb_alloc(c->pool,
+				     sizeof(struct cli_out) + CLI_TX_BUF_SIZE);
+			if (c->tx_write)
+				c->tx_write->next = o;
+			else
+				c->tx_buf = o;
+			o->wpos = o->outpos = o->buf;
+			o->end = o->buf + CLI_TX_BUF_SIZE;
+		}
+		c->tx_write = o;
+		if (!c->tx_pos)
+			c->tx_pos = o;
+		o->next = NULL;
 	}
-      c->tx_write = o;
-      if (!c->tx_pos)
-	c->tx_pos = o;
-      o->next = NULL;
-    }
-  o->wpos += size;
-  return o->wpos - size;
+	o->wpos += size;
+	return o->wpos - size;
 }
 
 /**
@@ -116,298 +114,268 @@ cli_alloc_out(struct cli *c, int size)
  * If you want to write to the current CLI output, you can use the cli_msg()
  * macro instead.
  */
-void
-cli_printf(struct cli *c, int code, char *msg, ...)
+void cli_printf(struct cli *c, int code, char *msg, ...)
 {
-  va_list args;
-  byte buf[CLI_LINE_SIZE];
-  int cd = code;
-  int errcode;
-  int size, cnt;
+	va_list args;
+	byte buf[CLI_LINE_SIZE];
+	int cd = code;
+	int errcode;
+	int size, cnt;
 
-  if (cd < 0)
-    {
-      cd = -cd;
-      if (cd == c->last_reply)
-	size = bsprintf(buf, " ");
-      else
-	size = bsprintf(buf, "%04d-", cd);
-      errcode = -8000;
-    }
-  else if (cd == CLI_ASYNC_CODE)
-    {
-      size = 1; buf[0] = '+'; 
-      errcode = cd;
-    }
-  else
-    {
-      size = bsprintf(buf, "%04d ", cd);
-      errcode = 8000;
-    }
-
-  c->last_reply = cd;
-  va_start(args, msg);
-  cnt = bvsnprintf(buf+size, sizeof(buf)-size-1, msg, args);
-  va_end(args);
-  if (cnt < 0)
-    {
-      cli_printf(c, errcode, "<line overflow>");
-      return;
-    }
-  size += cnt;
-  buf[size++] = '\n';
-  memcpy(cli_alloc_out(c, size), buf, size);
-}
-
-static void
-cli_copy_message(struct cli *c)
-{
-  byte *p, *q;
-  uint cnt = 2;
-
-  if (c->ring_overflow)
-    {
-      byte buf[64];
-      int n = bsprintf(buf, "<%d messages lost>\n", c->ring_overflow);
-      c->ring_overflow = 0;
-      memcpy(cli_alloc_out(c, n), buf, n);
-    }
-  p = c->ring_read;
-  while (*p)
-    {
-      cnt++;
-      p++;
-      if (p == c->ring_end)
-	p = c->ring_buf;
-      ASSERT(p != c->ring_write);
-    }
-  c->async_msg_size += cnt;
-  q = cli_alloc_out(c, cnt);
-  *q++ = '+';
-  p = c->ring_read;
-  do
-    {
-      *q = *p++;
-      if (p == c->ring_end)
-	p = c->ring_buf;
-    }
-  while (*q++);
-  c->ring_read = p;
-  q[-1] = '\n';
-}
-
-static void
-cli_hello(struct cli *c)
-{
-  cli_printf(c, 1, "BIRD " BIRD_VERSION " ready.");
-  c->cont = NULL;
-}
-
-static void
-cli_free_out(struct cli *c)
-{
-  struct cli_out *o, *p;
-
-  if (o = c->tx_buf)
-    {
-      o->wpos = o->outpos = o->buf;
-      while (p = o->next)
-	{
-	  o->next = p->next;
-	  mb_free(p);
+	if (cd < 0) {
+		cd = -cd;
+		if (cd == c->last_reply)
+			size = bsprintf(buf, " ");
+		else
+			size = bsprintf(buf, "%04d-", cd);
+		errcode = -8000;
+	} else if (cd == CLI_ASYNC_CODE) {
+		size = 1;
+		buf[0] = '+';
+		errcode = cd;
+	} else {
+		size = bsprintf(buf, "%04d ", cd);
+		errcode = 8000;
 	}
-    }
-  c->tx_write = c->tx_pos = NULL;
-  c->async_msg_size = 0;
+
+	c->last_reply = cd;
+	va_start(args, msg);
+	cnt = bvsnprintf(buf + size, sizeof(buf) - size - 1, msg, args);
+	va_end(args);
+	if (cnt < 0) {
+		cli_printf(c, errcode, "<line overflow>");
+		return;
+	}
+	size += cnt;
+	buf[size++] = '\n';
+	memcpy(cli_alloc_out(c, size), buf, size);
 }
 
-void
-cli_written(struct cli *c)
+static void cli_copy_message(struct cli *c)
 {
-  cli_free_out(c);
-  ev_schedule(c->event);
+	byte *p, *q;
+	uint cnt = 2;
+
+	if (c->ring_overflow) {
+		byte buf[64];
+		int n = bsprintf(buf, "<%d messages lost>\n", c->ring_overflow);
+		c->ring_overflow = 0;
+		memcpy(cli_alloc_out(c, n), buf, n);
+	}
+	p = c->ring_read;
+	while (*p) {
+		cnt++;
+		p++;
+		if (p == c->ring_end)
+			p = c->ring_buf;
+		ASSERT(p != c->ring_write);
+	}
+	c->async_msg_size += cnt;
+	q = cli_alloc_out(c, cnt);
+	*q++ = '+';
+	p = c->ring_read;
+	do {
+		*q = *p++;
+		if (p == c->ring_end)
+			p = c->ring_buf;
+	}
+	while (*q++);
+	c->ring_read = p;
+	q[-1] = '\n';
 }
 
+static void cli_hello(struct cli *c)
+{
+	cli_printf(c, 1, "BIRD " BIRD_VERSION " ready.");
+	c->cont = NULL;
+}
+
+static void cli_free_out(struct cli *c)
+{
+	struct cli_out *o, *p;
+
+	if (o = c->tx_buf) {
+		o->wpos = o->outpos = o->buf;
+		while (p = o->next) {
+			o->next = p->next;
+			mb_free(p);
+		}
+	}
+	c->tx_write = c->tx_pos = NULL;
+	c->async_msg_size = 0;
+}
+
+void cli_written(struct cli *c)
+{
+	cli_free_out(c);
+	ev_schedule(c->event);
+}
 
 static byte *cli_rh_pos;
 static uint cli_rh_len;
 static int cli_rh_trick_flag;
 struct cli *this_cli;
 
-static int
-cli_cmd_read_hook(byte *buf, uint max, UNUSED int fd)
+static int cli_cmd_read_hook(byte * buf, uint max, UNUSED int fd)
 {
-  if (!cli_rh_trick_flag)
-    {
-      cli_rh_trick_flag = 1;
-      buf[0] = '!';
-      return 1;
-    }
-  if (max > cli_rh_len)
-    max = cli_rh_len;
-  memcpy(buf, cli_rh_pos, max);
-  cli_rh_pos += max;
-  cli_rh_len -= max;
-  return max;
+	if (!cli_rh_trick_flag) {
+		cli_rh_trick_flag = 1;
+		buf[0] = '!';
+		return 1;
+	}
+	if (max > cli_rh_len)
+		max = cli_rh_len;
+	memcpy(buf, cli_rh_pos, max);
+	cli_rh_pos += max;
+	cli_rh_len -= max;
+	return max;
 }
 
-static void
-cli_command(struct cli *c)
+static void cli_command(struct cli *c)
 {
-  struct config f;
-  int res;
+	struct config f;
+	int res;
 
-  if (config->cli_debug > 1)
-    log(L_TRACE "CLI: %s", c->rx_buf);
-  bzero(&f, sizeof(f));
-  f.mem = c->parser_pool;
-  cf_read_hook = cli_cmd_read_hook;
-  cli_rh_pos = c->rx_buf;
-  cli_rh_len = strlen(c->rx_buf);
-  cli_rh_trick_flag = 0;
-  this_cli = c;
-  lp_flush(c->parser_pool);
-  res = cli_parse(&f);
-  if (!res)
-    cli_printf(c, 9001, f.err_msg);
+	if (config->cli_debug > 1)
+		log(L_TRACE "CLI: %s", c->rx_buf);
+	bzero(&f, sizeof(f));
+	f.mem = c->parser_pool;
+	cf_read_hook = cli_cmd_read_hook;
+	cli_rh_pos = c->rx_buf;
+	cli_rh_len = strlen(c->rx_buf);
+	cli_rh_trick_flag = 0;
+	this_cli = c;
+	lp_flush(c->parser_pool);
+	res = cli_parse(&f);
+	if (!res)
+		cli_printf(c, 9001, f.err_msg);
 }
 
-static void
-cli_event(void *data)
+static void cli_event(void *data)
 {
-  struct cli *c = data;
-  int err;
+	struct cli *c = data;
+	int err;
 
-  while (c->ring_read != c->ring_write &&
-      c->async_msg_size < CLI_MAX_ASYNC_QUEUE)
-    cli_copy_message(c);
+	while (c->ring_read != c->ring_write &&
+	       c->async_msg_size < CLI_MAX_ASYNC_QUEUE)
+		cli_copy_message(c);
 
-  if (c->tx_pos)
-    ;
-  else if (c->cont)
-    c->cont(c);
-  else
-    {
-      err = cli_get_command(c);
-      if (!err)
-	return;
-      if (err < 0)
-	cli_printf(c, 9000, "Command too long");
-      else
-	cli_command(c);
-    }
+	if (c->tx_pos) ;
+	else if (c->cont)
+		c->cont(c);
+	else {
+		err = cli_get_command(c);
+		if (!err)
+			return;
+		if (err < 0)
+			cli_printf(c, 9000, "Command too long");
+		else
+			cli_command(c);
+	}
 
-  cli_write_trigger(c);
+	cli_write_trigger(c);
 }
 
-struct cli *
-cli_new(void *priv)
+struct cli *cli_new(void *priv)
 {
-  struct pool *p = rp_new(cli_pool, "CLI");
-  struct cli *c = mb_alloc(p, sizeof(struct cli));
+	struct pool *p = rp_new(cli_pool, "CLI");
+	struct cli *c = mb_alloc(p, sizeof(struct cli));
 
-  bzero(c, sizeof(struct cli));
-  c->pool = p;
-  c->priv = priv;
-  c->event = ev_new(p);
-  c->event->hook = cli_event;
-  c->event->data = c;
-  c->cont = cli_hello;
-  c->parser_pool = lp_new(c->pool, 4096);
-  c->rx_buf = mb_alloc(c->pool, CLI_RX_BUF_SIZE);
-  ev_schedule(c->event);
-  return c;
+	bzero(c, sizeof(struct cli));
+	c->pool = p;
+	c->priv = priv;
+	c->event = ev_new(p);
+	c->event->hook = cli_event;
+	c->event->data = c;
+	c->cont = cli_hello;
+	c->parser_pool = lp_new(c->pool, 4096);
+	c->rx_buf = mb_alloc(c->pool, CLI_RX_BUF_SIZE);
+	ev_schedule(c->event);
+	return c;
 }
 
-void
-cli_kick(struct cli *c)
+void cli_kick(struct cli *c)
 {
-  if (!c->cont && !c->tx_pos)
-    ev_schedule(c->event);
+	if (!c->cont && !c->tx_pos)
+		ev_schedule(c->event);
 }
 
-static union list cli_log_hooks;
+static struct list_head cli_log_hooks;
 static int cli_log_inited;
 
-void
-cli_set_log_echo(struct cli *c, uint mask, uint size)
+void cli_set_log_echo(struct cli *c, uint mask, uint size)
 {
-  if (c->ring_buf)
-    {
-      mb_free(c->ring_buf);
-      c->ring_buf = c->ring_end = c->ring_read = c->ring_write = NULL;
-      rem_node(&c->n);
-    }
-  c->log_mask = mask;
-  if (mask && size)
-    {
-      c->ring_buf = mb_alloc(c->pool, size);
-      c->ring_end = c->ring_buf + size;
-      c->ring_read = c->ring_write = c->ring_buf;
-      add_tail(&cli_log_hooks, &c->n);
-      c->log_threshold = size / 8;
-    }
-  c->ring_overflow = 0;
+	if (c->ring_buf) {
+		mb_free(c->ring_buf);
+		c->ring_buf = c->ring_end = c->ring_read = c->ring_write = NULL;
+		list_del(&c->n);
+	}
+	c->log_mask = mask;
+	if (mask && size) {
+		c->ring_buf = mb_alloc(c->pool, size);
+		c->ring_end = c->ring_buf + size;
+		c->ring_read = c->ring_write = c->ring_buf;
+		list_add_tail(&c->n, &cli_log_hooks);
+		c->log_threshold = size / 8;
+	}
+	c->ring_overflow = 0;
 }
 
-void
-cli_echo(uint class, byte *msg)
+void cli_echo(uint class, byte * msg)
 {
-  unsigned len, free, i, l;
-  struct cli *c;
-  byte *m;
+	unsigned len, free, i, l;
+	struct cli *c;
+	byte *m;
 
-  if (!cli_log_inited || EMPTY_LIST(cli_log_hooks))
-    return;
-  len = strlen(msg) + 1;
-  WALK_LIST(c, cli_log_hooks)
-    {
-      if (!(c->log_mask & (1 << class)))
-	continue;
-      if (c->ring_read <= c->ring_write)
-	free = (c->ring_end - c->ring_buf) - (c->ring_write - c->ring_read + 1);
-      else
-	free = c->ring_read - c->ring_write - 1;
-      if ((len > free) ||
-	  (free < c->log_threshold && class < (unsigned) L_INFO[0]))
-	{
-	  c->ring_overflow++;
-	  continue;
+	if (!cli_log_inited || list_empty(&cli_log_hooks))
+		return;
+	len = strlen(msg) + 1;
+	list_for_each_entry(c, &cli_log_hooks, n) {
+		if (!(c->log_mask & (1 << class)))
+			continue;
+		if (c->ring_read <= c->ring_write)
+			free =
+			    (c->ring_end - c->ring_buf) - (c->ring_write -
+							   c->ring_read + 1);
+		else
+			free = c->ring_read - c->ring_write - 1;
+		if ((len > free) ||
+		    (free < c->log_threshold && class < (unsigned)L_INFO[0])) {
+			c->ring_overflow++;
+			continue;
+		}
+		if (c->ring_read == c->ring_write)
+			ev_schedule(c->event);
+		m = msg;
+		l = len;
+		while (l) {
+			if (c->ring_read <= c->ring_write)
+				i = c->ring_end - c->ring_write;
+			else
+				i = c->ring_read - c->ring_write;
+			if (i > l)
+				i = l;
+			memcpy(c->ring_write, m, i);
+			m += i;
+			l -= i;
+			c->ring_write += i;
+			if (c->ring_write == c->ring_end)
+				c->ring_write = c->ring_buf;
+		}
 	}
-      if (c->ring_read == c->ring_write)
-	ev_schedule(c->event);
-      m = msg;
-      l = len;
-      while (l)
-	{
-	  if (c->ring_read <= c->ring_write)
-	    i = c->ring_end - c->ring_write;
-	  else
-	    i = c->ring_read - c->ring_write;
-	  if (i > l)
-	    i = l;
-	  memcpy(c->ring_write, m, i);
-	  m += i;
-	  l -= i;
-	  c->ring_write += i;
-	  if (c->ring_write == c->ring_end)
-	    c->ring_write = c->ring_buf;
-	}
-    }
 }
 
 /* Hack for scheduled undo notification */
 extern struct cli *cmd_reconfig_stored_cli;
 
-void
-cli_free(struct cli *c)
+void cli_free(struct cli *c)
 {
-  cli_set_log_echo(c, 0, 0);
-  if (c->cleanup)
-    c->cleanup(c);
-  if (c == cmd_reconfig_stored_cli)
-    cmd_reconfig_stored_cli = NULL;
-  rfree(c->pool);
+	cli_set_log_echo(c, 0, 0);
+	if (c->cleanup)
+		c->cleanup(c);
+	if (c == cmd_reconfig_stored_cli)
+		cmd_reconfig_stored_cli = NULL;
+	rfree(c->pool);
 }
 
 /**
@@ -416,10 +384,9 @@ cli_free(struct cli *c)
  * This function is called during BIRD startup to initialize
  * the internal data structures of the CLI module.
  */
-void
-cli_init(void)
+void cli_init(void)
 {
-  cli_pool = rp_new(&root_pool, "CLI");
-  init_list(&cli_log_hooks);
-  cli_log_inited = 1;
+	cli_pool = rp_new(&root_pool, "CLI");
+	INIT_LIST_HEAD(&cli_log_hooks);
+	cli_log_inited = 1;
 }

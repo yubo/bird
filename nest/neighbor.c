@@ -28,8 +28,8 @@
  * two linked lists: one global and one per-interface (allowing quick
  * processing of interface change events). Inactive entries exist only
  * when the protocol has explicitly requested it via the %NEF_STICKY
- * flag because it wishes to be notified when the struct node will again become
- * a neighbor. Such entries are enqueued in a special union list which is walked
+ * flag because it wishes to be notified when the struct list_head will again become
+ * a neighbor. Such entries are enqueued in a special struct list_head which is walked
  * whenever an interface changes its state to up.
  *
  * When a struct neighbor struct event occurs (a struct neighbor gets disconnected or a sticky
@@ -47,143 +47,127 @@
 #define NEIGH_HASH_SIZE 256
 
 static struct slab *neigh_slab;
-static union list sticky_neigh_list, neigh_hash_table[NEIGH_HASH_SIZE];
+static struct list_head sticky_neigh_list, neigh_hash_table[NEIGH_HASH_SIZE];
 
-static inline uint
-neigh_hash(struct proto *p, ip_addr *a)
+static inline uint neigh_hash(struct proto *p, ip_addr * a)
 {
-  return (p->hash_key ^ ipa_hash(*a)) & (NEIGH_HASH_SIZE-1);
+	return (p->hash_key ^ ipa_hash(*a)) & (NEIGH_HASH_SIZE - 1);
 }
 
-static int
-if_connected(ip_addr *a, struct iface *i, struct ifa **ap)
+static int if_connected(ip_addr * a, struct iface *i, struct ifa **ap)
 {
-  struct ifa *b;
+	struct ifa *b;
 
-  if (!(i->flags & IF_UP))
-  {
-    *ap = NULL;
-    return -1;
-  }
-
-  WALK_LIST(b, i->addrs)
-    {
-      *ap = b;
-
-      if (ipa_equal(*a, b->ip))
-	return SCOPE_HOST;
-      if (b->flags & IA_PEER)
-	{
-	  if (ipa_equal(*a, b->opposite))
-	    return b->scope;
-	}
-      else
-	{
-	  if (ipa_in_net(*a, b->prefix, b->pxlen))
-	    {
-#ifndef IPV6
-	      if ((b->pxlen < (BITS_PER_IP_ADDRESS - 1)) &&
-		  (ipa_equal(*a, b->prefix) ||	/* Network address */
-		   ipa_equal(*a, b->brd)))	/* Broadcast */
-	      {
+	if (!(i->flags & IF_UP)) {
 		*ap = NULL;
 		return -1;
-	      }
+	}
+
+	list_for_each_entry(b, &i->addrs, n) {
+		*ap = b;
+
+		if (ipa_equal(*a, b->ip))
+			return SCOPE_HOST;
+		if (b->flags & IA_PEER) {
+			if (ipa_equal(*a, b->opposite))
+				return b->scope;
+		} else {
+			if (ipa_in_net(*a, b->prefix, b->pxlen)) {
+#ifndef IPV6
+				if ((b->pxlen < (BITS_PER_IP_ADDRESS - 1)) && (ipa_equal(*a, b->prefix) ||	/* Network address */
+									       ipa_equal(*a, b->brd))) {	/* Broadcast */
+					*ap = NULL;
+					return -1;
+				}
 #endif
 
-	      return b->scope;
-	    }
+				return b->scope;
+			}
+		}
 	}
-      }
 
-  *ap = NULL;
-  return -1;
+	*ap = NULL;
+	return -1;
 }
 
 /**
  * neigh_find - find or create a struct neighbor entry.
  * @p: protocol which asks for the entry.
- * @a: pointer to IP address of the struct node to be searched for.
+ * @a: pointer to IP address of the struct list_head to be searched for.
  * @flags: 0 or %NEF_STICKY if you want to create a sticky entry.
  *
- * Search the struct neighbor cache for a struct node with given IP address. If
+ * Search the struct neighbor cache for a struct list_head with given IP address. If
  * it's found, a pointer to the struct neighbor entry is returned. If no
- * such entry exists and the struct node is directly connected on
+ * such entry exists and the struct list_head is directly connected on
  * one of our active interfaces, a new entry is created and returned
  * to the caller with protocol-dependent fields initialized to zero.
- * If the struct node is not connected directly or *@a is not a valid unicast
+ * If the struct list_head is not connected directly or *@a is not a valid unicast
  * IP address, neigh_find() returns %NULL.
  */
-struct neighbor *
-neigh_find(struct proto *p, ip_addr *a, unsigned flags)
+struct neighbor *neigh_find(struct proto *p, ip_addr * a, unsigned flags)
 {
-  return neigh_find2(p, a, NULL, flags);
+	return neigh_find2(p, a, NULL, flags);
 }
 
-
-struct neighbor *
-neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags)
+struct neighbor *neigh_find2(struct proto *p, ip_addr * a, struct iface *ifa,
+			     unsigned flags)
 {
-  struct neighbor *n;
-  int class, scope = -1;
-  uint h = neigh_hash(p, a);
-  struct iface *i;
-  struct ifa *addr;
+	struct neighbor *n;
+	int class, scope = -1;
+	uint h = neigh_hash(p, a);
+	struct iface *i;
+	struct ifa *addr;
 
-  WALK_LIST(n, neigh_hash_table[h])	/* Search the cache */
-    if (n->proto == p && ipa_equal(*a, n->addr) && (!ifa || (ifa == n->iface)))
-      return n;
+	/* Search the cache */
+	list_for_each_entry(n, &neigh_hash_table[h], n)
+	    if (n->proto == p && ipa_equal(*a, n->addr)
+		&& (!ifa || (ifa == n->iface)))
+		return n;
 
-  class = ipa_classify(*a);
-  if (class < 0)			/* Invalid address */
-    return NULL;
-  if (((class & IADDR_SCOPE_MASK) == SCOPE_HOST) ||
-      (((class & IADDR_SCOPE_MASK) == SCOPE_LINK) && (ifa == NULL)) ||
-      !(class & IADDR_HOST))
-    return NULL;			/* Bad scope or a somecast */
+	class = ipa_classify(*a);
+	if (class < 0)		/* Invalid address */
+		return NULL;
+	if (((class & IADDR_SCOPE_MASK) == SCOPE_HOST) ||
+	    (((class & IADDR_SCOPE_MASK) == SCOPE_LINK) && (ifa == NULL)) ||
+	    !(class & IADDR_HOST))
+		return NULL;	/* Bad scope or a somecast */
 
-  if (ifa)
-    {
-      scope = if_connected(a, ifa, &addr);
-      flags |= NEF_BIND;
+	if (ifa) {
+		scope = if_connected(a, ifa, &addr);
+		flags |= NEF_BIND;
 
-      if ((scope < 0) && (flags & NEF_ONLINK))
-	scope = class & IADDR_SCOPE_MASK;
-    }
-  else
-    WALK_LIST(i, iface_list)
-      if ((scope = if_connected(a, i, &addr)) >= 0)
-	{
-	  ifa = i;
-	  break;
+		if ((scope < 0) && (flags & NEF_ONLINK))
+			scope = class & IADDR_SCOPE_MASK;
+	} else
+		list_for_each_entry(i, &iface_list, n)
+	    if ((scope = if_connected(a, i, &addr)) >= 0) {
+		ifa = i;
+		break;
 	}
 
-  /* scope < 0 means i don't know struct neighbor */
-  /* scope >= 0 implies ifa != NULL */
+	/* scope < 0 means i don't know struct neighbor */
+	/* scope >= 0 implies ifa != NULL */
 
-  if ((scope < 0) && !(flags & NEF_STICKY))
-    return NULL;
+	if ((scope < 0) && !(flags & NEF_STICKY))
+		return NULL;
 
-  n = sl_alloc(neigh_slab);
-  n->addr = *a;
-  if (scope >= 0)
-    {
-      add_tail(&neigh_hash_table[h], &n->n);
-      add_tail(&ifa->neighbors, &n->if_n);
-    }
-  else
-    {
-      add_tail(&sticky_neigh_list, &n->n);
-      scope = -1;
-    }
-  n->iface = ifa;
-  n->ifa = addr;
-  n->proto = p;
-  n->data = NULL;
-  n->aux = 0;
-  n->flags = flags;
-  n->scope = scope;
-  return n;
+	n = sl_alloc(neigh_slab);
+	n->addr = *a;
+	if (scope >= 0) {
+		list_add_tail(&n->n, &neigh_hash_table[h]);
+		list_add_tail(&n->if_n, &ifa->neighbors);
+	} else {
+		list_add_tail(&n->n, &sticky_neigh_list);
+		scope = -1;
+	}
+	n->iface = ifa;
+	n->ifa = addr;
+	n->proto = p;
+	n->data = NULL;
+	n->aux = 0;
+	n->flags = flags;
+	n->scope = scope;
+	return n;
 }
 
 /**
@@ -193,18 +177,18 @@ neigh_find2(struct proto *p, ip_addr *a, struct iface *ifa, unsigned flags)
  * This functions dumps the contents of a given struct neighbor entry
  * to debug output.
  */
-void
-neigh_dump(struct neighbor *n)
+void neigh_dump(struct neighbor *n)
 {
-  debug("%p %I ", n, n->addr);
-  if (n->iface)
-    debug("%s ", n->iface->name);
-  else
-    debug("[] ");
-  debug("%s %p %08x scope %s", n->proto->name, n->data, n->aux, ip_scope_text(n->scope));
-  if (n->flags & NEF_STICKY)
-    debug(" STICKY");
-  debug("\n");
+	debug("%p %I ", n, n->addr);
+	if (n->iface)
+		debug("%s ", n->iface->name);
+	else
+		debug("[] ");
+	debug("%s %p %08x scope %s", n->proto->name, n->data, n->aux,
+	      ip_scope_text(n->scope));
+	if (n->flags & NEF_STICKY)
+		debug(" STICKY");
+	debug("\n");
 }
 
 /**
@@ -213,68 +197,62 @@ neigh_dump(struct neighbor *n)
  * This function dumps the contents of the struct neighbor cache to
  * debug output.
  */
-void
-neigh_dump_all(void)
+void neigh_dump_all(void)
 {
-  struct neighbor *n;
-  int i;
+	struct neighbor *n;
+	int i;
 
-  debug("Known neighbors:\n");
-  WALK_LIST(n, sticky_neigh_list)
-    neigh_dump(n);
-  for(i=0; i<NEIGH_HASH_SIZE; i++)
-    WALK_LIST(n, neigh_hash_table[i])
-      neigh_dump(n);
-  debug("\n");
+	debug("Known neighbors:\n");
+	list_for_each_entry(n, &sticky_neigh_list, n)
+	    neigh_dump(n);
+	for (i = 0; i < NEIGH_HASH_SIZE; i++)
+		list_for_each_entry(n, &neigh_hash_table[i], n)
+		    neigh_dump(n);
+	debug("\n");
 }
 
 static void
 neigh_up(struct neighbor *n, struct iface *i, int scope, struct ifa *a)
 {
-  n->iface = i;
-  n->ifa = a;
-  n->scope = scope;
-  add_tail(&i->neighbors, &n->if_n);
-  rem_node(&n->n);
-  add_tail(&neigh_hash_table[neigh_hash(n->proto, &n->addr)], &n->n);
-  DBG("Waking up sticky struct neighbor %I\n", n->addr);
-  if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
-    n->proto->neigh_notify(n);
+	n->iface = i;
+	n->ifa = a;
+	n->scope = scope;
+	list_add_tail(&n->if_n, &i->neighbors);
+	list_del(&n->n);
+	list_add_tail(&n->n, &neigh_hash_table[neigh_hash(n->proto, &n->addr)]);
+	DBG("Waking up sticky struct neighbor %I\n", n->addr);
+	if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
+		n->proto->neigh_notify(n);
 }
 
-static void
-neigh_down(struct neighbor *n)
+static void neigh_down(struct neighbor *n)
 {
-  DBG("Flushing struct neighbor %I on %s\n", n->addr, n->iface->name);
-  rem_node(&n->if_n);
-  if (! (n->flags & NEF_BIND))
-    n->iface = NULL;
-  n->ifa = NULL;
-  n->scope = -1;
-  if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
-    n->proto->neigh_notify(n);
-  rem_node(&n->n);
-  if (n->flags & NEF_STICKY)
-    {
-      add_tail(&sticky_neigh_list, &n->n);
+	DBG("Flushing struct neighbor %I on %s\n", n->addr, n->iface->name);
+	list_del(&n->if_n);
+	if (!(n->flags & NEF_BIND))
+		n->iface = NULL;
+	n->ifa = NULL;
+	n->scope = -1;
+	if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
+		n->proto->neigh_notify(n);
+	list_del(&n->n);
+	if (n->flags & NEF_STICKY) {
+		list_add_tail(&n->n, &sticky_neigh_list);
 
-      /* Respawn struct neighbor if there is another matching prefix */
-      struct iface *i;
-      struct ifa *a;
-      int scope;
+		/* Respawn struct neighbor if there is another matching prefix */
+		struct iface *i;
+		struct ifa *a;
+		int scope;
 
-      if (!n->iface)
-	WALK_LIST(i, iface_list)
-	  if ((scope = if_connected(&n->addr, i, &a)) >= 0)
-	    {
-	      neigh_up(n, i, scope, a);
-	      return;
-	    }
-    }
-  else
-    sl_free(neigh_slab, n);
+		if (!n->iface)
+			list_for_each_entry(i, &iface_list, n)
+			    if ((scope = if_connected(&n->addr, i, &a)) >= 0) {
+				neigh_up(n, i, scope, a);
+				return;
+			}
+	} else
+		sl_free(neigh_slab, n);
 }
-
 
 /**
  * neigh_if_up: notify struct neighbor cache about interface up event
@@ -285,17 +263,16 @@ neigh_down(struct neighbor *n)
  * The struct neighbor cache wakes up all inactive sticky neighbors with
  * addresses belonging to prefixes of the interface @i.
  */
-void
-neigh_if_up(struct iface *i)
+void neigh_if_up(struct iface *i)
 {
-  struct ifa *a;
-  struct neighbor *n, *next;
-  int scope;
+	struct ifa *a;
+	struct neighbor *n, *next;
+	int scope;
 
-  WALK_LIST_DELSAFE(n, next, sticky_neigh_list)
-    if ((!n->iface || n->iface == i) &&
-	((scope = if_connected(&n->addr, i, &a)) >= 0))
-      neigh_up(n, i, scope, a);
+	list_for_each_entry_safe(n, next, &sticky_neigh_list, n)
+	    if ((!n->iface || n->iface == i) &&
+		((scope = if_connected(&n->addr, i, &a)) >= 0))
+		neigh_up(n, i, scope, a);
 }
 
 /**
@@ -307,13 +284,12 @@ neigh_if_up(struct iface *i)
  * It causes all entries belonging to neighbors connected to this interface
  * to be flushed.
  */
-void
-neigh_if_down(struct iface *i)
+void neigh_if_down(struct iface *i)
 {
-  struct node *x, *y;
+	struct list_head *x, *y;
 
-  WALK_LIST_DELSAFE(x, y, i->neighbors)
-    neigh_down(SKIP_BACK(struct neighbor, if_n, x));
+	list_for_each_safe(x, y, &i->neighbors)
+	    neigh_down(container_of(x, struct neighbor, if_n));
 }
 
 /**
@@ -324,17 +300,16 @@ neigh_if_down(struct iface *i)
  * All owners of struct neighbor entries connected to this interface are
  * notified.
  */
-void
-neigh_if_link(struct iface *i)
+void neigh_if_link(struct iface *i)
 {
-  struct node *x, *y;
+	struct list_head *x, *y;
 
-  WALK_LIST_DELSAFE(x, y, i->neighbors)
-    {
-      struct neighbor *n = SKIP_BACK(struct neighbor, if_n, x);
-      if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
-	n->proto->neigh_notify(n);
-    }
+	list_for_each_safe(x, y, &i->neighbors) {
+		struct neighbor *n = container_of(x, struct neighbor, if_n);
+		if (n->proto->neigh_notify
+		    && n->proto->core_state != FS_FLUSHING)
+			n->proto->neigh_notify(n);
+	}
 }
 
 /**
@@ -347,34 +322,31 @@ neigh_if_link(struct iface *i)
  * addresses belonging to prefixes of the interface belonging to @ifa
  * and causes all unreachable neighbors to be flushed.
  */
-void
-neigh_ifa_update(struct ifa *a)
+void neigh_ifa_update(struct ifa *a)
 {
-  struct iface *i = a->iface;
-  struct node *x, *y;
- 
-  /* Remove all neighbors whose scope has changed */
-  WALK_LIST_DELSAFE(x, y, i->neighbors)
-    {
-      struct ifa *aa;
-      struct neighbor *n = SKIP_BACK(struct neighbor, if_n, x);
-      if (if_connected(&n->addr, i, &aa) != n->scope)
-	neigh_down(n);
-    }
+	struct iface *i = a->iface;
+	struct list_head *x, *y;
 
-  /* Wake up all sticky neighbors that are reachable now */
-  neigh_if_up(i);
+	/* Remove all neighbors whose scope has changed */
+	list_for_each_safe(x, y, &i->neighbors) {
+		struct ifa *aa;
+		struct neighbor *n = container_of(x, struct neighbor, if_n);
+		if (if_connected(&n->addr, i, &aa) != n->scope)
+			neigh_down(n);
+	}
+
+	/* Wake up all sticky neighbors that are reachable now */
+	neigh_if_up(i);
 }
 
-static inline void
-neigh_prune_one(struct neighbor *n)
+static inline void neigh_prune_one(struct neighbor *n)
 {
-  if (n->proto->proto_state != PS_DOWN)
-    return;
-  rem_node(&n->n);
-  if (n->scope >= 0)
-    rem_node(&n->if_n);
-  sl_free(neigh_slab, n);
+	if (n->proto->proto_state != PS_DOWN)
+		return;
+	list_del(&n->n);
+	if (n->scope >= 0)
+		list_del(&n->if_n);
+	sl_free(neigh_slab, n);
 }
 
 /**
@@ -384,19 +356,17 @@ neigh_prune_one(struct neighbor *n)
  * corresponding to inactive protocols. It's called whenever a protocol
  * is shut down to get rid of all its heritage.
  */
-void
-neigh_prune(void)
+void neigh_prune(void)
 {
-  struct neighbor *n;
-  struct node *m;
-  int i;
+	struct neighbor *n, *m;
+	int i;
 
-  DBG("Pruning neighbors\n");
-  for(i=0; i<NEIGH_HASH_SIZE; i++)
-    WALK_LIST_DELSAFE(n, m, neigh_hash_table[i])
-      neigh_prune_one(n);
-  WALK_LIST_DELSAFE(n, m, sticky_neigh_list)
-    neigh_prune_one(n);
+	DBG("Pruning neighbors\n");
+	for (i = 0; i < NEIGH_HASH_SIZE; i++)
+		list_for_each_entry_safe(n, m, &neigh_hash_table[i], n)
+		    neigh_prune_one(n);
+	list_for_each_entry_safe(n, m, &sticky_neigh_list, n)
+	    neigh_prune_one(n);
 }
 
 /**
@@ -406,13 +376,12 @@ neigh_prune(void)
  * This function is called during BIRD startup to initialize
  * the struct neighbor cache module.
  */
-void
-neigh_init(struct pool *if_pool)
+void neigh_init(struct pool *if_pool)
 {
-  int i;
+	int i;
 
-  neigh_slab = sl_new(if_pool, sizeof(struct neighbor));
-  init_list(&sticky_neigh_list);
-  for(i=0; i<NEIGH_HASH_SIZE; i++)
-    init_list(&neigh_hash_table[i]);
+	neigh_slab = sl_new(if_pool, sizeof(struct neighbor));
+	INIT_LIST_HEAD(&sticky_neigh_list);
+	for (i = 0; i < NEIGH_HASH_SIZE; i++)
+		INIT_LIST_HEAD(&neigh_hash_table[i]);
 }

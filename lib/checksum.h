@@ -10,7 +10,7 @@
 #define _BIRD_CHECKSUM_H_
 
 /*
- *	Both checksumming functions accept a vararg union list of packet
+ *	Both checksumming functions accept a vararg struct list_head of packet
  *	fragments finished by NULL pointer.
  */
 

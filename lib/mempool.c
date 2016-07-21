@@ -60,7 +60,7 @@ static struct resclass lp_class = {
  * @blk: block size
  *
  * lp_new() creates a new linear memory struct pool struct resource inside the struct pool @p.
- * The linear struct pool consists of a union list of memory chunks of size at least
+ * The linear struct pool consists of a struct list_head of memory chunks of size at least
  * @blk.
  */
 struct linpool *lp_new(struct pool *p, uint blk)
@@ -174,7 +174,7 @@ void lp_flush(struct linpool *m)
 {
 	struct lp_chunk *c;
 
-	/* Relink all normal chunks to free union list and free all large chunks */
+	/* Relink all normal chunks to free struct list_head and free all large chunks */
 	m->ptr = m->end = NULL;
 	m->current = m->first;
 	while (c = m->first_large) {

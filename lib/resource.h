@@ -9,12 +9,12 @@
 #ifndef _BIRD_RESOURCE_H_
 #define _BIRD_RESOURCE_H_
 
-#include "lib/lists.h"
+#include "lib/list.h"
 
 /* Resource */
 
 struct resource {
-	struct node n;			/* Inside struct resource struct pool */
+	struct list_head n;			/* Inside struct resource struct pool */
 	struct resclass *class;	/* Resource class */
 };
 

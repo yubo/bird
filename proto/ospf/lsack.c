@@ -22,7 +22,7 @@ struct ospf_lsack_packet
 */
 
 struct lsa_node {
-	struct node n;
+	struct list_head n;
 	struct ospf_lsa_header lsa;
 };
 
@@ -56,7 +56,7 @@ void ospf_enqueue_lsack(struct ospf_neighbor *n,
 	/* Note that h_n is in network endianity */
 	struct lsa_node *no = mb_alloc(n->pool, sizeof(struct lsa_node));
 	memcpy(&no->lsa, h_n, sizeof(struct ospf_lsa_header));
-	add_tail(&n->ackl[queue], NODE no);
+	list_add_tail(&no->n, &n->ackl[queue]);
 	DBG("Adding %s ack for %R, ID: %R, RT: %R, Type: %u\n",
 	    (queue == ACKL_DIRECT) ? "direct" : "delayed",
 	    n->rid, ntohl(h_n->id), ntohl(h_n->rt), h_n->type_raw);
@@ -64,10 +64,10 @@ void ospf_enqueue_lsack(struct ospf_neighbor *n,
 
 void ospf_reset_lsack_queue(struct ospf_neighbor *n)
 {
-	struct lsa_node *no;
+	struct lsa_node *no, *p;
 
-	WALK_LIST_FIRST(no, n->ackl[ACKL_DELAY]) {
-		rem_node(NODE no);
+	list_for_each_entry_safe(no, p, &n->ackl[ACKL_DELAY], n) {
+		list_del_init(&no->n);
 		mb_free(no);
 	}
 }
@@ -87,12 +87,12 @@ ospf_send_lsack_(struct ospf_proto *p, struct ospf_neighbor *n, int queue)
 	ospf_pkt_fill_hdr(ifa, pkt, LSACK_P);
 	ospf_lsack_body(p, pkt, &lsas, &lsa_max);
 
-	for (i = 0; i < lsa_max && !EMPTY_LIST(n->ackl[queue]); i++) {
-		no = (struct lsa_node *)HEAD(n->ackl[queue]);
+	for (i = 0; i < lsa_max && !list_empty(&n->ackl[queue]); i++) {
+		no = (struct lsa_node *)n->ackl[queue].next;
 		memcpy(&lsas[i], &no->lsa, sizeof(struct ospf_lsa_header));
 		DBG("Iter %u ID: %R, RT: %R, Type: %04x\n",
 		    i, ntohl(lsas[i].id), ntohl(lsas[i].rt), lsas[i].type_raw);
-		rem_node(NODE no);
+		list_del_init(&no->n);
 		mb_free(no);
 	}
 
@@ -114,7 +114,7 @@ ospf_send_lsack_(struct ospf_proto *p, struct ospf_neighbor *n, int queue)
 
 void ospf_send_lsack(struct ospf_proto *p, struct ospf_neighbor *n, int queue)
 {
-	while (!EMPTY_LIST(n->ackl[queue]))
+	while (!list_empty(&n->ackl[queue]))
 		ospf_send_lsack_(p, n, queue);
 }
 

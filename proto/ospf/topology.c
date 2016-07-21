@@ -52,8 +52,11 @@ struct top_hash_entry *ospf_install_lsa(struct ospf_proto *p,
 
 	en = ospf_hash_get(p->gr, domain, lsa->id, lsa->rt, type);
 
-	if (!SNODE_VALID(en))
-		s_add_tail(&p->lsal, SNODE en);
+	if (list_empty(&en->n)) {
+		//s_list_add_tail(en->n ,&p->lsal);
+		list_add_tail(&en->n, &p->lsal);
+		list_del_init(&en->n_list);
+	}
 
 	if ((en->lsa_body == NULL) ||	/* No old LSA */
 	    (en->lsa.length != lsa->length) || (en->lsa.type_raw != lsa->type_raw) ||	/* Check for OSPFv2 options */
@@ -280,8 +283,10 @@ struct top_hash_entry *ospf_originate_lsa(struct ospf_proto *p,
 
 	en = ospf_hash_get(p->gr, lsa->dom, lsa->id, p->router_id, lsa->type);
 
-	if (!SNODE_VALID(en))
-		s_add_tail(&p->lsal, SNODE en);
+	if (list_empty(&en->n)){
+		list_add_tail(&en->n, &p->lsal);
+		list_del_init(&en->n_list);
+	}
 
 	if (!en->nf || !en->lsa_body)
 		en->nf = lsa->nf;
@@ -456,8 +461,15 @@ static void ospf_remove_lsa(struct ospf_proto *p, struct top_hash_entry *en)
 	 * Called by ospf_update_lsadb() as part of LSA flushing process.
 	 * Both lsa_body and next_lsa_body are NULL.
 	 */
+	//s_rem_node(SNODE en);
+	struct list_head *next = en->n.next;
 
-	s_rem_node(SNODE en);
+	list_del_init(&en->n);
+	if (!list_empty(next)){
+		struct top_hash_entry *next_e;
+		next_e = container_of(next, struct top_hash_entry, n);
+		list_splice_init(&en->n_list, &next_e->n_list);
+	}
 	ospf_hash_delete(p->gr, en);
 }
 
@@ -480,7 +492,8 @@ void ospf_update_lsadb(struct ospf_proto *p)
 	struct top_hash_entry *en, *nxt;
 	bird_clock_t real_age;
 
-	WALK_SLIST_DELSAFE(en, nxt, p->lsal) {
+	/*WALK_SLIST_DELSAFE(en, nxt, p->lsal) {*/
+	list_for_each_entry_safe(en, nxt, &p->lsal, n) {
 		if (en->next_lsa_body)
 			ospf_originate_next_lsa(p, en);
 
@@ -613,7 +626,7 @@ static int configured_stubnet(struct ospf_area *oa, struct ifa *a)
 {
 	/* Does not work for IA_PEER addresses, but it is not called on these */
 	struct ospf_stubnet_config *sn;
-	WALK_LIST(sn, oa->ac->stubnet_list) {
+	list_for_each_entry(sn, &oa->ac->stubnet_list, n) {
 		if (sn->summary) {
 			if (ipa_in_net(a->prefix, sn->px.addr, sn->px.len)
 			    && (a->pxlen >= sn->px.len))
@@ -635,7 +648,7 @@ static int bcast_net_active(struct ospf_iface *ifa)
 	if (ifa->state == OSPF_IS_WAITING)
 		return 0;
 
-	WALK_LIST(neigh, ifa->neigh_list) {
+	list_for_each_entry(neigh, &ifa->neigh_list, n) {
 		if (neigh->state == NEIGHBOR_FULL) {
 			if (neigh->rid == ifa->drid)
 				return 1;
@@ -690,13 +703,13 @@ static void prepare_rt2_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 	lsab_allocz(p, sizeof(struct ospf_lsa_rt));
 	/* ospf_lsa_rt header will be filled later */
 
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		int net_lsa = 0;
 		u32 link_cost = p->stub_router ? 0xffff : ifa->cost;
 
 		if ((ifa->type == OSPF_IT_VLINK) && (ifa->voa == oa) &&
-		    (!EMPTY_LIST(ifa->neigh_list))) {
-			neigh = (struct ospf_neighbor *)HEAD(ifa->neigh_list);
+		    (!list_empty(&ifa->neigh_list))) {
+			neigh = (struct ospf_neighbor *)ifa->neigh_list.next;
 			if ((neigh->state == NEIGHBOR_FULL)
 			    && (ifa->cost <= 0xffff))
 				bitv = 1;
@@ -711,20 +724,21 @@ static void prepare_rt2_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 		switch (ifa->type) {
 		case OSPF_IT_PTP:
 		case OSPF_IT_PTMP:
-			WALK_LIST(neigh, ifa->neigh_list)
-			    if (neigh->state == NEIGHBOR_FULL) {
-				/*
-				 * ln->data should be ifa->iface_id in case of no/ptp
-				 * address (ifa->addr->flags & IA_PEER) on PTP link (see
-				 * RFC 2328 12.4.1.1.), but the iface ID value has no use,
-				 * while using IP address even in this case is here for
-				 * compatibility with some broken implementations that use
-				 * this address as a next-hop.
-				 */
-				add_rt2_lsa_link(p, LSART_PTP, neigh->rid,
-						 ipa_to_u32(ifa->addr->ip),
-						 link_cost);
-				i++;
+			list_for_each_entry(neigh, &ifa->neigh_list, n){
+				if (neigh->state == NEIGHBOR_FULL) {
+					/*
+					 * ln->data should be ifa->iface_id in case of no/ptp
+					 * address (ifa->addr->flags & IA_PEER) on PTP link (see
+					 * RFC 2328 12.4.1.1.), but the iface ID value has no use,
+					 * while using IP address even in this case is here for
+					 * compatibility with some broken implementations that use
+					 * this address as a next-hop.
+					 */
+					add_rt2_lsa_link(p, LSART_PTP, neigh->rid,
+							 ipa_to_u32(ifa->addr->ip),
+							 link_cost);
+					i++;
+				}
 			}
 			break;
 
@@ -741,8 +755,8 @@ static void prepare_rt2_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 			break;
 
 		case OSPF_IT_VLINK:
-			neigh = (struct ospf_neighbor *)HEAD(ifa->neigh_list);
-			if ((!EMPTY_LIST(ifa->neigh_list))
+			neigh = (struct ospf_neighbor *)ifa->neigh_list.next;
+			if ((!list_empty(&ifa->neigh_list))
 			    && (neigh->state == NEIGHBOR_FULL)
 			    && (ifa->cost <= 0xffff))
 				add_rt2_lsa_link(p, LSART_VLNK, neigh->rid,
@@ -781,7 +795,7 @@ static void prepare_rt2_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 	}
 
 	struct ospf_stubnet_config *sn;
-	WALK_LIST(sn, oa->ac->stubnet_list)
+	list_for_each_entry(sn, &oa->ac->stubnet_list, n)
 	    if (!sn->hidden)
 		add_rt2_lsa_link(p, LSART_STUB, ipa_to_u32(sn->px.addr),
 				 u32_mkmask(sn->px.len), sn->cost), i++;
@@ -816,10 +830,10 @@ static void prepare_rt3_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 	lsab_allocz(p, sizeof(struct ospf_lsa_rt));
 	/* ospf_lsa_rt header will be filled later */
 
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if ((ifa->type == OSPF_IT_VLINK) && (ifa->voa == oa) &&
-		    (!EMPTY_LIST(ifa->neigh_list))) {
-			neigh = (struct ospf_neighbor *)HEAD(ifa->neigh_list);
+		    (!list_empty(&ifa->neigh_list))) {
+			neigh = (struct ospf_neighbor *)ifa->neigh_list.next;
 			if ((neigh->state == NEIGHBOR_FULL)
 			    && (ifa->cost <= 0xffff))
 				bitv = 1;
@@ -834,7 +848,7 @@ static void prepare_rt3_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 		switch (ifa->type) {
 		case OSPF_IT_PTP:
 		case OSPF_IT_PTMP:
-			WALK_LIST(neigh, ifa->neigh_list)
+			list_for_each_entry(neigh, &ifa->neigh_list, n)
 			    if (neigh->state == NEIGHBOR_FULL)
 				add_rt3_lsa_link(p, LSART_PTP, ifa,
 						 neigh->iface_id, neigh->rid),
@@ -850,8 +864,8 @@ static void prepare_rt3_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 			break;
 
 		case OSPF_IT_VLINK:
-			neigh = (struct ospf_neighbor *)HEAD(ifa->neigh_list);
-			if ((!EMPTY_LIST(ifa->neigh_list))
+			neigh = (struct ospf_neighbor *)ifa->neigh_list.next;
+			if ((!list_empty(&ifa->neigh_list))
 			    && (neigh->state == NEIGHBOR_FULL)
 			    && (ifa->cost <= 0xffff))
 				add_rt3_lsa_link(p, LSART_VLNK, ifa,
@@ -909,7 +923,7 @@ static void prepare_net2_lsa_body(struct ospf_proto *p, struct ospf_iface *ifa)
 	net->optx = u32_mkmask(ifa->addr->pxlen);
 	net->routers[0] = p->router_id;
 
-	WALK_LIST(n, ifa->neigh_list) {
+	list_for_each_entry(n, &ifa->neigh_list, n) {
 		if (n->state == NEIGHBOR_FULL) {
 			net->routers[i] = n->rid;
 			i++;
@@ -931,7 +945,7 @@ static void prepare_net3_lsa_body(struct ospf_proto *p, struct ospf_iface *ifa)
 	net->routers[0] = p->router_id;
 
 	struct ospf_neighbor *n;
-	WALK_LIST(n, ifa->neigh_list) {
+	list_for_each_entry(n, &ifa->neigh_list, n) {
 		if (n->state == NEIGHBOR_FULL) {
 			/* In OSPFv3, we would like to merge options from Link LSAs of added neighbors */
 
@@ -1180,7 +1194,7 @@ use_gw_for_fwaddr(struct ospf_proto *p, ip_addr gw, struct iface *iface)
 	if (ipa_zero(gw) || ipa_is_link_local(gw))
 		return 0;
 
-	WALK_LIST(ifa, p->iface_list)
+	list_for_each_entry(ifa, &p->iface_list, n)
 	    if ((ifa->iface == iface) &&
 		(!ospf_is_v2(p)
 		 || ipa_in_net(gw, ifa->addr->prefix, ifa->addr->pxlen)))
@@ -1198,7 +1212,7 @@ find_surrogate_fwaddr(struct ospf_proto *p, struct ospf_area *oa)
 
 	/* RFC 3101 2.3 - surrogate forwarding address selection */
 
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if ((ifa->oa != oa) || (ifa->type == OSPF_IT_VLINK))
 			continue;
 
@@ -1214,7 +1228,7 @@ find_surrogate_fwaddr(struct ospf_proto *p, struct ospf_area *oa)
 			}
 		} else {	/* OSPFv3 */
 
-			WALK_LIST(a, ifa->iface->addrs) {
+			list_for_each_entry(a, &ifa->iface->addrs, n) {
 				if ((a->flags & IA_SECONDARY) ||
 				    (a->flags & IA_PEER) ||
 				    (a->scope <= SCOPE_LINK))
@@ -1249,8 +1263,8 @@ ospf_rt_notify(struct proto *P, struct rtable * tbl UNUSED, struct network * n, 
 	 * 4) area border router - same as (1), it is attached to backbone
 	 */
 
-	if ((p->areano == 1) && oa_is_nssa(HEAD(p->area_list)))
-		oa = HEAD(p->area_list);
+	if ((p->areano == 1) && oa_is_nssa((void *)p->area_list.next))
+		oa = (void *)p->area_list.next;
 
 	if (!new) {
 		nf = (struct ort *) fib_find(&p->rtf, &n->n.prefix, n->n.pxlen);
@@ -1325,7 +1339,7 @@ static void prepare_link_lsa_body(struct ospf_proto *p, struct ospf_iface *ifa)
 	ll = NULL;		/* struct buffer might be reallocated later */
 
 	struct ifa *a;
-	WALK_LIST(a, ifa->iface->addrs) {
+	list_for_each_entry(a, &ifa->iface->addrs, n) {
 		if ((a->flags & IA_SECONDARY) || (a->scope < SCOPE_SITE))
 			continue;
 
@@ -1380,7 +1394,7 @@ prepare_prefix_rt_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 	lp->ref_rt = p->router_id;
 	lp = NULL;		/* struct buffer might be reallocated later */
 
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if ((ifa->oa != oa) || (ifa->type == OSPF_IT_VLINK)
 		    || (ifa->state == OSPF_IS_DOWN))
 			continue;
@@ -1393,7 +1407,7 @@ prepare_prefix_rt_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 			net_lsa = 0;
 
 		struct ifa *a;
-		WALK_LIST(a, ifa->iface->addrs) {
+		list_for_each_entry(a, &ifa->iface->addrs, n) {
 			if ((a->flags & IA_SECONDARY) ||
 			    (a->flags & IA_PEER) || (a->scope <= SCOPE_LINK))
 				continue;
@@ -1417,7 +1431,7 @@ prepare_prefix_rt_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 	}
 
 	struct ospf_stubnet_config *sn;
-	WALK_LIST(sn, oa->ac->stubnet_list)
+	list_for_each_entry(sn, &oa->ac->stubnet_list, n)
 	    if (!sn->hidden) {
 		lsab_put_prefix(p, sn->px.addr, sn->px.len, sn->cost);
 		if (sn->px.len == MAX_PREFIX_LENGTH)
@@ -1427,14 +1441,14 @@ prepare_prefix_rt_lsa_body(struct ospf_proto *p, struct ospf_area *oa)
 
 	/* If there are some configured vlinks, find some global address
 	   (even from another area), which will be used as a vlink endpoint. */
-	if (!EMPTY_LIST(cf->vlink_list) && !host_addr) {
-		WALK_LIST(ifa, p->iface_list) {
+	if (!list_empty(&cf->vlink_list) && !host_addr) {
+		list_for_each_entry(ifa, &p->iface_list, n) {
 			if ((ifa->type == OSPF_IT_VLINK)
 			    || (ifa->state == OSPF_IS_DOWN))
 				continue;
 
 			struct ifa *a;
-			WALK_LIST(a, ifa->iface->addrs) {
+			list_for_each_entry(a, &ifa->iface->addrs, n) {
 				if ((a->flags & IA_SECONDARY)
 				    || (a->scope <= SCOPE_LINK))
 					continue;
@@ -1570,7 +1584,7 @@ prepare_prefix_net_lsa_body(struct ospf_proto *p, struct ospf_iface *ifa)
 		add_link_lsa(p, en->next_lsa_body ? : en->lsa_body, offset,
 			     &pxc);
 
-	WALK_LIST(n, ifa->neigh_list)
+	list_for_each_entry(n, &ifa->neigh_list, n)
 	    if ((n->state == NEIGHBOR_FULL) &&
 		(en =
 		 ospf_hash_find(p->gr, ifa->iface_id, n->iface_id, n->rid,
@@ -1610,7 +1624,7 @@ void ospf_update_topology(struct ospf_proto *p)
 	struct ospf_area *oa;
 	struct ospf_iface *ifa;
 
-	WALK_LIST(oa, p->area_list) {
+	list_for_each_entry(oa, &p->area_list, n) {
 		if (oa->update_rt_lsa) {
 			/*
 			 * Generally, MinLSInterval is enforced in ospf_do_originate_lsa(), but
@@ -1638,7 +1652,7 @@ void ospf_update_topology(struct ospf_proto *p)
 		}
 	}
 
-	WALK_LIST(ifa, p->iface_list) {
+	list_for_each_entry(ifa, &p->iface_list, n) {
 		if (ifa->type == OSPF_IT_VLINK)
 			continue;
 

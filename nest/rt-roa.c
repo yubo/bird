@@ -10,21 +10,21 @@
 #include "nest/bird.h"
 #include "nest/route.h"
 #include "nest/cli.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 #include "lib/event.h"
 #include "lib/string.h"
 #include "conf/conf.h"
 
-
 struct pool *roa_pool;
-static struct slab *roa_slab;			/* Slab of struct roa_item */
-static union list roa_table_list;		/* List of struct roa_table */
+static struct slab *roa_slab;	/* Slab of struct roa_item */
+static struct list_head roa_table_list;	/* List of struct roa_table */
 struct roa_table *roa_table_default;	/* The first ROA table in the config */
 
-static inline int
-src_match(struct roa_item *it, byte src)
-{ return !src || it->src == src; }
+static inline int src_match(struct roa_item *it, byte src)
+{
+	return !src || it->src == src;
+}
 
 /**
  * roa_add_item - add a ROA entry
@@ -40,24 +40,26 @@ src_match(struct roa_item *it, byte src)
  * distinguish different sources of ROAs.
  */
 void
-roa_add_item(struct roa_table *t, ip_addr prefix, byte pxlen, byte maxlen, u32 asn, byte src)
+roa_add_item(struct roa_table *t, ip_addr prefix, byte pxlen, byte maxlen,
+	     u32 asn, byte src)
 {
-  struct roa_node *n = fib_get(&t->fib, &prefix, pxlen);
+	struct roa_node *n = fib_get(&t->fib, &prefix, pxlen);
 
-  // if ((n->items == NULL) && (n->n.x0 != ROA_INVALID))
-  // t->cached_items--;
+	// if ((n->items == NULL) && (n->n.x0 != ROA_INVALID))
+	// t->cached_items--;
 
-  struct roa_item *it;
-  for (it = n->items; it; it = it->next)
-    if ((it->maxlen == maxlen) && (it->asn == asn) && src_match(it, src))
-      return;
+	struct roa_item *it;
+	for (it = n->items; it; it = it->next)
+		if ((it->maxlen == maxlen) && (it->asn == asn)
+		    && src_match(it, src))
+			return;
 
-  it = sl_alloc(roa_slab);
-  it->asn = asn;
-  it->maxlen = maxlen;
-  it->src = src;
-  it->next = n->items;
-  n->items = it;
+	it = sl_alloc(roa_slab);
+	it->asn = asn;
+	it->maxlen = maxlen;
+	it->src = src;
+	it->next = n->items;
+	n->items = it;
 }
 
 /**
@@ -74,28 +76,29 @@ roa_add_item(struct roa_table *t, ip_addr prefix, byte pxlen, byte maxlen, u32 a
  * that source are considered.
  */
 void
-roa_delete_item(struct roa_table *t, ip_addr prefix, byte pxlen, byte maxlen, u32 asn, byte src)
+roa_delete_item(struct roa_table *t, ip_addr prefix, byte pxlen, byte maxlen,
+		u32 asn, byte src)
 {
-  struct roa_node *n = fib_find(&t->fib, &prefix, pxlen);
+	struct roa_node *n = fib_find(&t->fib, &prefix, pxlen);
 
-  if (!n)
-    return;
+	if (!n)
+		return;
 
-  struct roa_item *it, **itp;
-  for (itp = &n->items; it = *itp; itp = &it->next)
-    if ((it->maxlen == maxlen) && (it->asn == asn) && src_match(it, src))
-      break;
+	struct roa_item *it, **itp;
+	for (itp = &n->items; it = *itp; itp = &it->next)
+		if ((it->maxlen == maxlen) && (it->asn == asn)
+		    && src_match(it, src))
+			break;
 
-  if (!it)
-    return;
+	if (!it)
+		return;
 
-  *itp = it->next;
-  sl_free(roa_slab, it);
+	*itp = it->next;
+	sl_free(roa_slab, it);
 
-  // if ((n->items == NULL) && (n->n.x0 != ROA_INVALID))
-  // t->cached_items++;
+	// if ((n->items == NULL) && (n->n.x0 != ROA_INVALID))
+	// t->cached_items++;
 }
-
 
 /**
  * roa_flush - flush a ROA table
@@ -106,32 +109,26 @@ roa_delete_item(struct roa_table *t, ip_addr prefix, byte pxlen, byte maxlen, u3
  * @src is ROA_SRC_ANY, all entries in the table are removed,
  * otherwise only all entries from that source are removed.
  */
-void
-roa_flush(struct roa_table *t, byte src)
+void roa_flush(struct roa_table *t, byte src)
 {
-  struct roa_item *it, **itp;
-  struct roa_node *n;
+	struct roa_item *it, **itp;
+	struct roa_node *n;
 
-  FIB_WALK(&t->fib, fn)
-    {
-      n = (struct roa_node *) fn;
+	FIB_WALK(&t->fib, fn) {
+		n = (struct roa_node *)fn;
 
-      itp = &n->items;
-      while (it = *itp)
-	if (src_match(it, src))
-	  {
-	    *itp = it->next;
-	    sl_free(roa_slab, it);
-	  }
-	else
-	  itp = &it->next;
-    }
-  FIB_WALK_END;
+		itp = &n->items;
+		while (it = *itp)
+			if (src_match(it, src)) {
+				*itp = it->next;
+				sl_free(roa_slab, it);
+			} else
+				itp = &it->next;
+	}
+	FIB_WALK_END;
 
-  // TODO add cleanup of roa_nodes
+	// TODO add cleanup of roa_nodes
 }
-
-
 
 /*
 byte
@@ -180,74 +177,69 @@ roa_check(struct roa_table *t, ip_addr prefix, byte pxlen, u32 asn)
  * cannot determine origin AS, 0 could be used (in that case ROA_VALID
  * cannot happen).
  */
-byte
-roa_check(struct roa_table *t, ip_addr prefix, byte pxlen, u32 asn)
+byte roa_check(struct roa_table *t, ip_addr prefix, byte pxlen, u32 asn)
 {
-  struct roa_node *n;
-  ip_addr px;
-  byte anything = 0;
+	struct roa_node *n;
+	ip_addr px;
+	byte anything = 0;
 
-  int len;
-  for (len = pxlen; len >= 0; len--)
-    {
-      px = ipa_and(prefix, ipa_mkmask(len));
-      n = fib_find(&t->fib, &px, len);
+	int len;
+	for (len = pxlen; len >= 0; len--) {
+		px = ipa_and(prefix, ipa_mkmask(len));
+		n = fib_find(&t->fib, &px, len);
 
-      if (!n)
-	continue;
+		if (!n)
+			continue;
 
-      struct roa_item *it;
-      for (it = n->items; it; it = it->next)
-	{
-	  anything = 1;
-	  if ((it->maxlen >= pxlen) && (it->asn == asn) && asn)
-	    return ROA_VALID;
+		struct roa_item *it;
+		for (it = n->items; it; it = it->next) {
+			anything = 1;
+			if ((it->maxlen >= pxlen) && (it->asn == asn) && asn)
+				return ROA_VALID;
+		}
 	}
-    }
 
-  return anything ? ROA_INVALID : ROA_UNKNOWN;
+	return anything ? ROA_INVALID : ROA_UNKNOWN;
 }
 
-static void
-roa_node_init(struct fib_node *fn)
+static void roa_node_init(struct fib_node *fn)
 {
-  struct roa_node *n = (struct roa_node *) fn;
-  n->items = NULL;
+	struct roa_node *n = (struct roa_node *)fn;
+	n->items = NULL;
 }
 
-static inline void
-roa_populate(struct roa_table *t)
+static inline void roa_populate(struct roa_table *t)
 {
-  struct roa_item_config *ric;
-  for (ric = t->cf->roa_items; ric; ric = ric->next)
-    roa_add_item(t, ric->prefix, ric->pxlen, ric->maxlen, ric->asn, ROA_SRC_CONFIG);
+	struct roa_item_config *ric;
+	for (ric = t->cf->roa_items; ric; ric = ric->next)
+		roa_add_item(t, ric->prefix, ric->pxlen, ric->maxlen, ric->asn,
+			     ROA_SRC_CONFIG);
 }
 
-static void
-roa_new_table(struct roa_table_config *cf)
+static void roa_new_table(struct roa_table_config *cf)
 {
-  struct roa_table *t;
+	struct roa_table *t;
 
-  t = mb_allocz(roa_pool, sizeof(struct roa_table));
-  fib_init(&t->fib, roa_pool, sizeof(struct roa_node), 0, roa_node_init);
-  t->name = cf->name;
-  t->cf = cf;
+	t = mb_allocz(roa_pool, sizeof(struct roa_table));
+	fib_init(&t->fib, roa_pool, sizeof(struct roa_node), 0, roa_node_init);
+	t->name = cf->name;
+	t->cf = cf;
 
-  cf->table = t;
-  add_tail(&roa_table_list, &t->n);
+	cf->table = t;
+	list_add_tail( &t->n,&roa_table_list);
 
-  roa_populate(t);
+	roa_populate(t);
 }
 
-struct roa_table_config *
-roa_new_table_config(struct symbol *s)
+struct roa_table_config *roa_new_table_config(struct symbol *s)
 {
-  struct roa_table_config *rtc = cfg_allocz(sizeof(struct roa_table_config));
+	struct roa_table_config *rtc =
+	    cfg_allocz(sizeof(struct roa_table_config));
 
-  cf_define_symbol(s, SYM_ROA, rtc);
-  rtc->name = s->name;
-  add_tail(&new_config->roa_tables, &rtc->n);
-  return rtc;
+	cf_define_symbol(s, SYM_ROA, rtc);
+	rtc->name = s->name;
+	list_add_tail( &rtc->n,&new_config->roa_tables);
+	return rtc;
 }
 
 /**
@@ -257,16 +249,18 @@ roa_new_table_config(struct symbol *s)
  * are specifying the ROA entry.
  */
 void
-roa_add_item_config(struct roa_table_config *rtc, ip_addr prefix, byte pxlen, byte maxlen, u32 asn)
+roa_add_item_config(struct roa_table_config *rtc, ip_addr prefix, byte pxlen,
+		    byte maxlen, u32 asn)
 {
-  struct roa_item_config *ric = cfg_allocz(sizeof(struct roa_item_config));
+	struct roa_item_config *ric =
+	    cfg_allocz(sizeof(struct roa_item_config));
 
-  ric->prefix = prefix;
-  ric->pxlen = pxlen;
-  ric->maxlen = maxlen;
-  ric->asn = asn;
-  ric->next = rtc->roa_items;
-  rtc->roa_items = ric;
+	ric->prefix = prefix;
+	ric->pxlen = pxlen;
+	ric->maxlen = maxlen;
+	ric->asn = asn;
+	ric->next = rtc->roa_items;
+	rtc->roa_items = ric;
 }
 
 /**
@@ -275,20 +269,17 @@ roa_add_item_config(struct roa_table_config *rtc, ip_addr prefix, byte pxlen, by
  * This function is called during BIRD startup. It initializes
  * the ROA table module.
  */
-void
-roa_init(void)
+void roa_init(void)
 {
-  roa_pool = rp_new(&root_pool, "ROA tables");
-  roa_slab = sl_new(roa_pool, sizeof(struct roa_item));
-  init_list(&roa_table_list);
+	roa_pool = rp_new(&root_pool, "ROA tables");
+	roa_slab = sl_new(roa_pool, sizeof(struct roa_item));
+	INIT_LIST_HEAD(&roa_table_list);
 }
 
-void
-roa_preconfig(struct config *c)
+void roa_preconfig(struct config *c)
 {
-  init_list(&c->roa_tables);
+	INIT_LIST_HEAD(&c->roa_tables);
 }
-
 
 /**
  * roa_commit - commit new ROA table configuration
@@ -302,139 +293,123 @@ roa_preconfig(struct config *c)
  * roa_table_config). If it exists in both configurations, update the
  * configured ROA entries.
  */
-void
-roa_commit(struct config *new, struct config *old)
+void roa_commit(struct config *new, struct config *old)
 {
-  struct roa_table_config *cf;
-  struct roa_table *t;
+	struct roa_table_config *cf;
+	struct roa_table *t;
 
-  if (old)
-    WALK_LIST(t, roa_table_list)
-      {
-	struct symbol *sym = cf_find_symbol(new, t->name);
-	if (sym && sym->class == SYM_ROA)
-	  {
-	    /* Found old table in new config */
-	    cf = sym->def;
-	    cf->table = t;
-	    t->name = cf->name;
-	    t->cf = cf;
+	if (old)
+		list_for_each_entry(t, &roa_table_list, n) {
+		struct symbol *sym = cf_find_symbol(new, t->name);
+		if (sym && sym->class == SYM_ROA) {
+			/* Found old table in new config */
+			cf = sym->def;
+			cf->table = t;
+			t->name = cf->name;
+			t->cf = cf;
 
-	    /* Reconfigure it */
-	    roa_flush(t, ROA_SRC_CONFIG);
-	    roa_populate(t);
-	  }
-	else
-	  {
-	    t->cf->table = NULL;
+			/* Reconfigure it */
+			roa_flush(t, ROA_SRC_CONFIG);
+			roa_populate(t);
+		} else {
+			t->cf->table = NULL;
 
-	    /* Free it now */
-	    roa_flush(t, ROA_SRC_ANY);
-	    rem_node(&t->n);
-	    fib_free(&t->fib);
-	    mb_free(t);
-	  }
-      }
+			/* Free it now */
+			roa_flush(t, ROA_SRC_ANY);
+			list_del(&t->n);
+			fib_free(&t->fib);
+			mb_free(t);
+		}
+		}
 
-  /* Add new tables */
-  WALK_LIST(cf, new->roa_tables)
-    if (! cf->table)
-      roa_new_table(cf);
+	/* Add new tables */
+	list_for_each_entry(cf, &new->roa_tables, n)
+	    if (!cf->table)
+		roa_new_table(cf);
 
-  roa_table_default = EMPTY_LIST(new->roa_tables) ? NULL :
-    ((struct roa_table_config *) HEAD(new->roa_tables))->table;
+	roa_table_default = list_empty(&new->roa_tables) ? NULL :
+	    ((struct roa_table_config *)new->roa_tables.next)->table;
 }
 
-
-
-static void
-roa_show_node(struct cli *c, struct roa_node *rn, int len, u32 asn)
+static void roa_show_node(struct cli *c, struct roa_node *rn, int len, u32 asn)
 {
-  struct roa_item *ri;
+	struct roa_item *ri;
 
-  for (ri = rn->items; ri; ri = ri->next)
-    if ((ri->maxlen >= len) && (!asn || (ri->asn == asn)))
-      cli_printf(c, -1019, "%I/%d max %d as %u", rn->n.prefix, rn->n.pxlen, ri->maxlen, ri->asn);
+	for (ri = rn->items; ri; ri = ri->next)
+		if ((ri->maxlen >= len) && (!asn || (ri->asn == asn)))
+			cli_printf(c, -1019, "%I/%d max %d as %u", rn->n.prefix,
+				   rn->n.pxlen, ri->maxlen, ri->asn);
 }
 
-static void
-roa_show_cont(struct cli *c)
+static void roa_show_cont(struct cli *c)
 {
-  struct roa_show_data *d = c->rover;
-  struct fib *fib = &d->table->fib;
-  struct fib_iterator *it = &d->fit;
-  struct roa_node *rn;
-  unsigned max = 32;
+	struct roa_show_data *d = c->rover;
+	struct fib *fib = &d->table->fib;
+	struct fib_iterator *it = &d->fit;
+	struct roa_node *rn;
+	unsigned max = 32;
 
-  FIB_ITERATE_START(fib, it, f)
-    {
-      rn = (struct roa_node *) f;
+	FIB_ITERATE_START(fib, it, f) {
+		rn = (struct roa_node *)f;
 
-      if (!max--)
-	{
-	  FIB_ITERATE_PUT(it, f);
-	  return;
+		if (!max--) {
+			FIB_ITERATE_PUT(it, f);
+			return;
+		}
+
+		if ((d->mode == ROA_SHOW_ALL) ||
+		    net_in_net(rn->n.prefix, rn->n.pxlen, d->prefix, d->pxlen))
+			roa_show_node(c, rn, 0, d->asn);
 	}
+	FIB_ITERATE_END(f);
 
-      if ((d->mode == ROA_SHOW_ALL) ||
-	  net_in_net(rn->n.prefix, rn->n.pxlen, d->prefix, d->pxlen))
-	roa_show_node(c, rn, 0, d->asn);
-    }
-  FIB_ITERATE_END(f);
-
-  cli_printf(c, 0, "");
-  c->cont = c->cleanup = NULL;
+	cli_printf(c, 0, "");
+	c->cont = c->cleanup = NULL;
 }
 
-static void
-roa_show_cleanup(struct cli *c)
+static void roa_show_cleanup(struct cli *c)
 {
-  struct roa_show_data *d = c->rover;
+	struct roa_show_data *d = c->rover;
 
-  /* Unlink the iterator */
-  fit_get(&d->table->fib, &d->fit);
+	/* Unlink the iterator */
+	fit_get(&d->table->fib, &d->fit);
 }
 
-void
-roa_show(struct roa_show_data *d)
+void roa_show(struct roa_show_data *d)
 {
-  struct roa_node *rn;
-  ip_addr px;
-  int len;
+	struct roa_node *rn;
+	ip_addr px;
+	int len;
 
-  switch (d->mode)
-    {
-    case ROA_SHOW_ALL:
-    case ROA_SHOW_IN:
-      FIB_ITERATE_INIT(&d->fit, &d->table->fib);
-      this_cli->cont = roa_show_cont;
-      this_cli->cleanup = roa_show_cleanup;
-      this_cli->rover = d;
-      break;
+	switch (d->mode) {
+	case ROA_SHOW_ALL:
+	case ROA_SHOW_IN:
+		FIB_ITERATE_INIT(&d->fit, &d->table->fib);
+		this_cli->cont = roa_show_cont;
+		this_cli->cleanup = roa_show_cleanup;
+		this_cli->rover = d;
+		break;
 
-    case ROA_SHOW_PX:
-      rn = fib_find(&d->table->fib, &d->prefix, d->pxlen);
-      if (rn)
-	{
-	  roa_show_node(this_cli, rn, 0, d->asn);
-	  cli_msg(0, "");
+	case ROA_SHOW_PX:
+		rn = fib_find(&d->table->fib, &d->prefix, d->pxlen);
+		if (rn) {
+			roa_show_node(this_cli, rn, 0, d->asn);
+			cli_msg(0, "");
+		} else
+			cli_msg(-8001, "Network not in table");
+		break;
+
+	case ROA_SHOW_FOR:
+		for (len = d->pxlen; len >= 0; len--) {
+			px = ipa_and(d->prefix, ipa_mkmask(len));
+			rn = fib_find(&d->table->fib, &px, len);
+
+			if (!rn)
+				continue;
+
+			roa_show_node(this_cli, rn, 0, d->asn);
+		}
+		cli_msg(0, "");
+		break;
 	}
-      else
-	cli_msg(-8001, "Network not in table");
-      break;
-
-    case ROA_SHOW_FOR:
-      for (len = d->pxlen; len >= 0; len--)
-	{
-	  px = ipa_and(d->prefix, ipa_mkmask(len));
-	  rn = fib_find(&d->table->fib, &px, len);
-
-	  if (!rn)
-	    continue;
-
-	  roa_show_node(this_cli, rn, 0, d->asn);
-	}
-      cli_msg(0, "");
-      break;
-    }
 }

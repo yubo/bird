@@ -49,7 +49,7 @@ union list {		/* In fact two overlayed nodes */
 #define NODE_VALID(n) ((NODE (n))->next)
 #define WALK_LIST(n,list) for(n=HEAD(list); NODE_VALID(n); n=NODE_NEXT(n))
 #define WALK_LIST2(n,nn,list,pos) \
-  for(nn=(list).head; NODE_VALID(nn) && (n=SKIP_BACK(typeof(*n),pos,nn)); nn=nn->next)
+  for(nn=(list).head; NODE_VALID(nn) && (n=container_of(pos,typeof(*n),nn)); nn=nn->next)
 #define WALK_LIST_DELSAFE(n,nxt,list) \
      for(n=HEAD(list); nxt=NODE_NEXT(n); n=(void *) nxt)
 /* WALK_LIST_FIRST supposes that called code removes each processed struct node */
@@ -69,12 +69,12 @@ union list {		/* In fact two overlayed nodes */
 
 #else /* _BIRD_LISTS_C_ */
 #define LIST_INLINE
-void add_tail(union list *, struct node *);
+void list_add_tail(union list *, struct node *);
 void add_head(union list *, struct node *);
-void rem_node(struct node *);
+void list_del(struct node *);
 void add_tail_list(union list *, union list *);
-void init_list(union list *);
-void insert_node(struct node *, struct node *);
+void INIT_LIST_HEAD(union list *);
+void list_add(struct node *, struct node *);
 #endif
 
 #endif

@@ -14,7 +14,7 @@
  *
  * Each interface is represented by an &iface structure which carries
  * interface capability flags (%IF_MULTIACCESS, %IF_BROADCAST etc.),
- * MTU, interface name and index and finally a linked union list of network
+ * MTU, interface name and index and finally a linked struct list_head of network
  * prefixes assigned to the interface, each one represented by
  * struct &ifa.
  *
@@ -35,7 +35,7 @@
 
 static struct pool *if_pool;
 
-union list iface_list;
+struct list_head iface_list;
 
 /**
  * ifa_dump - dump interface address
@@ -85,7 +85,7 @@ void if_dump(struct iface *i)
 	if (i->flags & IF_TMP_DOWN)
 		debug(" TDOWN");
 	debug(" MTU=%d\n", i->mtu);
-	WALK_LIST(a, i->addrs) {
+	list_for_each_entry(a, &i->addrs, n) {
 		ifa_dump(a);
 		ASSERT((a != i->addr) == !(a->flags & IA_PRIMARY));
 	}
@@ -102,7 +102,7 @@ void if_dump_all(void)
 	struct iface *i;
 
 	debug("Known network interfaces:\n");
-	WALK_LIST(i, iface_list)
+	list_for_each_entry(i, &iface_list, n)
 	    if_dump(i);
 	debug("Router ID: %08x\n", config->router_id);
 }
@@ -152,7 +152,7 @@ static void ifa_notify_change_(unsigned c, struct ifa *a)
 	DBG("IFA change notification (%x) for %s:%I\n", c, a->iface->name,
 	    a->ip);
 
-	WALK_LIST(p, active_proto_list)
+	list_for_each_entry(p, &active_proto_list, n)
 	    ifa_send_notify(p, c, a);
 }
 
@@ -202,16 +202,16 @@ static void if_notify_change(unsigned c, struct iface *i)
 		neigh_if_down(i);
 
 	if (c & IF_CHANGE_DOWN)
-		WALK_LIST(a, i->addrs) {
+		list_for_each_entry(a, &i->addrs, n) {
 		a->flags = (i->flags & ~IA_FLAGS) | (a->flags & IA_FLAGS);
 		ifa_notify_change_(IF_CHANGE_DOWN, a);
 		}
 
-	WALK_LIST(p, active_proto_list)
+	list_for_each_entry(p, &active_proto_list, n)
 	    if_send_notify(p, c, i);
 
 	if (c & IF_CHANGE_UP)
-		WALK_LIST(a, i->addrs) {
+		list_for_each_entry(a, &i->addrs, n) {
 		a->flags = (i->flags & ~IA_FLAGS) | (a->flags & IA_FLAGS);
 		ifa_notify_change_(IF_CHANGE_UP, a);
 		}
@@ -283,7 +283,7 @@ struct iface *if_update(struct iface *new)
 	struct iface *i;
 	unsigned c;
 
-	WALK_LIST(i, iface_list)
+	list_for_each_entry(i, &iface_list, n)
 	    if (!strcmp(new->name, i->name)) {
 		new->addr = i->addr;
 		new->flags = if_recalc_flags(new, new->flags);
@@ -291,7 +291,7 @@ struct iface *if_update(struct iface *new)
 		if (c & IF_CHANGE_TOO_MUCH) {	/* Changed a lot, convert it to down/up */
 			DBG("Interface %s changed too much -- forcing down/up transition\n", i->name);
 			if_change_flags(i, i->flags | IF_TMP_DOWN);
-			rem_node(&i->n);
+			list_del(&i->n);
 			new->addr = i->addr;
 			memcpy(&new->addrs, &i->addrs, sizeof(i->addrs));
 			memcpy(i, new, sizeof(*i));
@@ -308,11 +308,11 @@ struct iface *if_update(struct iface *new)
 	}
 	i = mb_alloc(if_pool, sizeof(struct iface));
 	memcpy(i, new, sizeof(*i));
-	init_list(&i->addrs);
+	INIT_LIST_HEAD(&i->addrs);
 newif:
-	init_list(&i->neighbors);
+	INIT_LIST_HEAD(&i->neighbors);
 	i->flags |= IF_UPDATED | IF_TMP_DOWN;	/* Tmp down as we don't have addresses yet */
-	add_tail(&iface_list, &i->n);
+	list_add_tail( &i->n,&iface_list);
 	return i;
 }
 
@@ -321,9 +321,9 @@ void if_start_update(void)
 	struct iface *i;
 	struct ifa *a;
 
-	WALK_LIST(i, iface_list) {
+	list_for_each_entry(i, &iface_list, n) {
 		i->flags &= ~IF_UPDATED;
-		WALK_LIST(a, i->addrs)
+		list_for_each_entry(a, &i->addrs, n)
 		    a->flags &= ~IF_UPDATED;
 	}
 }
@@ -339,13 +339,13 @@ void if_end_update(void)
 	struct iface *i;
 	struct ifa *a, *b;
 
-	WALK_LIST(i, iface_list) {
+	list_for_each_entry(i, &iface_list, n) {
 		if (!(i->flags & IF_UPDATED))
 			if_change_flags(i,
 					(i->
 					 flags & ~IF_ADMIN_UP) | IF_SHUTDOWN);
 		else {
-			WALK_LIST_DELSAFE(a, b, i->addrs)
+			list_for_each_entry_safe(a, b, &i->addrs, n)
 			    if (!(a->flags & IF_UPDATED))
 				ifa_delete(a);
 			if_end_partial_update(i);
@@ -375,13 +375,13 @@ void if_feed_baby(struct proto *p)
 
 	if (!p->if_notify && !p->ifa_notify)	/* shortcut */
 		return;
-	DBG("Announcing interfaces to new protocol %s\n", p->name);
-	WALK_LIST(i, iface_list) {
-		if_send_notify(p,
-			       IF_CHANGE_CREATE | ((i->flags & IF_UP) ?
-						   IF_CHANGE_UP : 0), i);
+	log(L_TRACE "Announcing interfaces to new protocol %s\n", p->name);
+	list_for_each_entry(i, &iface_list, n) {
+		if_send_notify(p, IF_CHANGE_CREATE
+				| ((i->flags & IF_UP) ?  IF_CHANGE_UP : 0),
+				i);
 		if (i->flags & IF_UP)
-			WALK_LIST(a, i->addrs)
+			list_for_each_entry(a, &i->addrs, n)
 			    ifa_send_notify(p, IF_CHANGE_CREATE | IF_CHANGE_UP,
 					    a);
 	}
@@ -399,7 +399,7 @@ struct iface *if_find_by_index(unsigned idx)
 {
 	struct iface *i;
 
-	WALK_LIST(i, iface_list)
+	list_for_each_entry(i, &iface_list, n)
 	    if (i->index == idx && !(i->flags & IF_SHUTDOWN))
 		return i;
 	return NULL;
@@ -417,7 +417,7 @@ struct iface *if_find_by_name(char *name)
 {
 	struct iface *i;
 
-	WALK_LIST(i, iface_list)
+	list_for_each_entry(i, &iface_list, n)
 	    if (!strcmp(i->name, name))
 		return i;
 	return NULL;
@@ -434,9 +434,9 @@ struct iface *if_get_by_name(char *name)
 	i = mb_allocz(if_pool, sizeof(struct iface));
 	strncpy(i->name, name, sizeof(i->name) - 1);
 	i->flags = IF_SHUTDOWN;
-	init_list(&i->addrs);
-	init_list(&i->neighbors);
-	add_tail(&iface_list, &i->n);
+	INIT_LIST_HEAD(&i->addrs);
+	INIT_LIST_HEAD(&i->neighbors);
+	list_add_tail( &i->n,&iface_list);
 	return i;
 }
 
@@ -454,8 +454,7 @@ static int ifa_recalc_primary(struct iface *i)
 
 	if (a) {
 		a->flags |= IA_PRIMARY;
-		rem_node(&a->n);
-		add_head(&i->addrs, &a->n);
+		list_move(&a->n, &i->addrs);
 	}
 
 	i->addr = a;
@@ -466,7 +465,7 @@ void ifa_recalc_all_primary_addresses(void)
 {
 	struct iface *i;
 
-	WALK_LIST(i, iface_list) {
+	list_for_each_entry(i, &iface_list, n) {
 		if (ifa_recalc_primary(i))
 			if_change_flags(i, i->flags | IF_TMP_DOWN);
 	}
@@ -491,7 +490,7 @@ struct ifa *ifa_update(struct ifa *a)
 	struct iface *i = a->iface;
 	struct ifa *b;
 
-	WALK_LIST(b, i->addrs)
+	list_for_each_entry(b, &i->addrs, n)
 	    if (ifa_same(b, a)) {
 		if (ipa_equal(b->brd, a->brd) &&
 		    ipa_equal(b->opposite, a->opposite) &&
@@ -511,7 +510,7 @@ struct ifa *ifa_update(struct ifa *a)
 
 	b = mb_alloc(if_pool, sizeof(struct ifa));
 	memcpy(b, a, sizeof(struct ifa));
-	add_tail(&i->addrs, &b->n);
+	list_add_tail( &b->n,&i->addrs);
 	b->flags = (i->flags & ~IA_FLAGS) | (a->flags & IA_FLAGS);
 	if (ifa_recalc_primary(i))
 		if_change_flags(i, i->flags | IF_TMP_DOWN);
@@ -533,9 +532,9 @@ void ifa_delete(struct ifa *a)
 	struct iface *i = a->iface;
 	struct ifa *b;
 
-	WALK_LIST(b, i->addrs)
+	list_for_each_entry(b, &i->addrs, n)
 	    if (ifa_same(b, a)) {
-		rem_node(&b->n);
+		list_del(&b->n);
 		if (b->flags & IF_UP) {
 			b->flags &= ~IF_UP;
 			ifa_notify_change(IF_CHANGE_DOWN, b);
@@ -556,11 +555,11 @@ u32 if_choose_router_id(struct iface_patt * mask, u32 old_id)
 	struct ifa *a, *b;
 
 	b = NULL;
-	WALK_LIST(i, iface_list) {
+	list_for_each_entry(i, &iface_list, n) {
 		if (!(i->flags & IF_ADMIN_UP) || (i->flags & IF_SHUTDOWN))
 			continue;
 
-		WALK_LIST(a, i->addrs) {
+		list_for_each_entry(a, &i->addrs, n) {
 			if (a->flags & IA_SECONDARY)
 				continue;
 
@@ -601,7 +600,7 @@ u32 if_choose_router_id(struct iface_patt * mask, u32 old_id)
 void if_init(void)
 {
 	if_pool = rp_new(&root_pool, "Interfaces");
-	init_list(&iface_list);
+	INIT_LIST_HEAD(&iface_list);
 	neigh_init(if_pool);
 }
 
@@ -613,7 +612,7 @@ int iface_patt_match(struct iface_patt *ifp, struct iface *i, struct ifa *a)
 {
 	struct iface_patt_node *p;
 
-	WALK_LIST(p, ifp->ipn_list) {
+	list_for_each_entry(p, &ifp->ipn_list, n) {
 		char *t = p->pattern;
 		int pos = p->positive;
 
@@ -646,12 +645,12 @@ int iface_patt_match(struct iface_patt *ifp, struct iface *i, struct ifa *a)
 	return 0;
 }
 
-struct iface_patt *iface_patt_find(union list *l, struct iface *i,
+struct iface_patt *iface_patt_find(struct list_head *l, struct iface *i,
 				   struct ifa *a)
 {
 	struct iface_patt *p;
 
-	WALK_LIST(p, *l)
+	list_for_each_entry(p, l, n)
 	    if (iface_patt_match(p, i, a))
 		return p;
 
@@ -662,8 +661,8 @@ static int iface_plists_equal(struct iface_patt *pa, struct iface_patt *pb)
 {
 	struct iface_patt_node *x, *y;
 
-	x = HEAD(pa->ipn_list);
-	y = HEAD(pb->ipn_list);
+	x = (void *)pa->ipn_list.next;
+	y = (void *)pb->ipn_list.next;
 	while (x->n.next && y->n.next) {
 		if ((x->positive != y->positive) || (!x->pattern && y->pattern) ||	/* This nasty lines where written by me... :-( Feela */
 		    (!y->pattern && x->pattern) ||
@@ -679,13 +678,13 @@ static int iface_plists_equal(struct iface_patt *pa, struct iface_patt *pb)
 }
 
 int
-iface_patts_equal(union list *a, union list *b,
+iface_patts_equal(struct list_head *a, struct list_head *b,
 		  int (*comp) (struct iface_patt *, struct iface_patt *))
 {
 	struct iface_patt *x, *y;
 
-	x = HEAD(*a);
-	y = HEAD(*b);
+	x = (void *)a->next;
+	y = (void *)b->next;
 	while (x->n.next && y->n.next) {
 		if (!iface_plists_equal(x, y) || (comp && !comp(x, y)))
 			return 0;
@@ -720,7 +719,7 @@ void if_show(void)
 	struct ifa *a;
 	char *type;
 
-	WALK_LIST(i, iface_list) {
+	list_for_each_entry(i, &iface_list, n) {
 		if (i->flags & IF_SHUTDOWN)
 			continue;
 
@@ -740,7 +739,7 @@ void if_show(void)
 			(i->flags & IF_IGNORE) ? " Ignored" : "", i->mtu);
 		if (i->addr)
 			if_show_addr(i->addr);
-		WALK_LIST(a, i->addrs)
+		list_for_each_entry(a, &i->addrs, n)
 		    if (a != i->addr)
 			if_show_addr(a);
 	}
@@ -753,7 +752,7 @@ void if_show_summary(void)
 	byte addr[STD_ADDRESS_P_LENGTH + 16];
 
 	cli_msg(-2005, "interface state address");
-	WALK_LIST(i, iface_list) {
+	list_for_each_entry(i, &iface_list, n) {
 		if (i->addr)
 			bsprintf(addr, "%I/%d", i->addr->ip, i->addr->pxlen);
 		else

@@ -32,34 +32,16 @@
 #include "nest/rt-dev.h"
 #include "nest/password.h"
 #include "nest/cmds.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 
-
-
-
-
-#include "proto/bfd/bfd.h"
-
-
-
-#include "proto/bgp/bgp.h"
-
-
-
+//#include "proto/bfd/bfd.h"
+//#include "proto/bgp/bgp.h"
 #include "proto/ospf/ospf.h"
-
-
-
-#include "proto/pipe/pipe.h"
-
-
-
-#include "proto/rip/rip.h"
+#include "proto/proto.h"
+//#include "proto/pipe/pipe.h"
+//#include "proto/rip/rip.h"
 #include "nest/iface.h"
-
-
-
-#include "proto/static/static.h"
+//#include "proto/static/static.h"
 
 
 static struct keyword keyword_list[] = {

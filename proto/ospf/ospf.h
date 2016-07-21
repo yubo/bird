@@ -16,8 +16,7 @@
 
 #include "lib/checksum.h"
 #include "lib/ip.h"
-#include "lib/lists.h"
-#include "lib/slists.h"
+#include "lib/list.h"
 #include "lib/socket.h"
 #include "lib/timer.h"
 #include "lib/resource.h"
@@ -96,12 +95,12 @@ struct ospf_config {
 	u8 abr;
 	u8 asbr;
 	int ecmp;
-	union list area_list;		/* union list of area configs (struct ospf_area_config) */
-	union list vlink_list;	/* union list of configured vlinks (struct ospf_iface_patt) */
+	struct list_head area_list;		/* struct list_head of area configs (struct ospf_area_config) */
+	struct list_head vlink_list;	/* struct list_head of configured vlinks (struct ospf_iface_patt) */
 };
 
 struct ospf_area_config {
-	struct node n;
+	struct list_head n;
 	u32 areaid;
 	u32 default_cost;	/* Cost of default route for stub areas
 				   (With possible LSA_EXT3_EBIT for NSSA areas) */
@@ -111,14 +110,14 @@ struct ospf_area_config {
 	u8 default_nssa;	/* Generate default NSSA route for NSSA+summary area */
 	u8 translator;		/* Translator role, for NSSA ABR */
 	u32 transint;		/* Translator stability interval */
-	union list patt_list;		/* List of iface configs (struct ospf_iface_patt) */
-	union list net_list;		/* List of aggregate networks for that area */
-	union list enet_list;		/* List of aggregate external (NSSA) networks */
-	union list stubnet_list;	/* List of stub networks added to Router LSA */
+	struct list_head patt_list;		/* List of iface configs (struct ospf_iface_patt) */
+	struct list_head net_list;		/* List of aggregate networks for that area */
+	struct list_head enet_list;		/* List of aggregate external (NSSA) networks */
+	struct list_head stubnet_list;	/* List of stub networks added to Router LSA */
 };
 
 struct area_net_config {
-	struct node n;
+	struct list_head n;
 	struct prefix px;
 	u32 tag;
 	u8 hidden;
@@ -133,7 +132,7 @@ struct area_net {
 };
 
 struct ospf_stubnet_config {
-	struct node n;
+	struct list_head n;
 	struct prefix px;
 	u32 cost;
 	u8 hidden;
@@ -141,7 +140,7 @@ struct ospf_stubnet_config {
 };
 
 struct nbma_node {
-	struct node n;
+	struct list_head n;
 	ip_addr ip;
 	byte eligible;
 	byte found;
@@ -159,7 +158,7 @@ struct ospf_iface_patt {
 	u32 deadc;
 	u32 deadint;
 	u32 inftransdelay;
-	union list nbma_list;
+	struct list_head nbma_list;
 	u32 priority;
 	u32 voa;
 	u32 vid;
@@ -184,7 +183,7 @@ struct ospf_iface_patt {
 	u8 ttl_security;	/* bool + 2 for TX only */
 	u8 bfd;
 	u8 bsd_secondary;
-	union list *passwords;
+	struct list_head *passwords;
 };
 
 /* Default values for interface parameters */
@@ -203,11 +202,12 @@ struct ospf_proto {
 	struct timer *disp_timer;	/* OSPF proto dispatcher */
 	uint tick;
 	struct top_graph *gr;	/* LSA graph */
-	struct slist lsal;		/* List of all LSA's */
+	struct list_head lsal;		/* List of all LSA's */
+	struct list_head lsal_list;		/* List of all LSA's */
 	int calcrt;		/* Routing table calculation scheduled?
 				   0=no, 1=normal, 2=forced reload */
-	union list iface_list;	/* List of OSPF interfaces (struct ospf_iface) */
-	union list area_list;		/* List of OSPF areas (struct ospf_area) */
+	struct list_head iface_list;	/* List of OSPF interfaces (struct ospf_iface) */
+	struct list_head area_list;		/* List of OSPF areas (struct ospf_area) */
 	int areano;		/* Number of area I belong to */
 	int padj;		/* Number of neighbors in Exchange or Loading state */
 	struct fib rtf;		/* Routing table */
@@ -230,12 +230,12 @@ struct ospf_proto {
 };
 
 struct ospf_area {
-	struct node n;
+	struct list_head n;
 	u32 areaid;
 	struct ospf_area_config *ac;	/* Related area config */
 	struct top_hash_entry *rt;	/* My own router LSA */
 	struct top_hash_entry *pxr_lsa;	/* Originated prefix LSA */
-	union list cand;		/* List of candidates for RT calc. */
+	struct list_head cand;		/* List of candidates for RT calc. */
 	struct fib net_fib;	/* Networks to advertise or not */
 	struct fib enet_fib;	/* External networks for NSSAs */
 	u32 options;		/* Optional features */
@@ -249,7 +249,7 @@ struct ospf_area {
 };
 
 struct ospf_iface {
-	struct node n;
+	struct list_head n;
 	struct iface *iface;	/* Nest's iface (NULL for vlinks) */
 	struct ifa *addr;	/* IP prefix associated with that OSPF iface */
 	struct ospf_area *oa;
@@ -258,7 +258,7 @@ struct ospf_iface {
 
 	struct pool *pool;
 	struct birdsock *sk;		/* IP socket */
-	union list neigh_list;	/* List of neighbors (struct ospf_neighbor) */
+	struct list_head neigh_list;	/* List of neighbors (struct ospf_neighbor) */
 	u32 cost;		/* Cost of iface */
 	u32 waitint;		/* number of sec before changing state from wait */
 	u32 rxmtint;		/* number of seconds between LSA retransmissions */
@@ -273,7 +273,7 @@ struct ospf_iface {
 				   transmit a Link State Update Packet over this
 				   interface.  LSAs contained in the update */
 	u16 helloint;		/* number of seconds between hello sending */
-	union list *passwords;
+	struct list_head *passwords;
 	u32 csn;		/* Last used crypt seq number */
 	bird_clock_t csn_use;	/* Last time when packet with that CSN was sent */
 	ip_addr all_routers;	/* Multicast (or broadcast) address for all routers */
@@ -307,7 +307,7 @@ struct ospf_iface {
 	u16 flood_queue_used;	/* The current number of LSAs in flood_queue */
 	u16 flood_queue_size;	/* The maximum number of LSAs in flood_queue */
 	int fadj;		/* Number of fully adjacent neighbors */
-	union list nbma_list;
+	struct list_head nbma_list;
 	u8 priority;		/* A router priority for DR election */
 	u8 ioprob;
 #define OSPF_I_OK 0		/* Everything OK */
@@ -326,7 +326,7 @@ struct ospf_iface {
 };
 
 struct ospf_neighbor {
-	struct node n;
+	struct list_head n;
 	struct pool *pool;
 	struct ospf_iface *ifa;
 	u8 state;
@@ -348,28 +348,31 @@ struct ospf_neighbor {
 	u32 bdr;		/* Neighbor's idea of BDR */
 	u32 iface_id;		/* ID of Neighbour's iface connected to common network */
 
-	/* Database summary union list iterator, controls initial dbdes exchange.
-	 * Advances in the LSA union list as dbdes packets are sent.
+	/* Database summary struct list_head iterator, controls initial dbdes exchange.
+	 * Advances in the LSA struct list_head as dbdes packets are sent.
 	 */
-	struct siterator dbsi;		/* iterator of po->lsal */
+	struct list_head dbsi;		/* iterator of po->lsal */
+	struct list_head dbsi_list;	/* iterator of po->lsal */
 
 	/* Link state request list, controls initial LSA exchange.
 	 * Entries added when received in dbdes packets, removed as sent in lsreq packets.
 	 */
-	struct slist lsrql;		/* struct slist of struct top_hash_entry from n->lsrqh */
+	struct list_head lsrql;		/* struct slist of struct top_hash_entry from n->lsrqh */
+	struct list_head lsrql_list;	/* struct slist of struct top_hash_entry from n->lsrqh */
 	struct top_graph *lsrqh;
-	struct top_hash_entry *lsrqi;	/* Pointer to the first unsent struct node in lsrql */
+	struct top_hash_entry *lsrqi;	/* Pointer to the first unsent struct list_head in lsrql */
 
 	/* Link state retransmission list, controls LSA retransmission during flood.
 	 * Entries added as sent in lsupd packets, removed when received in lsack packets.
 	 * These entries hold ret_count in appropriate LSA entries.
 	 */
-	struct slist lsrtl;		/* struct slist of struct top_hash_entry from n->lsrth */
+	struct list_head lsrtl;		/* struct slist of struct top_hash_entry from n->lsrth */
+	struct list_head lsrtl_list;	/* struct slist of struct top_hash_entry from n->lsrth */
 	struct top_graph *lsrth;
 	struct timer *dbdes_timer;	/* DBDES exchange struct timer */
 	struct timer *lsrq_timer;	/* LSA request struct timer */
 	struct timer *lsrt_timer;	/* LSA retransmission struct timer */
-	union list ackl[2];
+	struct list_head ackl[2];
 #define ACKL_DIRECT 0
 #define ACKL_DELAY 1
 	struct timer *ackd_timer;	/* Delayed ack struct timer */
@@ -801,7 +804,8 @@ struct ospf_area *ospf_find_area(struct ospf_proto *p, u32 aid);
 
 static inline struct ospf_area *ospf_main_area(struct ospf_proto *p)
 {
-	return (p->areano == 1) ? HEAD(p->area_list) : p->backbone;
+	return (p->areano == 1)
+		? (list_empty(&p->area_list) ? NULL : (void *)p->area_list.next) : p->backbone;
 }
 
 static inline int oa_is_stub(struct ospf_area *oa)
@@ -843,7 +847,7 @@ int ospf_iface_assure_bufsize(struct ospf_iface *ifa, uint plen);
 int ospf_iface_reconfigure(struct ospf_iface *ifa, struct ospf_iface_patt *new);
 void ospf_reconfigure_ifaces(struct ospf_proto *p);
 void ospf_open_vlink_sk(struct ospf_proto *p);
-struct nbma_node *find_nbma_node_(union list * nnl, ip_addr ip);
+struct nbma_node *find_nbma_node_(struct list_head * nnl, ip_addr ip);
 
 static inline struct nbma_node *find_nbma_node(struct ospf_iface *ifa,
 					       ip_addr ip)

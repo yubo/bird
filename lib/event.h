@@ -15,16 +15,16 @@ struct event {
 	struct resource r;
 	void (*hook) (void *);
 	void *data;
-	struct node n;		/* Internal link */
+	struct list_head n;		/* Internal link */
 };
 
-typedef union list event_list;
+typedef struct list_head event_list;
 
 extern event_list global_event_list;
 
 struct event *ev_new(struct pool *);
 void ev_run(struct event *);
-#define ev_init_list(el) init_list(el)
+#define ev_INIT_LIST_HEAD(el) INIT_LIST_HEAD(el)
 void ev_enqueue(event_list *, struct event *);
 void ev_schedule(struct event *);
 void ev_postpone(struct event *);

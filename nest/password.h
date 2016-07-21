@@ -12,7 +12,7 @@
 #include "lib/timer.h"
 
 struct password_item {
-  struct node n;
+  struct list_head n;
   char *password;
   int id;
   bird_clock_t accfrom, accto, genfrom, gento;
@@ -20,9 +20,9 @@ struct password_item {
 
 extern struct password_item *last_password_item;
 
-struct password_item *password_find(union list *l, int first_fit);
-struct password_item *password_find_by_id(union list *l, int id);
-struct password_item *password_find_by_value(union list *l, char *pass, uint size);
+struct password_item *password_find(struct list_head *l, int first_fit);
+struct password_item *password_find_by_id(struct list_head *l, int id);
+struct password_item *password_find_by_value(struct list_head *l, char *pass, uint size);
 
 static inline int password_verify(struct password_item *p1, char *p2, uint size)
 {

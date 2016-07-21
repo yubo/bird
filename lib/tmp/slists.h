@@ -11,7 +11,7 @@
 
 /*
  *  These linked lists work in a way similar to standard lists defined
- *  in lib/lists.h, but in addition to all usual union list functions they
+ *  in lib/lists.h, but in addition to all usual struct list_head functions they
  *  provide fast deletion/insertion/everything-safe asynchronous
  *  walking.
  *
@@ -29,7 +29,7 @@
  *		     ...
  *		     if (decided_to_stop) {
  *			s_put(&i, n);	// Store current position (maybe even
- *					// that we stay at union list end)
+ *					// that we stay at struct list_head end)
  *			return;		// and return
  *		     }
  *		     ...
@@ -76,21 +76,21 @@ struct siterator {
      for(n=SHEAD(list); nxt=SNODE_NEXT(n); n=(void *) nxt)
 #define EMPTY_SLIST(list) (!(list).head->next)
 
-void s_add_tail(struct slist *, struct snode *);
+void s_list_add_tail(struct slist *, struct snode *);
 void s_add_head(struct slist *, struct snode *);
-void s_rem_node(struct snode *);
+void s_list_del(struct snode *);
 void s_add_tail_list(struct slist *, struct slist *);
-void s_init_list(struct slist *);
-void s_insert_node(struct snode *, struct snode *);
+void s_INIT_LIST_HEAD(struct slist *);
+void s_list_add(struct snode *, struct snode *);
 
 struct snode *s_get(struct siterator *);
 void s_put(struct siterator *, struct snode *n);
-static inline void s_init(struct siterator * i, struct slist *l)
+static inline void s_init(struct siterator *i, struct slist *l)
 {
 	s_put(i, SHEAD(*l));
 }
 
-static inline int s_is_used(struct siterator * i)
+static inline int s_is_used(struct siterator *i)
 {
 	return (i->prev != NULL);
 }

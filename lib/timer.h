@@ -21,7 +21,7 @@ struct timer {
 	void *data;
 	unsigned randomize;	/* Amount of randomization */
 	unsigned recurrent;	/* Timer recurrence */
-	struct node n;		/* Internal link */
+	struct list_head n;		/* Internal link */
 	bird_clock_t expires;	/* 0=inactive */
 };
 

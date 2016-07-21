@@ -102,7 +102,7 @@ ospf_send_hello(struct ospf_iface *ifa, int kind, struct ospf_neighbor *dirn)
 
 	/* Fill all neighbors */
 	if (kind != OHS_SHUTDOWN) {
-		WALK_LIST(neigh, ifa->neigh_list) {
+		list_for_each_entry(neigh, &ifa->neigh_list, n) {
 			if (i == max) {
 				log(L_WARN "%s: Too many neighbors on %s",
 				    p->p.name, ifa->ifname);
@@ -134,13 +134,13 @@ ospf_send_hello(struct ospf_iface *ifa, int kind, struct ospf_neighbor *dirn)
 		int me_elig = ifa->priority > 0;
 
 		if (kind == OHS_POLL) {	/* Poll struct timer */
-			WALK_LIST(nb, ifa->nbma_list)
+			list_for_each_entry(nb, &ifa->nbma_list, n)
 			    if (!nb->found
 				&& (to_all || (me_elig && nb->eligible)))
 				ospf_send_to(ifa, nb->ip);
 		} else {	/* Hello struct timer */
 
-			WALK_LIST(n1, ifa->neigh_list)
+			list_for_each_entry(n1, &ifa->neigh_list, n)
 			    if (to_all || (me_elig && (n1->priority > 0)) ||
 				(n1->rid == ifa->drid)
 				|| (n1->rid == ifa->bdrid))
@@ -149,16 +149,16 @@ ospf_send_hello(struct ospf_iface *ifa, int kind, struct ospf_neighbor *dirn)
 		break;
 
 	case OSPF_IT_PTMP:
-		WALK_LIST(n1, ifa->neigh_list)
+		list_for_each_entry(n1, &ifa->neigh_list, n)
 		    ospf_send_to(ifa, n1->ip);
 
-		WALK_LIST(nb, ifa->nbma_list)
+		list_for_each_entry(nb, &ifa->nbma_list, n)
 		    if (!nb->found)
 			ospf_send_to(ifa, nb->ip);
 
 		/* If there is no other target, we also send HELLO packet to the other end */
 		if (ipa_nonzero(ifa->addr->opposite) && !ifa->strictnbma &&
-		    EMPTY_LIST(ifa->neigh_list) && EMPTY_LIST(ifa->nbma_list))
+		    list_empty(&ifa->neigh_list) && list_empty(&ifa->nbma_list))
 			ospf_send_to(ifa, ifa->addr->opposite);
 		break;
 
@@ -293,6 +293,7 @@ ospf_receive_hello(struct ospf_packet *pkt, struct ospf_iface *ifa,
 			   rcv_rid, ifa->ifname, faddr);
 
 		n = ospf_neighbor_new(ifa);
+OSPF_TRACE(D_EVENTS, "-----neighbor %x lsrt_timer %x", n,  n->lsrt_timer);
 
 		n->rid = rcv_rid;
 		n->ip = faddr;
@@ -325,7 +326,7 @@ ospf_receive_hello(struct ospf_packet *pkt, struct ospf_iface *ifa,
 		if ((ifa->priority == 0) && (n->priority > 0))
 			ospf_send_hello(n->ifa, OHS_HELLO, n);
 
-	/* Examine union list of neighbors */
+	/* Examine struct list_head of neighbors */
 	for (i = 0; i < neigh_count; i++)
 		if (neighbors[i] == htonl(p->router_id))
 			goto found_self;

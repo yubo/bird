@@ -52,7 +52,7 @@ static size_t slab_memsize(struct resource * r);
 struct slab {
 	struct resource r;
 	uint size;
-	union list objs;
+	struct list_head objs;
 };
 
 static struct resclass sl_class = {
@@ -65,7 +65,7 @@ static struct resclass sl_class = {
 };
 
 struct sl_obj {
-	struct node n;
+	struct list_head n;
 	uintptr_t data_align[0];
 	byte data[0];
 };
@@ -74,7 +74,7 @@ struct slab *sl_new(struct pool * p, uint size)
 {
 	struct slab *s = ralloc(p, &sl_class);
 	s->size = size;
-	init_list(&s->objs);
+	INIT_LIST_HEAD(&s->objs);
 	return s;
 }
 
@@ -82,15 +82,15 @@ void *sl_alloc(struct slab * s)
 {
 	struct sl_obj *o = xmalloc(sizeof(struct sl_obj) + s->size);
 
-	add_tail(&s->objs, &o->n);
+	list_add_tail(&o->n, &s->objs);
 	return o->data;
 }
 
 void sl_free(struct slab * s, void *oo)
 {
-	struct sl_obj *o = SKIP_BACK(struct sl_obj, data, oo);
+	struct sl_obj *o = container_of( oo,struct sl_obj, data);
 
-	rem_node(&o->n);
+	list_del(&o->n);
 	xfree(o);
 }
 
@@ -99,7 +99,8 @@ static void slab_free(struct resource * r)
 	struct slab *s = (struct slab *) r;
 	struct sl_obj *o, *p;
 
-	for (o = HEAD(s->objs); p = (struct sl_obj *)o->n.next; o = p)
+	/*for (o = HEAD(s->objs); p = (struct sl_obj *)o->n.next; o = p)*/
+	list_for_each_entry_safe(o, p, &s->objs, n)
 		xfree(o);
 }
 
@@ -109,7 +110,7 @@ static void slab_dump(struct resource * r)
 	int cnt = 0;
 	struct sl_obj *o;
 
-	WALK_LIST(o, s->objs)
+	list_for_each(o, s->objs)
 	    cnt++;
 	debug("(%d objects per %d bytes)\n", cnt, s->size);
 }
@@ -120,7 +121,7 @@ static size_t slab_memsize(struct resource * r)
 	size_t cnt = 0;
 	struct sl_obj *o;
 
-	WALK_LIST(o, s->objs)
+	list_for_each(o, s->objs)
 	    cnt++;
 
 	return ALLOC_OVERHEAD + sizeof(struct slab) + cnt * (ALLOC_OVERHEAD +
@@ -139,7 +140,7 @@ static size_t slab_memsize(struct resource * r)
 struct slab {
 	struct resource r;
 	uint obj_size, head_size, objs_per_slab, num_empty_heads, data_size;
-	union list empty_heads, partial_heads, full_heads;
+	struct list_head empty_heads, partial_heads, full_heads;
 };
 
 static struct resclass sl_class = {
@@ -152,7 +153,7 @@ static struct resclass sl_class = {
 };
 
 struct sl_head {
-	struct node n;
+	struct list_head n;
 	struct sl_obj *first_free;
 	int num_full;
 };
@@ -195,9 +196,9 @@ struct slab *sl_new(struct pool * p, uint size)
 	if (!s->objs_per_slab)
 		bug("Slab: object too large");
 	s->num_empty_heads = 0;
-	init_list(&s->empty_heads);
-	init_list(&s->partial_heads);
-	init_list(&s->full_heads);
+	INIT_LIST_HEAD(&s->empty_heads);
+	INIT_LIST_HEAD(&s->partial_heads);
+	INIT_LIST_HEAD(&s->full_heads);
 	return s;
 }
 
@@ -226,14 +227,14 @@ static struct sl_head *sl_new_head(struct slab * s)
  * sl_alloc() allocates space for a single object from the
  * Slab and returns a pointer to the object.
  */
-void *sl_alloc(struct slab * s)
+void *sl_alloc(struct slab *s)
 {
 	struct sl_head *h;
 	struct sl_obj *o;
 
 redo:
-	h = HEAD(s->partial_heads);
-	if (!h->n.next)
+	h = (void *)(s->partial_heads.next);
+	if (list_empty(&h->n))
 		goto no_partial;
 okay:
 	o = h->first_free;
@@ -247,20 +248,21 @@ okay:
 	return o->u.data;
 
 full_partial:
-	rem_node(&h->n);
-	add_tail(&s->full_heads, &h->n);
+	/*list_del_init(&h->n);
+	list_add_tail(&h->n, &s->full_heads);*/
+	list_move_tail(&h->n, &s->full_heads);
 	goto redo;
 
 no_partial:
-	h = HEAD(s->empty_heads);
-	if (h->n.next) {
-		rem_node(&h->n);
-		add_head(&s->partial_heads, &h->n);
+	if (!list_empty(&s->empty_heads)) {
+		h = (void *)s->empty_heads.next;
+		list_del(&h->n);
+		list_add(&h->n, &s->partial_heads);
 		s->num_empty_heads--;
 		goto okay;
 	}
 	h = sl_new_head(s);
-	add_head(&s->partial_heads, &h->n);
+	list_add(&h->n, &s->partial_heads);
 	goto okay;
 }
 
@@ -274,7 +276,7 @@ no_partial:
  */
 void sl_free(struct slab * s, void *oo)
 {
-	struct sl_obj *o = SKIP_BACK(struct sl_obj, u.data, oo);
+	struct sl_obj *o = container_of( oo,struct sl_obj, u.data);
 	struct sl_head *h = o->slab;
 
 #ifdef POISON
@@ -283,16 +285,16 @@ void sl_free(struct slab * s, void *oo)
 	o->u.next = h->first_free;
 	h->first_free = o;
 	if (!--h->num_full) {
-		rem_node(&h->n);
+		list_del(&h->n);
 		if (s->num_empty_heads >= MAX_EMPTY_HEADS)
 			xfree(h);
 		else {
-			add_head(&s->empty_heads, &h->n);
+			list_add(&h->n, &s->empty_heads);
 			s->num_empty_heads++;
 		}
 	} else if (!o->u.next) {
-		rem_node(&h->n);
-		add_head(&s->partial_heads, &h->n);
+		list_del(&h->n);
+		list_add(&h->n, &s->partial_heads);
 	}
 }
 
@@ -301,11 +303,12 @@ static void slab_free(struct resource * r)
 	struct slab *s = (struct slab *) r;
 	struct sl_head *h, *g;
 
-	WALK_LIST_DELSAFE(h, g, s->empty_heads)
+	//WALK_LIST_DELSAFE(h, g, s->empty_heads)
+	list_for_each_entry_safe(h, g, &s->empty_heads, n)
 	    xfree(h);
-	WALK_LIST_DELSAFE(h, g, s->partial_heads)
+	list_for_each_entry_safe(h, g, &s->partial_heads, n)
 	    xfree(h);
-	WALK_LIST_DELSAFE(h, g, s->full_heads)
+	list_for_each_entry_safe(h, g, &s->full_heads, n)
 	    xfree(h);
 }
 
@@ -315,11 +318,11 @@ static void slab_dump(struct resource * r)
 	int ec = 0, pc = 0, fc = 0;
 	struct sl_head *h;
 
-	WALK_LIST(h, s->empty_heads)
+	list_for_each_entry(h, &s->empty_heads, n)
 	    ec++;
-	WALK_LIST(h, s->partial_heads)
+	list_for_each_entry(h, &s->partial_heads, n)
 	    pc++;
-	WALK_LIST(h, s->full_heads)
+	list_for_each_entry(h, &s->full_heads, n)
 	    fc++;
 	debug("(%de+%dp+%df blocks per %d objs per %d bytes)\n", ec, pc, fc,
 	      s->objs_per_slab, s->obj_size);
@@ -331,11 +334,11 @@ static size_t slab_memsize(struct resource * r)
 	size_t heads = 0;
 	struct sl_head *h;
 
-	WALK_LIST(h, s->empty_heads)
+	list_for_each_entry(h, &s->empty_heads, n)
 	    heads++;
-	WALK_LIST(h, s->partial_heads)
+	list_for_each_entry(h, &s->partial_heads, n)
 	    heads++;
-	WALK_LIST(h, s->full_heads)
+	list_for_each_entry(h, &s->full_heads, n)
 	    heads++;
 
 	return ALLOC_OVERHEAD + sizeof(struct slab) + heads * (ALLOC_OVERHEAD +
@@ -347,10 +350,10 @@ static struct resource *slab_lookup(struct resource * r, unsigned long a)
 	struct slab *s = (struct slab *) r;
 	struct sl_head *h;
 
-	WALK_LIST(h, s->partial_heads)
+	list_for_each_entry(h, &s->partial_heads, n)
 	    if ((unsigned long)h < a && (unsigned long)h + SLAB_SIZE < a)
 		return r;
-	WALK_LIST(h, s->full_heads)
+	list_for_each_entry(h, &s->full_heads, n)
 	    if ((unsigned long)h < a && (unsigned long)h + SLAB_SIZE < a)
 		return r;
 	return NULL;

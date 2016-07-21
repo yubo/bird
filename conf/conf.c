@@ -62,18 +62,18 @@ struct config *config, *new_config;
 
 static struct config *old_config;	/* Old configuration */
 static struct config *future_config;	/* New config held here if recon requested during recon */
-static int old_cftype;			/* Type of transition old_config -> config (RECONFIG_SOFT/HARD) */
-static int future_cftype;		/* Type of scheduled transition, may also be RECONFIG_UNDO */
+static int old_cftype;		/* Type of transition old_config -> config (RECONFIG_SOFT/HARD) */
+static int future_cftype;	/* Type of scheduled transition, may also be RECONFIG_UNDO */
 /* Note that when future_cftype is RECONFIG_UNDO, then future_config is NULL,
    therefore proper check for future scheduled config checks future_cftype */
 
-static struct event *config_event;		/* Event for finalizing reconfiguration */
-static struct timer *config_timer;		/* Timer for scheduled configuration rollback */
+static struct event *config_event;	/* Event for finalizing reconfiguration */
+static struct timer *config_timer;	/* Timer for scheduled configuration rollback */
 
 /* These are public just for cmd_show_status(), should not be accessed elsewhere */
-int shutting_down;			/* Shutdown requested, do not accept new config changes */
-int configuring;			/* Reconfiguration is running */
-int undo_available;			/* Undo was not requested from last reconfiguration */
+int shutting_down;		/* Shutdown requested, do not accept new config changes */
+int configuring;		/* Reconfiguration is running */
+int undo_available;		/* Undo was not requested from last reconfiguration */
 /* Note that both shutting_down and undo_available are related to requests, not processing */
 
 /**
@@ -84,28 +84,29 @@ int undo_available;			/* Undo was not requested from last reconfiguration */
  * struct pool and a linear memory struct pool to it and makes it available for
  * further use. Returns a pointer to the structure.
  */
-struct config *
-config_alloc(byte *name)
+struct config *config_alloc(byte * name)
 {
-  struct pool *p = rp_new(&root_pool, "Config");
-  struct linpool *l = lp_new(p, 4080);
-  struct config *c = lp_allocz(l, sizeof(struct config));
+	struct pool *p = rp_new(&root_pool, "Config");
+	struct linpool *l = lp_new(p, 4080);
+	struct config *c = lp_allocz(l, sizeof(struct config));
 
-  /* Duplication of name string in local linear struct pool */
-  uint nlen = strlen(name) + 1;
-  char *ndup = lp_allocu(l, nlen);
-  memcpy(ndup, name, nlen);
+	/* Duplication of name string in local linear struct pool */
+	uint nlen = strlen(name) + 1;
+	char *ndup = lp_allocu(l, nlen);
+	memcpy(ndup, name, nlen);
 
-  c->mrtdump_file = -1; /* Hack, this should be sysdep-specific */
-  c->pool = p;
-  c->mem = l;
-  c->file_name = ndup;
-  c->load_time = now;
-  c->tf_route = c->tf_proto = (struct timeformat){"%T", "%F", 20*3600};
-  c->tf_base = c->tf_log = (struct timeformat){"%F %T", NULL, 0};
-  c->gr_wait = DEFAULT_GR_WAIT;
+	c->mrtdump_file = -1;	/* Hack, this should be sysdep-specific */
+	c->pool = p;
+	c->mem = l;
+	c->file_name = ndup;
+	c->load_time = now;
+	c->tf_route = c->tf_proto = (struct timeformat) {
+	"%T", "%F", 20 * 3600};
+	c->tf_base = c->tf_log = (struct timeformat) {
+	"%F %T", NULL, 0};
+	c->gr_wait = DEFAULT_GR_WAIT;
 
-  return c;
+	return c;
 }
 
 /**
@@ -121,35 +122,35 @@ config_alloc(byte *name)
  * error has occurred (such as anybody calling cf_error()) and
  * the @err_msg field has been set to the error message.
  */
-int
-config_parse(struct config *c)
+int config_parse(struct config *c)
 {
-  int done = 0;
-  DBG("Parsing configuration file `%s'\n", c->file_name);
-  new_config = c;
-  cfg_mem = c->mem;
-  if (setjmp(conf_jmpbuf))
-    goto cleanup;
+	int done = 0;
+	DBG("Parsing configuration file `%s'\n", c->file_name);
+	new_config = c;
+	cfg_mem = c->mem;
+	if (setjmp(conf_jmpbuf))
+		goto cleanup;
 
-  cf_lex_init(0, c);
-  sysdep_preconfig(c);
-  protos_preconfig(c);
-  rt_preconfig(c);
-  roa_preconfig(c);
-  cf_parse();
-  protos_postconfig(c);
-  if (EMPTY_LIST(c->protos))
-    cf_error("No protocol is specified in the config file");
+	cf_lex_init(0, c);
+	sysdep_preconfig(c);
+	protos_preconfig(c);
+	rt_preconfig(c);
+	roa_preconfig(c);
+	cf_parse();
+	protos_postconfig(c);
+	if (list_empty(&c->protos))
+		cf_error("No protocol is specified in the config file");
 #ifdef IPV6
-  if (!c->router_id)
-    cf_error("Router ID must be configured manually on IPv6 routers");
+	if (!c->router_id)
+		cf_error
+		    ("Router ID must be configured manually on IPv6 routers");
 #endif
-  done = 1;
+	done = 1;
 
 cleanup:
-  new_config = NULL;
-  cfg_mem = NULL;
-  return done;
+	new_config = NULL;
+	cfg_mem = NULL;
+	return done;
 }
 
 /**
@@ -159,25 +160,24 @@ cleanup:
  * cli_parse() is similar to config_parse(), but instead of a configuration,
  * it parses a CLI command. See the CLI module for more information.
  */
-int
-cli_parse(struct config *c)
+int cli_parse(struct config *c)
 {
-  int done = 0;
-  c->sym_fallback = config->sym_hash;
-  new_config = c;
-  cfg_mem = c->mem;
-  if (setjmp(conf_jmpbuf))
-    goto cleanup;
+	int done = 0;
+	c->sym_fallback = config->sym_hash;
+	new_config = c;
+	cfg_mem = c->mem;
+	if (setjmp(conf_jmpbuf))
+		goto cleanup;
 
-  cf_lex_init(1, c);
-  cf_parse();
-  done = 1;
+	cf_lex_init(1, c);
+	cf_parse();
+	done = 1;
 
 cleanup:
-  c->sym_fallback = NULL;
-  new_config = NULL;
-  cfg_mem = NULL;
-  return done;
+	c->sym_fallback = NULL;
+	new_config = NULL;
+	cfg_mem = NULL;
+	return done;
 }
 
 /**
@@ -187,118 +187,111 @@ cleanup:
  * This function takes a &config structure and frees all resources
  * associated with it.
  */
-void
-config_free(struct config *c)
+void config_free(struct config *c)
 {
-  if (c)
-    rfree(c->pool);
+	if (c)
+		rfree(c->pool);
 }
 
-void
-config_add_obstacle(struct config *c)
+void config_add_obstacle(struct config *c)
 {
-  DBG("+++ adding obstacle %d\n", c->obstacle_count);
-  c->obstacle_count++;
+	DBG("+++ adding obstacle %d\n", c->obstacle_count);
+	c->obstacle_count++;
 }
 
-void
-config_del_obstacle(struct config *c)
+void config_del_obstacle(struct config *c)
 {
-  DBG("+++ deleting obstacle %d\n", c->obstacle_count);
-  c->obstacle_count--;
-  if (!c->obstacle_count)
-    ev_schedule(config_event);
+	DBG("+++ deleting obstacle %d\n", c->obstacle_count);
+	c->obstacle_count--;
+	if (!c->obstacle_count)
+		ev_schedule(config_event);
 }
 
-static int
-global_commit(struct config *new, struct config *old)
+static int global_commit(struct config *new, struct config *old)
 {
-  if (!old)
-    return 0;
+	if (!old)
+		return 0;
 
-  if (!ipa_equal(old->listen_bgp_addr, new->listen_bgp_addr) ||
-      (old->listen_bgp_port != new->listen_bgp_port) ||
-      (old->listen_bgp_flags != new->listen_bgp_flags))
-    log(L_WARN "Reconfiguration of BGP listening socket not implemented, please restart BIRD.");
+	if (!ipa_equal(old->listen_bgp_addr, new->listen_bgp_addr) ||
+	    (old->listen_bgp_port != new->listen_bgp_port) ||
+	    (old->listen_bgp_flags != new->listen_bgp_flags))
+		log(L_WARN
+		    "Reconfiguration of BGP listening socket not implemented, please restart BIRD.");
 
-  if (!new->router_id)
-    {
-      new->router_id = old->router_id;
+	if (!new->router_id) {
+		new->router_id = old->router_id;
 
-      if (new->router_id_from)
-	{
-	  u32 id = if_choose_router_id(new->router_id_from, old->router_id);
-	  if (!id)
-	    log(L_WARN "Cannot determine router ID, using old one");
-	  else
-	    new->router_id = id;
+		if (new->router_id_from) {
+			u32 id =
+			    if_choose_router_id(new->router_id_from,
+						old->router_id);
+			if (!id)
+				log(L_WARN
+				    "Cannot determine router ID, using old one");
+			else
+				new->router_id = id;
+		}
 	}
-    }
 
-  return 0;
+	return 0;
 }
 
-static int
-config_do_commit(struct config *c, int type)
+static int config_do_commit(struct config *c, int type)
 {
-  if (type == RECONFIG_UNDO)
-    {
-      c = old_config;
-      type = old_cftype;
-    }
-  else
-    config_free(old_config);
+	if (type == RECONFIG_UNDO) {
+		c = old_config;
+		type = old_cftype;
+	} else
+		config_free(old_config);
 
-  old_config = config;
-  old_cftype = type;
-  config = c;
+	old_config = config;
+	old_cftype = type;
+	config = c;
 
-  configuring = 1;
-  if (old_config && !config->shutdown)
-    log(L_INFO "Reconfiguring");
+	configuring = 1;
+	if (old_config && !config->shutdown)
+		log(L_INFO "Reconfiguring");
 
-  if (old_config)
-    old_config->obstacle_count++;
+	if (old_config)
+		old_config->obstacle_count++;
 
-  DBG("sysdep_commit\n");
-  int force_restart = sysdep_commit(c, old_config);
-  DBG("global_commit\n");
-  force_restart |= global_commit(c, old_config);
-  DBG("rt_commit\n");
-  rt_commit(c, old_config);
-  roa_commit(c, old_config);
-  DBG("protos_commit\n");
-  protos_commit(c, old_config, force_restart, type);
+	DBG("sysdep_commit\n");
+	int force_restart = sysdep_commit(c, old_config);
+	DBG("global_commit\n");
+	force_restart |= global_commit(c, old_config);
+	DBG("rt_commit\n");
+	rt_commit(c, old_config);
+	roa_commit(c, old_config);
+	DBG("protos_commit\n");
+	protos_commit(c, old_config, force_restart, type);
 
-  int obs = 0;
-  if (old_config)
-    obs = --old_config->obstacle_count;
+	int obs = 0;
+	if (old_config)
+		obs = --old_config->obstacle_count;
 
-  DBG("do_commit finished with %d obstacles remaining\n", obs);
-  return !obs;
+	DBG("do_commit finished with %d obstacles remaining\n", obs);
+	return !obs;
 }
 
-static void
-config_done(void *unused UNUSED)
+static void config_done(void *unused UNUSED)
 {
-  if (config->shutdown)
-    sysdep_shutdown_done();
+	if (config->shutdown)
+		sysdep_shutdown_done();
 
-  configuring = 0;
-  if (old_config)
-    log(L_INFO "Reconfigured");
+	configuring = 0;
+	if (old_config)
+		log(L_INFO "Reconfigured");
 
-  if (future_cftype)
-    {
-      int type = future_cftype;
-      struct config *conf = future_config;
-      future_cftype = RECONFIG_NONE;
-      future_config = NULL;
+	if (future_cftype) {
+		int type = future_cftype;
+		struct config *conf = future_config;
+		future_cftype = RECONFIG_NONE;
+		future_config = NULL;
 
-      log(L_INFO "Reconfiguring to queued configuration");
-      if (config_do_commit(conf, type))
-	config_done(NULL);
-    }
+		log(L_INFO "Reconfiguring to queued configuration");
+		if (config_do_commit(conf, type))
+			config_done(NULL);
+	}
 }
 
 /**
@@ -328,42 +321,37 @@ config_done(void *unused UNUSED)
  * or %CONF_SHUTDOWN if BIRD is in shutdown mode and no new configurations
  * are accepted.
  */
-int
-config_commit(struct config *c, int type, int timeout)
+int config_commit(struct config *c, int type, int timeout)
 {
-  if (shutting_down)
-    {
-      config_free(c);
-      return CONF_SHUTDOWN;
-    }
-
-  undo_available = 1;
-  if (timeout > 0)
-    tm_start(config_timer, timeout);
-  else
-    tm_stop(config_timer);
-
-  if (configuring)
-    {
-      if (future_cftype)
-	{
-	  log(L_INFO "Queueing new configuration, ignoring the one already queued");
-	  config_free(future_config);
+	if (shutting_down) {
+		config_free(c);
+		return CONF_SHUTDOWN;
 	}
-      else
-	log(L_INFO "Queueing new configuration");
 
-      future_cftype = type;
-      future_config = c;
-      return CONF_QUEUED;
-    }
+	undo_available = 1;
+	if (timeout > 0)
+		tm_start(config_timer, timeout);
+	else
+		tm_stop(config_timer);
 
-  if (config_do_commit(c, type))
-    {
-      config_done(NULL);
-      return CONF_DONE;
-    }
-  return CONF_PROGRESS;
+	if (configuring) {
+		if (future_cftype) {
+			log(L_INFO
+			    "Queueing new configuration, ignoring the one already queued");
+			config_free(future_config);
+		} else
+			log(L_INFO "Queueing new configuration");
+
+		future_cftype = type;
+		future_config = c;
+		return CONF_QUEUED;
+	}
+
+	if (config_do_commit(c, type)) {
+		config_done(NULL);
+		return CONF_DONE;
+	}
+	return CONF_PROGRESS;
 }
 
 /**
@@ -376,15 +364,14 @@ config_commit(struct config *c, int type, int timeout)
  * Result: %CONF_CONFIRM when the current configuration is confirmed,
  * %CONF_NONE when there is nothing to confirm (i.e. undo struct timer is not active).
  */
-int
-config_confirm(void)
+int config_confirm(void)
 {
-  if (config_timer->expires == 0)
-    return CONF_NOTHING;
+	if (config_timer->expires == 0)
+		return CONF_NOTHING;
 
-  tm_stop(config_timer);
+	tm_stop(config_timer);
 
-  return CONF_CONFIRM;
+	return CONF_CONFIRM;
 }
 
 /**
@@ -408,66 +395,58 @@ config_confirm(void)
  * was config_undo() too)  or %CONF_SHUTDOWN if BIRD is in shutdown mode and 
  * no new configuration changes  are accepted.
  */
-int
-config_undo(void)
+int config_undo(void)
 {
-  if (shutting_down)
-    return CONF_SHUTDOWN;
+	if (shutting_down)
+		return CONF_SHUTDOWN;
 
-  if (!undo_available || !old_config)
-    return CONF_NOTHING;
+	if (!undo_available || !old_config)
+		return CONF_NOTHING;
 
-  undo_available = 0;
-  tm_stop(config_timer);
+	undo_available = 0;
+	tm_stop(config_timer);
 
-  if (configuring)
-    {
-      if (future_cftype)
-	{
-	  config_free(future_config);
-	  future_config = NULL;
+	if (configuring) {
+		if (future_cftype) {
+			config_free(future_config);
+			future_config = NULL;
 
-	  log(L_INFO "Removing queued configuration");
-	  future_cftype = RECONFIG_NONE;
-	  return CONF_UNQUEUED;
+			log(L_INFO "Removing queued configuration");
+			future_cftype = RECONFIG_NONE;
+			return CONF_UNQUEUED;
+		} else {
+			log(L_INFO "Queueing undo configuration");
+			future_cftype = RECONFIG_UNDO;
+			return CONF_QUEUED;
+		}
 	}
-      else
-	{
-	  log(L_INFO "Queueing undo configuration");
-	  future_cftype = RECONFIG_UNDO;
-	  return CONF_QUEUED;
-	}
-    }
 
-  if (config_do_commit(NULL, RECONFIG_UNDO))
-    {
-      config_done(NULL);
-      return CONF_DONE;
-    }
-  return CONF_PROGRESS;
+	if (config_do_commit(NULL, RECONFIG_UNDO)) {
+		config_done(NULL);
+		return CONF_DONE;
+	}
+	return CONF_PROGRESS;
 }
 
 extern void cmd_reconfig_undo_notify(void);
 
-static void
-config_timeout(struct timer *t)
+static void config_timeout(struct timer *t)
 {
-  log(L_INFO "Config timeout expired, starting undo");
-  cmd_reconfig_undo_notify();
+	log(L_INFO "Config timeout expired, starting undo");
+	cmd_reconfig_undo_notify();
 
-  int r = config_undo();
-  if (r < 0)
-    log(L_ERR "Undo request failed");
+	int r = config_undo();
+	if (r < 0)
+		log(L_ERR "Undo request failed");
 }
 
-void
-config_init(void)
+void config_init(void)
 {
-  config_event = ev_new(&root_pool);
-  config_event->hook = config_done;
+	config_event = ev_new(&root_pool);
+	config_event->hook = config_done;
 
-  config_timer = tm_new(&root_pool);
-  config_timer->hook = config_timeout;
+	config_timer = tm_new(&root_pool);
+	config_timer->hook = config_timeout;
 }
 
 /**
@@ -476,23 +455,22 @@ config_init(void)
  * This function initiates shutdown of BIRD. It's accomplished by asking
  * for switching to an empty configuration.
  */
-void
-order_shutdown(void)
+void order_shutdown(void)
 {
-  struct config *c;
+	struct config *c;
 
-  if (shutting_down)
-    return;
+	if (shutting_down)
+		return;
 
-  log(L_INFO "Shutting down");
-  c = lp_alloc(config->mem, sizeof(struct config));
-  memcpy(c, config, sizeof(struct config));
-  init_list(&c->protos);
-  init_list(&c->tables);
-  c->shutdown = 1;
+	log(L_INFO "Shutting down");
+	c = lp_alloc(config->mem, sizeof(struct config));
+	memcpy(c, config, sizeof(struct config));
+	INIT_LIST_HEAD(&c->protos);
+	INIT_LIST_HEAD(&c->tables);
+	c->shutdown = 1;
 
-  config_commit(c, RECONFIG_HARD, 0);
-  shutting_down = 1;
+	config_commit(c, RECONFIG_HARD, 0);
+	shutting_down = 1;
 }
 
 /**
@@ -503,21 +481,20 @@ order_shutdown(void)
  * from the parser, a preconfig hook or a postconfig hook, to report an
  * error in the configuration.
  */
-void
-cf_error(char *msg, ...)
+void cf_error(char *msg, ...)
 {
-  char buf[1024];
-  va_list args;
+	char buf[1024];
+	va_list args;
 
-  va_start(args, msg);
-  if (bvsnprintf(buf, sizeof(buf), msg, args) < 0)
-    strcpy(buf, "<bug: error message too long>");
-  va_end(args);
-  new_config->err_msg = cfg_strdup(buf);
-  new_config->err_lino = ifs->lino;
-  new_config->err_file_name = ifs->file_name;
-  cf_lex_unwind();
-  longjmp(conf_jmpbuf, 1);
+	va_start(args, msg);
+	if (bvsnprintf(buf, sizeof(buf), msg, args) < 0)
+		strcpy(buf, "<bug: error message too long>");
+	va_end(args);
+	new_config->err_msg = cfg_strdup(buf);
+	new_config->err_lino = ifs->lino;
+	new_config->err_file_name = ifs->file_name;
+	cf_lex_unwind();
+	longjmp(conf_jmpbuf, 1);
 }
 
 /**
@@ -529,26 +506,22 @@ cf_error(char *msg, ...)
  * It's often used when a string literal occurs in the configuration
  * and we want to preserve it for further use.
  */
-char *
-cfg_strdup(char *c)
+char *cfg_strdup(char *c)
 {
-  int l = strlen(c) + 1;
-  char *z = cfg_allocu(l);
-  memcpy(z, c, l);
-  return z;
+	int l = strlen(c) + 1;
+	char *z = cfg_allocu(l);
+	memcpy(z, c, l);
+	return z;
 }
 
-
-void
-cfg_copy_list(union list *dest, union list *src, unsigned node_size)
+void cfg_copy_list(struct list_head *dest, struct list_head *src, unsigned node_size)
 {
-  struct node *dn, *sn;
+	struct list_head *dn, *sn;
 
-  init_list(dest);
-  WALK_LIST(sn, *src)
-  {
-    dn = cfg_alloc(node_size);
-    memcpy(dn, sn, node_size);
-    add_tail(dest, dn);
-  }
+	INIT_LIST_HEAD(dest);
+	list_for_each(sn, src) {
+		dn = cfg_alloc(node_size);
+		memcpy(dn, sn, node_size);
+		list_add_tail( dn,dest);
+	}
 }

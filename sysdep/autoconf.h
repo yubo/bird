@@ -5,7 +5,7 @@
  */
 
 /* System configuration file */
-#define SYSCONF_INCLUDE "./sysdep/cf/linux.h"
+#define SYSCONF_INCLUDE "./sysdep/linux.h"
 
 /* Include debugging code */
 /* #undef DEBUGGING */
@@ -38,13 +38,15 @@
 
 /* Protocols compiled in */
 #define CONFIG_STATIC 1
-#define CONFIG_RIP 1
-/* #undef CONFIG_RADV */
-#define CONFIG_BFD 1
-#define CONFIG_BGP 1
 #define CONFIG_OSPF 1
-#define CONFIG_PIPE 1
+#if 0
+#define CONFIG_RIP 0
+/* #undef CONFIG_RADV */
+#define CONFIG_BFD 0
+#define CONFIG_BGP 0
+#define CONFIG_PIPE 0
 /* #undef CONFIG_BABEL */
+#endif
 
 /* We use multithreading */
 #define USE_PTHREADS 1

@@ -49,7 +49,7 @@ struct birdsock {
 	int fd;			/* System-dependent data */
 	int index;		/* Index in poll struct buffer */
 	int rcv_ttl;		/* TTL of last received datagram */
-	struct node n;
+	struct list_head n;
 	void *rbuf_alloc, *tbuf_alloc;
 	char *password;		/* Password for MD5 authentication */
 	char *err;		/* Error message */

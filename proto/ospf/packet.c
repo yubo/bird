@@ -336,7 +336,7 @@ int ospf_rx_hook(struct birdsock * sk, int len)
 			return 1;
 
 		struct ospf_iface *iff = NULL;
-		WALK_LIST(iff, p->iface_list) {
+		list_for_each_entry(iff, &p->iface_list, n) {
 			if ((iff->type == OSPF_IT_VLINK) &&
 			    (iff->voa == ifa->oa) &&
 			    (iff->instance_id == instance_id) &&
@@ -479,7 +479,7 @@ void ospf_send_to_agt(struct ospf_iface *ifa, u8 state)
 {
 	struct ospf_neighbor *n;
 
-	WALK_LIST(n, ifa->neigh_list)
+	list_for_each_entry(n, &ifa->neigh_list, n)
 	    if (n->state >= state)
 		ospf_send_to(ifa, n->ip);
 }

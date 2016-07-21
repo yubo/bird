@@ -30,7 +30,7 @@
 #include <netinet/icmp6.h>
 
 #include "nest/bird.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 #include "lib/timer.h"
 #include "lib/socket.h"
@@ -117,7 +117,7 @@ void *tracked_fopen(struct pool *p, char *name, char *mode)
 
 #define NEAR_TIMER_LIMIT 4
 
-static union list near_timers, far_timers;
+static struct list_head near_timers, far_timers;
 static bird_clock_t first_far_timer = TIME_INFINITY;
 
 /* now must be different from 0, because 0 is a special value in timer->expires */
@@ -219,11 +219,16 @@ struct timer *tm_new(struct pool *p)
 
 static inline void tm_insert_near(struct timer *t)
 {
-	struct node *n = HEAD(near_timers);
+	/*struct list_head *n = near_timers.next;
 
-	while (n->next && (SKIP_BACK(struct timer, n, n)->expires < t->expires))
-		 n = n->next;
-	insert_node(&t->n, n->prev);
+	while (n->next && (container_of(n, struct timer, n)->expires < t->expires))
+		 n = n->next;*/
+
+	struct timer *p;
+	list_for_each_entry(p, &near_timers, n)
+		if(p->expires >= t->expires)
+			break;
+	list_add(&t->n, p->n.prev);
 }
 
 /**
@@ -253,14 +258,14 @@ void tm_start(struct timer *t, unsigned after)
 	if (t->expires == when)
 		return;
 	if (t->expires)
-		rem_node(&t->n);
+		list_del(&t->n);
 	t->expires = when;
 	if (after <= NEAR_TIMER_LIMIT)
 		tm_insert_near(t);
 	else {
 		if (!first_far_timer || first_far_timer > when)
 			first_far_timer = when;
-		add_tail(&far_timers, &t->n);
+		list_add_tail( &t->n,&far_timers);
 	}
 }
 
@@ -274,19 +279,19 @@ void tm_start(struct timer *t, unsigned after)
 void tm_stop(struct timer *t)
 {
 	if (t->expires) {
-		rem_node(&t->n);
+		list_del(&t->n);
 		t->expires = 0;
 	}
 }
 
-static void tm_dump_them(char *name, union list *l)
+static void tm_dump_them(char *name, struct list_head *l)
 {
-	struct node *n;
+	struct list_head *n;
 	struct timer *t;
 
 	debug("%s timers:\n", name);
-	WALK_LIST(n, *l) {
-		t = SKIP_BACK(struct timer, n, n);
+	list_for_each(n, l) {
+		t = container_of(n, struct timer, n);
 		debug("%p ", t);
 		tm_dump(&t->r);
 	}
@@ -303,8 +308,8 @@ static inline time_t tm_first_shot(void)
 {
 	time_t x = first_far_timer;
 
-	if (!EMPTY_LIST(near_timers)) {
-		struct timer *t = SKIP_BACK(struct timer, n, HEAD(near_timers));
+	if (!list_empty(&near_timers)) {
+		struct timer *t = container_of(near_timers.next, struct timer, n);
 		if (t->expires < x)
 			x = t->expires;
 	}
@@ -316,28 +321,28 @@ void io_log_event(void *hook, void *data);
 static void tm_shot(void)
 {
 	struct timer *t;
-	struct node *n, *m;
+	struct list_head *n, *m;
 
 	if (first_far_timer <= now) {
 		bird_clock_t limit = now + NEAR_TIMER_LIMIT;
 		first_far_timer = TIME_INFINITY;
-		n = HEAD(far_timers);
+		n = far_timers.next;
 		while (m = n->next) {
-			t = SKIP_BACK(struct timer, n, n);
+			t = container_of(n, struct timer, n);
 			if (t->expires <= limit) {
-				rem_node(n);
+				list_del(n);
 				tm_insert_near(t);
 			} else if (t->expires < first_far_timer)
 				first_far_timer = t->expires;
 			n = m;
 		}
 	}
-	while ((n = HEAD(near_timers))->next) {
+	list_for_each_safe(n, m, &near_timers){
 		int delay;
-		t = SKIP_BACK(struct timer, n, n);
+		t = container_of(n, struct timer, n);
 		if (t->expires > now)
 			break;
-		rem_node(n);
+		list_del(n);
 		delay = t->expires - now;
 		t->expires = 0;
 		if (t->recurrent) {
@@ -988,16 +993,16 @@ void sk_log_error(struct birdsock *s, const char *p)
  *	Actual struct birdsock code
  */
 
-static union list sock_list;
+static struct list_head sock_list;
 static struct birdsock *current_sock;
 static struct birdsock *stored_sock;
 
 static inline struct birdsock *sk_next(struct birdsock *s)
 {
-	if (!s->n.next->next)
+	if (list_is_last(&s->n, &sock_list))
 		return NULL;
 	else
-		return SKIP_BACK(struct birdsock, n, s->n.next);
+		return container_of(s->n.next, struct birdsock, n);
 }
 
 static void sk_alloc_bufs(struct birdsock *s)
@@ -1038,7 +1043,7 @@ static void sk_free(struct resource *r)
 			current_sock = sk_next(s);
 		if (s == stored_sock)
 			stored_sock = sk_next(s);
-		rem_node(&s->n);
+		list_del(&s->n);
 	}
 }
 
@@ -1223,7 +1228,7 @@ static int sk_setup(struct birdsock *s)
 
 static void sk_insert(struct birdsock *s)
 {
-	add_tail(&sock_list, &s->n);
+	list_add_tail(&s->n, &sock_list);
 }
 
 static void sk_tcp_connected(struct birdsock *s)
@@ -1246,8 +1251,8 @@ static int sk_passive_connected(struct birdsock *s, int type)
 	int loc_sa_len = sizeof(loc_sa);
 	int rem_sa_len = sizeof(rem_sa);
 
-	int fd =
-	    accept(s->fd, ((type == SK_TCP) ? &rem_sa.sa : NULL), &rem_sa_len);
+	int fd = accept(s->fd, ((type == SK_TCP) ? &rem_sa.sa : NULL),
+			&rem_sa_len);
 	if (fd < 0) {
 		if ((errno != EINTR) && (errno != EAGAIN))
 			s->err_hook(s, errno);
@@ -1265,15 +1270,14 @@ static int sk_passive_connected(struct birdsock *s, int type)
 
 	if (type == SK_TCP) {
 		if ((getsockname(fd, &loc_sa.sa, &loc_sa_len) < 0) ||
-		    (sockaddr_read
-		     (&loc_sa, s->af, &t->saddr, &t->iface, &t->sport) < 0))
+		    (sockaddr_read (&loc_sa, s->af, &t->saddr,
+				    &t->iface, &t->sport) < 0))
 			log(L_WARN
 			    "SOCK: Cannot get local IP address for TCP<");
 
-		if (sockaddr_read
-		    (&rem_sa, s->af, &t->daddr, &t->iface, &t->dport) < 0)
-			log(L_WARN
-			    "SOCK: Cannot get remote IP address for TCP<");
+		if (sockaddr_read(&rem_sa, s->af, &t->daddr, &t->iface,
+					&t->dport) < 0)
+			log(L_WARN "SOCK: Cannot get remote IP address for TCP<");
 	}
 
 	if (sk_setup(t) < 0) {
@@ -1779,12 +1783,10 @@ void sk_err(struct birdsock *s, int revents)
 
 void sk_dump_all(void)
 {
-	struct node *n;
 	struct birdsock *s;
 
 	debug("Open sockets:\n");
-	WALK_LIST(n, sock_list) {
-		s = SKIP_BACK(struct birdsock, n, n);
+	list_for_each_entry(s, &sock_list, n) {
 		debug("%p ", s);
 		sk_dump(&s->r);
 	}
@@ -1946,10 +1948,10 @@ volatile int async_dump_flag;
 
 void io_init(void)
 {
-	init_list(&near_timers);
-	init_list(&far_timers);
-	init_list(&sock_list);
-	init_list(&global_event_list);
+	INIT_LIST_HEAD(&near_timers);
+	INIT_LIST_HEAD(&far_timers);
+	INIT_LIST_HEAD(&sock_list);
+	INIT_LIST_HEAD(&global_event_list);
 	krt_io_init();
 	init_times();
 	update_times();
@@ -1966,7 +1968,6 @@ void io_loop(void)
 	time_t tout;
 	int nfds, events, pout;
 	struct birdsock *s;
-	struct node *n;
 	int fdmax = 256;
 	struct pollfd *pfd = xmalloc(fdmax * sizeof(struct pollfd));
 
@@ -1985,10 +1986,10 @@ timers:
 		io_close_event();
 
 		nfds = 0;
-		WALK_LIST(n, sock_list) {
-			pfd[nfds] = (struct pollfd) {
-			.fd = -1};	/* everything other set to 0 by this */
-			s = SKIP_BACK(struct birdsock, n, n);
+		list_for_each_entry(s, &sock_list, n) {
+			/* everything other set to 0 by this */
+			pfd[nfds] = (struct pollfd) { .fd = -1};
+
 			if (s->rx_hook) {
 				pfd[nfds].fd = s->fd;
 				pfd[nfds].events |= POLLIN;
@@ -2005,9 +2006,7 @@ timers:
 
 			if (nfds >= fdmax) {
 				fdmax *= 2;
-				pfd =
-				    xrealloc(pfd,
-					     fdmax * sizeof(struct pollfd));
+				pfd = xrealloc(pfd, fdmax * sizeof(struct pollfd));
 			}
 		}
 
@@ -2047,8 +2046,7 @@ timers:
 		}
 		if (pout) {
 			/* guaranteed to be non-empty */
-			current_sock =
-			    SKIP_BACK(struct birdsock, n, HEAD(sock_list));
+			current_sock = list_first_entry(&sock_list, struct birdsock, n);
 
 			while (current_sock) {
 				struct birdsock *s = current_sock;
@@ -2061,32 +2059,27 @@ timers:
 				int steps;
 
 				steps = MAX_STEPS;
-				if (s->fast_rx
-				    && (pfd[s->index].revents & POLLIN)
-				    && s->rx_hook)
+				if (s->fast_rx && (pfd[s->index].revents & POLLIN)
+						&& s->rx_hook){
 					do {
 						steps--;
-						io_log_event(s->rx_hook,
-							     s->data);
-						e = sk_read(s,
-							    pfd[s->
-								index].revents);
+						io_log_event(s->rx_hook, s->data);
+						e = sk_read(s, pfd[s->index].revents);
 						if (s != current_sock)
 							goto next;
-					}
-					while (e && s->rx_hook && steps);
+					} while (e && s->rx_hook && steps);
+				}
 
 				steps = MAX_STEPS;
-				if (pfd[s->index].revents & POLLOUT)
+				if (pfd[s->index].revents & POLLOUT){
 					do {
 						steps--;
-						io_log_event(s->tx_hook,
-							     s->data);
+						io_log_event(s->tx_hook, s->data);
 						e = sk_write(s);
 						if (s != current_sock)
 							goto next;
-					}
-					while (e && steps);
+					} while (e && steps);
+				}
 
 				current_sock = sk_next(s);
 next:				;
@@ -2100,9 +2093,8 @@ next:				;
 			int count = 0;
 			current_sock = stored_sock;
 			if (current_sock == NULL)
-				current_sock =
-				    SKIP_BACK(struct birdsock, n,
-					      HEAD(sock_list));
+				current_sock = list_first_entry(&sock_list,
+						struct birdsock, n);
 
 			while (current_sock && count < MAX_RX_STEPS) {
 				struct birdsock *s = current_sock;

@@ -36,71 +36,71 @@
 #include "nest/locks.h"
 #include "nest/iface.h"
 
-static union list olock_list;
+static struct list_head olock_list;
 static struct event *olock_event;
 
-static inline int
-olock_same(struct object_lock *x, struct object_lock *y)
+static inline int olock_same(struct object_lock *x, struct object_lock *y)
 {
-  return
-    x->type == y->type &&
-    x->iface == y->iface &&
-    x->port == y->port &&
-    x->inst == y->inst &&
-    ipa_equal(x->addr, y->addr);
+	return
+	    x->type == y->type &&
+	    x->iface == y->iface &&
+	    x->port == y->port &&
+	    x->inst == y->inst && ipa_equal(x->addr, y->addr);
 }
 
-static void
-olock_free(struct resource *r)
+static void olock_free(struct resource *r)
 {
-  struct object_lock *q, *l = (struct object_lock *) r;
-  struct node *n;
+	struct object_lock *q, *l = (struct object_lock *)r;
+	struct list_head *n;
 
-  DBG("olock: Freeing %p\n", l);
-  switch (l->state)
-    {
-    case OLOCK_STATE_FREE:
-      break;
-    case OLOCK_STATE_LOCKED:
-    case OLOCK_STATE_EVENT:
-      rem_node(&l->n);
-      n = HEAD(l->waiters);
-      if (n->next)
-	{
-	  DBG("olock: -> %p becomes locked\n", n);
-	  q = SKIP_BACK(struct object_lock, n, n);
-	  rem_node(n);
-	  add_tail_list(&q->waiters, &l->waiters);
-	  q->state = OLOCK_STATE_EVENT;
-	  add_head(&olock_list, n);
-	  ev_schedule(olock_event);
+	DBG("olock: Freeing %p\n", l);
+	switch (l->state) {
+	case OLOCK_STATE_FREE:
+		break;
+	case OLOCK_STATE_LOCKED:
+	case OLOCK_STATE_EVENT:
+		list_del(&l->n);
+		/* check it */
+		/*n = HEAD(l->waiters);
+		if (!list_empty(&n->next)) {*/
+		if (!list_empty(&l->waiters)) {
+			DBG("olock: -> %p becomes locked\n", n);
+			n = l->waiters.next;
+			q = container_of(n, struct object_lock, n);
+			list_del(n);
+			/*add_tail_list(&q->waiters, &l->waiters);*/
+			list_splice_tail(&l->waiters, &q->waiters);
+			q->state = OLOCK_STATE_EVENT;
+			list_add(n, &olock_list);
+			ev_schedule(olock_event);
+		}
+		break;
+	case OLOCK_STATE_WAITING:
+		list_del(&l->n);
+		break;
+	default:
+		ASSERT(0);
 	}
-      break;
-    case OLOCK_STATE_WAITING:
-      rem_node(&l->n);
-      break;
-    default:
-      ASSERT(0);
-    }
 }
 
-static void
-olock_dump(struct resource *r)
+static void olock_dump(struct resource *r)
 {
-  struct object_lock *l = (struct object_lock *) r;
-  static char *olock_states[] = { "free", "locked", "waiting", "event" };
+	struct object_lock *l = (struct object_lock *)r;
+	static char *olock_states[] = { "free", "locked", "waiting", "event" };
 
-  debug("(%d:%s:%I:%d:%d) [%s]\n", l->type, (l->iface ? l->iface->name : "?"), l->addr, l->port, l->inst, olock_states[l->state]);
-  if (!EMPTY_LIST(l->waiters))
-    debug(" [wanted]\n");
+	debug("(%d:%s:%I:%d:%d) [%s]\n", l->type,
+	      (l->iface ? l->iface->name : "?"), l->addr, l->port, l->inst,
+	      olock_states[l->state]);
+	if (!list_empty(&l->waiters))
+		debug(" [wanted]\n");
 }
 
 static struct resclass olock_class = {
-  "ObjLock",
-  sizeof(struct object_lock),
-  olock_free,
-  olock_dump,
-  NULL
+	"ObjLock",
+	sizeof(struct object_lock),
+	olock_free,
+	olock_dump,
+	NULL
 };
 
 /**
@@ -111,14 +111,13 @@ static struct resclass olock_class = {
  * and returns a pointer to it. After filling in the structure, the caller
  * should call olock_acquire() to do the real locking.
  */
-struct object_lock *
-olock_new(struct pool *p)
+struct object_lock *olock_new(struct pool *p)
 {
-  struct object_lock *l = ralloc(p, &olock_class);
+	struct object_lock *l = ralloc(p, &olock_class);
 
-  l->state = OLOCK_STATE_FREE;
-  init_list(&l->waiters);
-  return l;
+	l->state = OLOCK_STATE_FREE;
+	INIT_LIST_HEAD(&l->waiters);
+	return l;
 }
 
 /**
@@ -132,50 +131,46 @@ olock_new(struct pool *p)
  *
  * When you want to release the resource, just rfree() the lock.
  */
-void
-olock_acquire(struct object_lock *l)
+void olock_acquire(struct object_lock *l)
 {
-  struct node *n;
-  struct object_lock *q;
+	struct list_head *n;
+	struct object_lock *q;
 
-  WALK_LIST(n, olock_list)
-    {
-      q = SKIP_BACK(struct object_lock, n, n);
-      if (olock_same(q, l))
-	{
-	  l->state = OLOCK_STATE_WAITING;
-	  add_tail(&q->waiters, &l->n);
-	  DBG("olock: %p waits\n", l);
-	  return;
+	list_for_each(n, &olock_list) {
+		q = container_of( n,struct object_lock, n);
+		if (olock_same(q, l)) {
+			l->state = OLOCK_STATE_WAITING;
+			list_add_tail( &l->n,&q->waiters);
+			DBG("olock: %p waits\n", l);
+			return;
+		}
 	}
-    }
-  DBG("olock: %p acquired immediately\n", l);
-  l->state = OLOCK_STATE_EVENT;
-  add_head(&olock_list, &l->n);
-  ev_schedule(olock_event);
+	DBG("olock: %p acquired immediately\n", l);
+	l->state = OLOCK_STATE_EVENT;
+	/*add_head(&olock_list, &l->n);*/
+	list_add(&l->n, &olock_list);
+	ev_schedule(olock_event);
 }
 
-static void
-olock_run_event(void *unused UNUSED)
+static void olock_run_event(void *unused UNUSED)
 {
-  struct node *n;
-  struct object_lock *q;
+	struct object_lock *q;
 
-  DBG("olock: Processing events\n");
-  for(;;)
-    {
-      n = HEAD(olock_list);
-      if (!n->next)
-	break;
-      q = SKIP_BACK(struct object_lock, n, n);
-      if (q->state != OLOCK_STATE_EVENT)
-	break;
-      DBG("olock: %p locked\n", q);
-      q->state = OLOCK_STATE_LOCKED;
-      rem_node(&q->n);
-      add_tail(&olock_list, &q->n);
-      q->hook(q);
-    }
+	DBG("olock: Processing events\n");
+	for (;;) {
+		/* check it */
+		if (list_empty(&olock_list)){
+			break;
+		}
+		q = container_of(olock_list.next, struct object_lock, n);
+		if (q->state != OLOCK_STATE_EVENT)
+			break;
+		DBG("olock: %p locked\n", q);
+		q->state = OLOCK_STATE_LOCKED;
+		list_del(&q->n);
+		list_add_tail(&q->n, &olock_list);
+		q->hook(q);
+	}
 }
 
 /**
@@ -184,11 +179,10 @@ olock_run_event(void *unused UNUSED)
  * This function is called during BIRD startup. It initializes
  * all the internal data structures of the lock module.
  */
-void
-olock_init(void)
+void olock_init(void)
 {
-  DBG("olock: init\n");
-  init_list(&olock_list);
-  olock_event = ev_new(&root_pool);
-  olock_event->hook = olock_run_event;
+	DBG("olock: init\n");
+	INIT_LIST_HEAD(&olock_list);
+	olock_event = ev_new(&root_pool);
+	olock_event->hook = olock_run_event;
 }

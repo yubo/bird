@@ -9,7 +9,7 @@
 #ifndef _BIRD_PROTOCOL_H_
 #define _BIRD_PROTOCOL_H_
 
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 #include "lib/timer.h"
 #include "conf/conf.h"
@@ -34,7 +34,7 @@ struct symbol;
  */
 
 struct protocol {
-  struct node n;
+  struct list_head n;
   char *name;
   char *template;			/* Template for automatic generation of names */
   int name_counter;			/* Counter for automatic name generation */
@@ -83,7 +83,7 @@ extern struct protocol
  */
 
 struct proto_config {
-  struct node n;
+  struct list_head n;
   struct config *global;		/* Global configuration data */
   struct protocol *protocol;		/* Protocol */
   struct proto *proto;			/* Instance we've created */
@@ -133,8 +133,8 @@ struct proto_stats {
 };
 
 struct proto {
-  struct node n;				/* Node in *_proto_list */
-  struct node glob_node;			/* Node in global proto_list */
+  struct list_head n;				/* Node in *_proto_list */
+  struct list_head glob_node;			/* Node in global proto_list */
   struct protocol *proto;		/* Protocol */
   struct proto_config *cf;		/* Configuration data */
   struct proto_config *cf_new;		/* Configuration we want to switch to after shutdown (NULL=delete) */
@@ -285,7 +285,7 @@ proto_get_router_id(struct proto_config *pc)
   return pc->router_id ? pc->router_id : pc->global->router_id;
 }
 
-extern union list active_proto_list;
+extern struct list_head active_proto_list;
 
 /*
  *  Each protocol instance runs two different state machines:
@@ -448,7 +448,7 @@ proto_reset_limit(struct proto_limit *l)
  */
 
 struct announce_hook {
-  struct node n;
+  struct list_head n;
   struct rtable *table;
   struct proto *proto;
   struct filter *in_filter;		/* Input filter */

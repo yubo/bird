@@ -17,7 +17,7 @@
 /**
  * DOC: Resource pools
  *
- * Resource pools (&pool) are just containers holding a union list of
+ * Resource pools (&pool) are just containers holding a struct list_head of
  * other resources. Freeing a struct pool causes all the listed resources
  * to be freed as well. Each existing &resource is linked to some pool
  * except for a root struct pool which isn't linked anywhere, so all the
@@ -30,7 +30,7 @@
 
 struct pool {
 	struct resource r;
-	union list inside;
+	struct list_head inside;
 	char *name;
 };
 
@@ -64,7 +64,7 @@ struct pool *rp_new(struct pool * p, char *name)
 {
 	struct pool *z = ralloc(p, &pool_class);
 	z->name = name;
-	init_list(&z->inside);
+	INIT_LIST_HEAD(&z->inside);
 	return z;
 }
 
@@ -73,11 +73,9 @@ static void pool_free(struct resource * P)
 	struct pool *p = (struct pool *) P;
 	struct resource *r, *rr;
 
-	r = HEAD(p->inside);
-	while (rr = (struct resource *) r->n.next) {
+	list_for_each_entry_safe(r, rr, &p->inside, n) {
 		r->class->free(r);
 		xfree(r);
-		r = rr;
 	}
 }
 
@@ -88,7 +86,7 @@ static void pool_dump(struct resource * P)
 
 	debug("%s\n", p->name);
 	indent += 3;
-	WALK_LIST(r, p->inside)
+	list_for_each_entry(r, &p->inside, n)
 	    rdump(r);
 	indent -= 3;
 }
@@ -99,7 +97,7 @@ static size_t pool_memsize(struct resource * P)
 	struct resource *r;
 	size_t sum = sizeof(struct pool) + ALLOC_OVERHEAD;
 
-	WALK_LIST(r, p->inside)
+	list_for_each_entry(r, &p->inside, n)
 	    sum += rmemsize(r);
 
 	return sum;
@@ -110,7 +108,7 @@ static struct resource *pool_lookup(struct resource * P, unsigned long a)
 	struct pool *p = (struct pool *) P;
 	struct resource *r, *q;
 
-	WALK_LIST(r, p->inside)
+	list_for_each_entry(r, &p->inside, n)
 	    if (r->class->lookup && (q = r->class->lookup(r, a)))
 		return q;
 	return NULL;
@@ -130,8 +128,8 @@ void rmove(void *res, struct pool * p)
 
 	if (r) {
 		if (r->n.next)
-			rem_node(&r->n);
-		add_tail(&p->inside, &r->n);
+			list_del(&r->n);
+		list_add_tail( &r->n,&p->inside);
 	}
 }
 
@@ -153,7 +151,7 @@ void rfree(void *res)
 		return;
 
 	if (r->n.next)
-		rem_node(&r->n);
+		list_del(&r->n);
 	r->class->free(r);
 	r->class = NULL;
 	xfree(r);
@@ -202,14 +200,14 @@ size_t rmemsize(void *res)
  * Allocated memory is zeroed. Size of the struct resource structure is taken
  * from the @size field of the &resclass.
  */
-void *ralloc(struct pool * p, struct resclass *c)
+void *ralloc(struct pool *p, struct resclass *c)
 {
 	struct resource *r = xmalloc(c->size);
 	bzero(r, c->size);
 
 	r->class = c;
 	if (p)
-		add_tail(&p->inside, &r->n);
+		list_add_tail(&r->n, &p->inside);
 	return r;
 }
 
@@ -246,7 +244,7 @@ void resource_init(void)
 {
 	root_pool.r.class = &pool_class;
 	root_pool.name = "Root";
-	init_list(&root_pool.inside);
+	INIT_LIST_HEAD(&root_pool.inside);
 }
 
 /**
@@ -322,7 +320,7 @@ void *mb_alloc(struct pool * p, unsigned size)
 	struct mblock *b = xmalloc(sizeof(struct mblock) + size);
 
 	b->r.class = &mb_class;
-	add_tail(&p->inside, &b->r.n);
+	list_add_tail( &b->r.n,&p->inside);
 	b->size = size;
 	return b->data;
 }
@@ -364,7 +362,7 @@ void *mb_allocz(struct pool * p, unsigned size)
  */
 void *mb_realloc(void *m, unsigned size)
 {
-	struct mblock *b = SKIP_BACK(struct mblock, data, m);
+	struct mblock *b = container_of( m,struct mblock, data);
 
 	b = xrealloc(b, sizeof(struct mblock) + size);
 	replace_node(&b->r.n, &b->r.n);
@@ -383,7 +381,7 @@ void mb_free(void *m)
 	if (!m)
 		return;
 
-	struct mblock *b = SKIP_BACK(struct mblock, data, m);
+	struct mblock *b = container_of( m,struct mblock, data);
 	rfree(b);
 }
 

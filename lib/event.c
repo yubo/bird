@@ -27,8 +27,8 @@ event_list global_event_list;
 inline void ev_postpone(struct event *e)
 {
 	if (ev_active(e)) {
-		rem_node(&e->n);
-		e->n.next = NULL;
+		list_del_init(&e->n);
+		/*e->n.next = NULL;*/
 	}
 }
 
@@ -37,7 +37,7 @@ static void ev_dump(struct resource *r)
 	struct event *e = (struct event *)r;
 
 	debug("(code %p, data %p, %s)\n",
-	      e->hook, e->data, e->n.next ? "scheduled" : "inactive");
+	      e->hook, e->data, list_empty(&e->n) ? "scheduled" : "inactive");
 }
 
 static struct resclass ev_class = {
@@ -67,7 +67,7 @@ struct event *ev_new(struct pool *p)
  * @e: an event
  *
  * This function explicitly runs the struct event @e (calls its hook
- * function) and removes it from an struct event union list if it's linked to any.
+ * function) and removes it from an struct event struct list_head if it's linked to any.
  *
  * From the hook function, you can call ev_enqueue() or ev_schedule()
  * to re-add the event.
@@ -84,12 +84,12 @@ inline void ev_run(struct event *e)
  * @e: an event
  *
  * ev_enqueue() stores the struct event @e to the specified event
- * union list @l which can be run by calling ev_run_list().
+ * struct list_head @l which can be run by calling ev_run_list().
  */
 inline void ev_enqueue(event_list * l, struct event *e)
 {
 	ev_postpone(e);
-	add_tail(l, &e->n);
+	list_add_tail(&e->n, l);
 }
 
 /**
@@ -97,7 +97,7 @@ inline void ev_enqueue(event_list * l, struct event *e)
  * @e: an event
  *
  * This function schedules an struct event by enqueueing it to a system-wide
- * struct event union list which is run by the platform dependent code whenever
+ * struct event struct list_head which is run by the platform dependent code whenever
  * appropriate.
  */
 void ev_schedule(struct event *e)
@@ -111,18 +111,18 @@ void io_log_event(void *hook, void *data);
  * ev_run_list - run an struct event list
  * @l: an struct event list
  *
- * This function calls ev_run() for all events enqueued in the union list @l.
+ * This function calls ev_run() for all events enqueued in the struct list_head @l.
  */
 int ev_run_list(event_list * l)
 {
-	struct node *n;
-	union list tmp_list;
+	struct list_head tmp_list;
+	struct event *e;
 
-	init_list(&tmp_list);
-	add_tail_list(&tmp_list, l);
-	init_list(l);
-	WALK_LIST_FIRST(n, tmp_list) {
-		struct event *e = SKIP_BACK(struct event, n, n);
+	INIT_LIST_HEAD(&tmp_list);
+	list_splice_tail(l, &tmp_list);
+	INIT_LIST_HEAD(l);
+	while(!list_empty(&tmp_list)){
+		e = container_of(tmp_list.next, struct event, n);
 
 		/* This is ugly hack, we want to log just events executed from the main I/O loop */
 		if (l == &global_event_list)
@@ -130,5 +130,5 @@ int ev_run_list(event_list * l)
 
 		ev_run(e);
 	}
-	return !EMPTY_LIST(*l);
+	return !list_empty(l);
 }

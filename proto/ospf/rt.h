@@ -94,7 +94,7 @@ static inline int rt_is_nssa(struct ort * nf)
  * - only router, network and AS-external LSAs
  * - lsa.age < LSA_MAXAGE
  * - dist < LSINFINITY (or 2*LSINFINITY for ext-LSAs)
- * - nhs is non-NULL unless the struct node is oa->rt (calculating router itself)
+ * - nhs is non-NULL unless the struct list_head is oa->rt (calculating router itself)
  * - beware, nhs is not valid after SPF calculation
  *
  * Invariants for structs struct orta nodes of fib tables po->rtf, oa->rtr:
@@ -113,7 +113,7 @@ static inline int rt_is_nssa(struct ort * nf)
  * - configured stubnets (nhs is NULL, only RTS_OSPF struct orta nodes in po->rtf)
  *
  * Dummy vlink nexthops and configured stubnets cannot be mixed with
- * regular ones, nhs field contains either union list of gateway+device nodes,
+ * regular ones, nhs field contains either struct list_head of gateway+device nodes,
  * one vlink node, or NULL for configured stubnet.
  *
  * Dummy vlink nexthops can appear in both network (rtf) and backbone area router

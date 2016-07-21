@@ -33,11 +33,15 @@ static void ackd_timer_hook(struct timer * t);
 
 static void init_lists(struct ospf_proto *p, struct ospf_neighbor *n)
 {
-	s_init_list(&(n->lsrql));
-	n->lsrqi = SHEAD(n->lsrql);
+	//s_init_list(&(n->lsrql));
+	INIT_LIST_HEAD(&n->lsrql);
+	INIT_LIST_HEAD(&n->lsrql_list);
+	n->lsrqi = (void *)n->lsrql.next;
 	n->lsrqh = ospf_top_new(p, n->pool);
 
-	s_init_list(&(n->lsrtl));
+	//s_init_list(&(n->lsrtl));
+	INIT_LIST_HEAD(&n->lsrtl);
+	INIT_LIST_HEAD(&n->lsrtl_list);
 	n->lsrth = ospf_top_new(p, n->pool);
 }
 
@@ -45,7 +49,7 @@ static void release_lsrtl(struct ospf_proto *p, struct ospf_neighbor *n)
 {
 	struct top_hash_entry *ret, *en;
 
-	WALK_SLIST(ret, n->lsrtl) {
+	list_for_each_entry(ret, &n->lsrtl, n) {
 		en = ospf_hash_find_entry(p->gr, ret);
 		if (en)
 			en->ret_count--;
@@ -53,7 +57,7 @@ static void release_lsrtl(struct ospf_proto *p, struct ospf_neighbor *n)
 }
 
 /* Resets LSA request and retransmit lists.
- * We do not reset DB summary union list iterator here,
+ * We do not reset DB summary struct list_head iterator here,
  * it is reset during entering EXCHANGE state.
  */
 static void reset_lists(struct ospf_proto *p, struct ospf_neighbor *n)
@@ -79,25 +83,27 @@ struct ospf_neighbor *ospf_neighbor_new(struct ospf_iface *ifa)
 
 	n->pool = pool;
 	n->ifa = ifa;
-	add_tail(&ifa->neigh_list, NODE n);
+	list_add_tail(&n->n, &ifa->neigh_list);
 	n->adj = 0;
 	n->csn = 0;
 	n->state = NEIGHBOR_DOWN;
 
 	init_lists(p, n);
-	s_init(&(n->dbsi), &(p->lsal));
+//	s_init(&(n->dbsi), &(p->lsal));
+	list_add(&n->dbsi_list, &p->lsal_list);
+	list_add(&n->dbsi, &p->lsal);
 
-	init_list(&n->ackl[ACKL_DIRECT]);
-	init_list(&n->ackl[ACKL_DELAY]);
+	INIT_LIST_HEAD(&n->ackl[ACKL_DIRECT]);
+	INIT_LIST_HEAD(&n->ackl[ACKL_DELAY]);
 
 	n->inactim = tm_new_set(pool, inactivity_timer_hook, n, 0, 0);
 	n->dbdes_timer = tm_new_set(pool, dbdes_timer_hook, n, 0, ifa->rxmtint);
 	n->lsrq_timer = tm_new_set(pool, lsrq_timer_hook, n, 0, ifa->rxmtint);
 	n->lsrt_timer = tm_new_set(pool, lsrt_timer_hook, n, 0, ifa->rxmtint);
-	n->ackd_timer =
-	    tm_new_set(pool, ackd_timer_hook, n, 0, ifa->rxmtint / 2);
+	n->ackd_timer = tm_new_set(pool, ackd_timer_hook, n, 0,
+			ifa->rxmtint / 2);
 
-	return (n);
+	return n;
 }
 
 static void ospf_neigh_down(struct ospf_neighbor *n)
@@ -112,9 +118,10 @@ static void ospf_neigh_down(struct ospf_neighbor *n)
 			nn->found = 0;
 	}
 
-	s_get(&(n->dbsi));
+	//s_get(&(n->dbsi));
+	list_del_init(&n->dbsi);
 	release_lsrtl(p, n);
-	rem_node(NODE n);
+	list_del_init(&n->n);
 	rfree(n->pool);
 
 	OSPF_TRACE(D_EVENTS, "Neighbor %R on %s removed", rid, ifa->ifname);
@@ -236,18 +243,21 @@ void ospf_neigh_sm(struct ospf_neighbor *n, int event)
 		if (n->state == NEIGHBOR_EXSTART) {
 			ospf_neigh_chstate(n, NEIGHBOR_EXCHANGE);
 
-			/* Reset DB summary union list iterator */
-			s_get(&(n->dbsi));
-			s_init(&(n->dbsi), &p->lsal);
+			/* Reset DB summary struct list_head iterator */
+			//s_get(&(n->dbsi));
+			list_del_init(&n->dbsi);
+			//s_init(&(n->dbsi), &p->lsal);
+			list_move(&n->dbsi_list, &p->lsal_list);
+			list_add(&n->dbsi, &p->lsal);
 
-			/* Add MaxAge LSA entries to retransmission union list */
+			/* Add MaxAge LSA entries to retransmission struct list_head */
 			ospf_add_flushed_to_lsrt(p, n);
 		} else
 			bug("NEGDONE and I'm not in EXSTART?");
 		break;
 
 	case INM_EXDONE:
-		if (!EMPTY_SLIST(n->lsrql))
+		if (!list_empty(&n->lsrql))
 			ospf_neigh_chstate(n, NEIGHBOR_LOADING);
 		else
 			ospf_neigh_chstate(n, NEIGHBOR_FULL);
@@ -348,14 +358,14 @@ static inline u32 neigh_get_id(struct ospf_proto *p, struct ospf_neighbor *n)
 	return ospf_is_v2(p) ? ipa_to_u32(n->ip) : n->rid;
 }
 
-static struct ospf_neighbor *elect_bdr(struct ospf_proto *p, union list nl)
+static struct ospf_neighbor *elect_bdr(struct ospf_proto *p, struct list_head nl)
 {
 	struct ospf_neighbor *neigh, *n1, *n2;
 	u32 nid;
 
 	n1 = NULL;
 	n2 = NULL;
-	WALK_LIST(neigh, nl) {	/* First try those decl. themselves */
+	list_for_each_entry(neigh, &nl, n) {	/* First try those decl. themselves */
 		nid = neigh_get_id(p, neigh);
 
 		if (neigh->state >= NEIGHBOR_2WAY)	/* Higher than 2WAY */
@@ -399,13 +409,13 @@ static struct ospf_neighbor *elect_bdr(struct ospf_proto *p, union list nl)
 	return (n1);
 }
 
-static struct ospf_neighbor *elect_dr(struct ospf_proto *p, union list nl)
+static struct ospf_neighbor *elect_dr(struct ospf_proto *p, struct list_head nl)
 {
 	struct ospf_neighbor *neigh, *n;
 	u32 nid;
 
 	n = NULL;
-	WALK_LIST(neigh, nl) {	/* And now DR */
+	list_for_each_entry(neigh, &nl, n) {	/* And now DR */
 		nid = neigh_get_id(p, neigh);
 
 		if (neigh->state >= NEIGHBOR_2WAY)	/* Higher than 2WAY */
@@ -433,7 +443,7 @@ static struct ospf_neighbor *elect_dr(struct ospf_proto *p, union list nl)
  * @ifa: actual interface
  *
  * When the wait struct timer fires, it is time to elect (Backup) Designated Router.
- * Structure describing me is added to this union list so every electing router has
+ * Structure describing me is added to this struct list_head so every electing router has
  * the same list. Backup Designated Router is elected before Designated
  * Router. This process is described in 9.4 of RFC 2328. The function is
  * supposed to be called only from ospf_iface_sm() as a part of the interface
@@ -456,7 +466,7 @@ void ospf_dr_election(struct ospf_iface *ifa)
 	me.bdr = ospf_is_v2(p) ? ipa_to_u32(ifa->bdrip) : ifa->bdrid;
 	me.iface_id = ifa->iface_id;
 
-	add_tail(&ifa->neigh_list, NODE & me);
+	list_add_tail(&me.n, &ifa->neigh_list);
 
 	nbdr = elect_bdr(p, ifa->neigh_list);
 	ndr = elect_dr(p, ifa->neigh_list);
@@ -479,7 +489,7 @@ void ospf_dr_election(struct ospf_iface *ifa)
 			ndr = nbdr;
 	}
 
-	rem_node(NODE & me);
+	list_del_init(&me.n);
 
 	u32 old_drid = ifa->drid;
 	u32 old_bdrid = ifa->bdrid;
@@ -503,7 +513,7 @@ void ospf_dr_election(struct ospf_iface *ifa)
 
 	/* Review struct neighbor adjacencies if DR or BDR changed */
 	if ((ifa->drid != old_drid) || (ifa->bdrid != old_bdrid))
-		WALK_LIST(neigh, ifa->neigh_list)
+		list_for_each_entry(neigh, &ifa->neigh_list, n)
 		    if (neigh->state >= NEIGHBOR_2WAY)
 			ospf_neigh_sm(neigh, INM_ADJOK);
 
@@ -515,7 +525,7 @@ void ospf_dr_election(struct ospf_iface *ifa)
 struct ospf_neighbor *find_neigh(struct ospf_iface *ifa, u32 rid)
 {
 	struct ospf_neighbor *n;
-	WALK_LIST(n, ifa->neigh_list)
+	list_for_each_entry(n, &ifa->neigh_list, n)
 	    if (n->rid == rid)
 		return n;
 	return NULL;
@@ -524,7 +534,7 @@ struct ospf_neighbor *find_neigh(struct ospf_iface *ifa, u32 rid)
 struct ospf_neighbor *find_neigh_by_ip(struct ospf_iface *ifa, ip_addr ip)
 {
 	struct ospf_neighbor *n;
-	WALK_LIST(n, ifa->neigh_list)
+	list_for_each_entry(n, &ifa->neigh_list, n)
 	    if (ipa_equal(n->ip, ip))
 		return n;
 	return NULL;
@@ -555,9 +565,9 @@ static void ospf_neigh_bfd_hook(struct bfd_request *req)
 void ospf_neigh_update_bfd(struct ospf_neighbor *n, int use_bfd)
 {
 	if (use_bfd && !n->bfd_req)
-		n->bfd_req =
-		    bfd_request_session(n->pool, n->ip, n->ifa->addr->ip,
-					n->ifa->iface, ospf_neigh_bfd_hook, n);
+		n->bfd_req = bfd_request_session(n->pool, n->ip,
+				n->ifa->addr->ip, n->ifa->iface,
+				ospf_neigh_bfd_hook, n);
 
 	if (!use_bfd && n->bfd_req) {
 		rfree(n->bfd_req);
@@ -586,7 +596,7 @@ static void lsrq_timer_hook(struct timer * t)
 
 	// OSPF_TRACE(D_EVENTS, "LSRQ struct timer expired for nbr %R on %s", n->rid, n->ifa->ifname);
 
-	if ((n->state >= NEIGHBOR_EXCHANGE) && !EMPTY_SLIST(n->lsrql))
+	if ((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(&n->lsrql))
 		ospf_send_lsreq(p, n);
 }
 
@@ -597,7 +607,7 @@ static void lsrt_timer_hook(struct timer * t)
 
 	// OSPF_TRACE(D_EVENTS, "LSRT struct timer expired for nbr %R on %s", n->rid, n->ifa->ifname);
 
-	if ((n->state >= NEIGHBOR_EXCHANGE) && !EMPTY_SLIST(n->lsrtl))
+	if ((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(&n->lsrtl))
 		ospf_rxmt_lsupd(p, n);
 }
 

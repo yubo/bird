@@ -9,7 +9,7 @@
 #ifndef _BIRD_ROUTE_H_
 #define _BIRD_ROUTE_H_
 
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 #include "lib/timer.h"
 #include "nest/protocol.h"
@@ -34,7 +34,7 @@ struct cli;
 
 struct fib_node {
 	struct fib_node *next;	/* Next in hash chain */
-	struct fib_iterator *readers;	/* List of readers of this struct node */
+	struct fib_iterator *readers;	/* List of readers of this struct list_head */
 	byte pxlen;
 	byte flags;		/* User-defined */
 	byte x0, x1;		/* User-defined */
@@ -44,7 +44,7 @@ struct fib_node {
 
 struct fib_iterator {		/* See lib/slists.h for an explanation */
 	struct fib_iterator *prev, *next;	/* Must be synced with struct fib_node! */
-	byte efef;		/* 0xff to distinguish between iterator and struct node */
+	byte efef;		/* 0xff to distinguish between iterator and struct list_head */
 	byte pad[3];
 	struct fib_node *node;	/* Or NULL if freshly merged */
 	uint hash;
@@ -112,7 +112,7 @@ void fit_put_next(struct fib *f, struct fib_iterator *i, struct fib_node *n,
 
 /*
  *	Master Routing Tables. Generally speaking, each of them contains a FIB
- *	with each entry pointing to a union list of route entries representing routes
+ *	with each entry pointing to a struct list_head of route entries representing routes
  *	to given network (with the selected one at the head).
  *
  *	Each of the RTE's contains variable data (the preference and protocol-dependent
@@ -122,7 +122,7 @@ void fit_put_next(struct fib *f, struct fib_iterator *i, struct fib_node *n,
  */
 
 struct rtable_config {
-	struct node n;
+	struct list_head n;
 	char *name;
 	struct rtable *table;
 	struct proto_config *krt_attached;	/* Kernel syncer attached to this table */
@@ -132,10 +132,10 @@ struct rtable_config {
 };
 
 struct rtable {
-	struct node n;		/* Node in union list of all tables */
+	struct list_head n;		/* Node in struct list_head of all tables */
 	struct fib fib;
 	char *name;		/* Name of this table */
-	union list hooks;	/* List of announcement hooks */
+	struct list_head hooks;	/* List of announcement hooks */
 	int pipe_busy;		/* Pipe loop detection */
 	int use_count;		/* Number of protocols using this table */
 	struct hostcache *hostcache;
@@ -172,12 +172,12 @@ struct hostcache {
 	unsigned hash_items;
 	struct linpool *lp;	/* Linpool for trie */
 	struct f_trie *trie;	/* Trie of prefixes that might affect hostentries */
-	union list hostentries;	/* List of all hostentries */
+	struct list_head hostentries;	/* List of all hostentries */
 	byte update_hostcache;
 };
 
 struct hostentry {
-	struct node ln;
+	struct list_head ln;
 	ip_addr addr;		/* IP address of host, part of key */
 	ip_addr link;		/* (link-local) IP address of host, used as gw
 				   if host is directly attached */
@@ -474,7 +474,7 @@ struct eattr {
 #define EAF_TYPE_AS_PATH 0x06	/* BGP AS path (encoding per RFC 1771:4.3) */
 #define EAF_TYPE_BITFIELD 0x09	/* 32-bit embedded bitfield */
 #define EAF_TYPE_INT_SET 0x0a	/* Set of u32's (e.g., a community list) */
-#define EAF_TYPE_EC_SET 0x0e	/* Set of pairs of u32's - ext. community union list */
+#define EAF_TYPE_EC_SET 0x0e	/* Set of pairs of u32's - ext. community struct list_head */
 #define EAF_TYPE_UNDEF 0x0f	/* `force undefined' entry */
 #define EAF_EMBEDDED 0x01	/* Data stored in eattr.u.data (part of type spec) */
 #define EAF_VAR_LENGTH 0x02	/* Attribute length is variable (part of type spec) */
@@ -492,7 +492,7 @@ static inline int adata_same(struct adata *a, struct adata *b)
 }
 
 struct ea_list {
-	struct ea_list *next;	/* In case we have an override union list */
+	struct ea_list *next;	/* In case we have an override struct list_head */
 	byte flags;		/* Flags: EALF_... */
 	byte rfu;
 	word count;		/* Number of attributes */
@@ -644,7 +644,7 @@ struct roa_node {
 };
 
 struct roa_table {
-	struct node n;		/* Node in roa_table_list */
+	struct list_head n;		/* Node in roa_table_list */
 	struct fib fib;
 	char *name;		/* Name of this ROA table */
 	struct roa_table_config *cf;	/* Configuration of this ROA table */
@@ -658,7 +658,7 @@ struct roa_item_config {
 };
 
 struct roa_table_config {
-	struct node n;		/* Node in config->rpa_tables */
+	struct list_head n;		/* Node in config->rpa_tables */
 	char *name;		/* Name of this ROA table */
 	struct roa_table *table;
 

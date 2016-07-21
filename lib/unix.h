@@ -115,10 +115,10 @@ void krt_io_init(void);
 
 void main_thread_init(void);
 void log_init_debug(char *);		/* Initialize debug dump to given file (NULL=stderr, ""=off) */
-void log_switch(int debug, union list *l, char *); /* Use l=NULL for initial switch */
+void log_switch(int debug, struct list_head *l, char *); /* Use l=NULL for initial switch */
 
 struct log_config {
-  struct node n;
+  struct list_head n;
   uint mask;				/* Classes to log */
   void *fh;				/* FILE to log to, NULL=syslog */
   int terminal_flag;

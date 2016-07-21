@@ -116,7 +116,7 @@ static char * number(char * str, long num, int base, int size, int precision,
  * @buf: destination buffer
  * @size: size of the buffer
  * @fmt: format string
- * @args: a union list of arguments to be formatted
+ * @args: a struct list_head of arguments to be formatted
  *
  * This functions acts like ordinary sprintf() except that it checks
  * available space to avoid struct buffer overflows and it allows some more
@@ -387,7 +387,7 @@ int bvsnprintf(char *buf, int size, const char *fmt, va_list args)
  * bvsprintf - BIRD's vsprintf()
  * @buf: buffer
  * @fmt: format string
- * @args: a union list of arguments to be formatted
+ * @args: a struct list_head of arguments to be formatted
  *
  * This function is equivalent to bvsnprintf() with an infinite
  * struct buffer size. Please use carefully only when you are absolutely

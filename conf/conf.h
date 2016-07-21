@@ -18,15 +18,15 @@
 struct config {
   struct pool *pool;				/* Pool the configuration is stored in */
   struct linpool *mem;				/* Linear struct pool containing configuration data */
-  union list protos;				/* Configured protocol instances (struct proto_config) */
-  union list tables;				/* Configured routing tables (struct rtable_config) */
-  union list roa_tables;			/* Configured ROA tables (struct roa_table_config) */
-  union list logfiles;			/* Configured log fils (sysdep) */
+  struct list_head protos;				/* Configured protocol instances (struct proto_config) */
+  struct list_head tables;				/* Configured routing tables (struct rtable_config) */
+  struct list_head roa_tables;			/* Configured ROA tables (struct roa_table_config) */
+  struct list_head logfiles;			/* Configured log fils (sysdep) */
 
   int mrtdump_file;			/* Configured MRTDump file (sysdep, fd in unix) */
   char *syslog_name;			/* Name used for syslog (NULL -> no syslog) */
   struct rtable_config *master_rtc;	/* Configuration of master routing table */
-  struct iface_patt *router_id_from;	/* Configured union list of router ID iface patterns */
+  struct iface_patt *router_id_from;	/* Configured struct list_head of router ID iface patterns */
 
   u32 router_id;			/* Our Router ID */
   ip_addr listen_bgp_addr;		/* Listening BGP socket should use this address */
@@ -96,7 +96,7 @@ extern struct linpool *cfg_mem;
 #define cfg_allocu(size) lp_allocu(cfg_mem, size)
 #define cfg_allocz(size) lp_allocz(cfg_mem, size)
 char *cfg_strdup(char *c);
-void cfg_copy_list(union list *dest, union list *src, unsigned node_size);
+void cfg_copy_list(struct list_head *dest, struct list_head *src, unsigned node_size);
 
 /* Lexer */
 

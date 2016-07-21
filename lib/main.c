@@ -21,7 +21,7 @@
 #include <libgen.h>
 
 #include "nest/bird.h"
-#include "lib/lists.h"
+#include "lib/list.h"
 #include "lib/resource.h"
 #include "lib/socket.h"
 #include "lib/event.h"
@@ -158,7 +158,7 @@ static int cf_read(byte * dest, uint len, int fd)
 
 void sysdep_preconfig(struct config *c)
 {
-	init_list(&c->logfiles);
+	INIT_LIST_HEAD(&c->logfiles);
 
 	c->latency_limit = UNIX_DEFAULT_LATENCY_LIMIT;
 	c->watchdog_warning = UNIX_DEFAULT_WATCHDOG_WARNING;
