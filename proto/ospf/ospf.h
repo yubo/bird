@@ -17,6 +17,7 @@
 #include "lib/checksum.h"
 #include "lib/ip.h"
 #include "lib/list.h"
+#include "lib/hlist.h"
 #include "lib/socket.h"
 #include "lib/timer.h"
 #include "lib/resource.h"
@@ -202,8 +203,7 @@ struct ospf_proto {
 	struct timer *disp_timer;	/* OSPF proto dispatcher */
 	uint tick;
 	struct top_graph *gr;	/* LSA graph */
-	struct list_head lsal;		/* List of all LSA's */
-	struct list_head lsal_list;		/* List of all LSA's */
+	struct hlist lsal;	/* List of all LSA's */
 	int calcrt;		/* Routing table calculation scheduled?
 				   0=no, 1=normal, 2=forced reload */
 	struct list_head iface_list;	/* List of OSPF interfaces (struct ospf_iface) */
@@ -351,14 +351,12 @@ struct ospf_neighbor {
 	/* Database summary struct list_head iterator, controls initial dbdes exchange.
 	 * Advances in the LSA struct list_head as dbdes packets are sent.
 	 */
-	struct list_head dbsi;		/* iterator of po->lsal */
-	struct list_head dbsi_list;	/* iterator of po->lsal */
+	struct hlist dbsi;		/* iterator of po->lsal */
 
 	/* Link state request list, controls initial LSA exchange.
 	 * Entries added when received in dbdes packets, removed as sent in lsreq packets.
 	 */
-	struct list_head lsrql;		/* struct slist of struct top_hash_entry from n->lsrqh */
-	struct list_head lsrql_list;	/* struct slist of struct top_hash_entry from n->lsrqh */
+	struct hlist lsrql;		/* struct slist of struct top_hash_entry from n->lsrqh */
 	struct top_graph *lsrqh;
 	struct top_hash_entry *lsrqi;	/* Pointer to the first unsent struct list_head in lsrql */
 
@@ -366,8 +364,7 @@ struct ospf_neighbor {
 	 * Entries added as sent in lsupd packets, removed when received in lsack packets.
 	 * These entries hold ret_count in appropriate LSA entries.
 	 */
-	struct list_head lsrtl;		/* struct slist of struct top_hash_entry from n->lsrth */
-	struct list_head lsrtl_list;	/* struct slist of struct top_hash_entry from n->lsrth */
+	struct hlist lsrtl;		/* struct slist of struct top_hash_entry from n->lsrth */
 	struct top_graph *lsrth;
 	struct timer *dbdes_timer;	/* DBDES exchange struct timer */
 	struct timer *lsrq_timer;	/* LSA request struct timer */

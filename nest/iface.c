@@ -291,7 +291,7 @@ struct iface *if_update(struct iface *new)
 		if (c & IF_CHANGE_TOO_MUCH) {	/* Changed a lot, convert it to down/up */
 			DBG("Interface %s changed too much -- forcing down/up transition\n", i->name);
 			if_change_flags(i, i->flags | IF_TMP_DOWN);
-			list_del(&i->n);
+			list_del_init(&i->n);
 			new->addr = i->addr;
 			memcpy(&new->addrs, &i->addrs, sizeof(i->addrs));
 			memcpy(i, new, sizeof(*i));
@@ -534,7 +534,7 @@ void ifa_delete(struct ifa *a)
 
 	list_for_each_entry(b, &i->addrs, n)
 	    if (ifa_same(b, a)) {
-		list_del(&b->n);
+		list_del_init(&b->n);
 		if (b->flags & IF_UP) {
 			b->flags &= ~IF_UP;
 			ifa_notify_change(IF_CHANGE_DOWN, b);
@@ -661,9 +661,10 @@ static int iface_plists_equal(struct iface_patt *pa, struct iface_patt *pb)
 {
 	struct iface_patt_node *x, *y;
 
-	x = (void *)pa->ipn_list.next;
-	y = (void *)pb->ipn_list.next;
-	while (x->n.next && y->n.next) {
+	x = list_first_entry(&pa->ipn_list, struct iface_patt_node, n);
+	y = list_first_entry(&pb->ipn_list, struct iface_patt_node, n);
+
+	while (x->n.next != &pa->ipn_list && y->n.next != &pb->ipn_list) {
 		if ((x->positive != y->positive) || (!x->pattern && y->pattern) ||	/* This nasty lines where written by me... :-( Feela */
 		    (!y->pattern && x->pattern) ||
 		    ((x->pattern != y->pattern)
@@ -674,7 +675,7 @@ static int iface_plists_equal(struct iface_patt *pa, struct iface_patt *pb)
 		x = (void *)x->n.next;
 		y = (void *)y->n.next;
 	}
-	return (!x->n.next && !y->n.next);
+	return (x->n.next == &pa->ipn_list && y->n.next == &pb->ipn_list);
 }
 
 int
@@ -683,15 +684,16 @@ iface_patts_equal(struct list_head *a, struct list_head *b,
 {
 	struct iface_patt *x, *y;
 
-	x = (void *)a->next;
-	y = (void *)b->next;
-	while (x->n.next && y->n.next) {
+	x = list_first_entry(a, struct iface_patt, n);
+	y = list_first_entry(b, struct iface_patt, n);
+
+	while (x->n.next != a && y->n.next != b) {
 		if (!iface_plists_equal(x, y) || (comp && !comp(x, y)))
 			return 0;
 		x = (void *)x->n.next;
 		y = (void *)y->n.next;
 	}
-	return (!x->n.next && !y->n.next);
+	return (x->n.next == a && y->n.next == b);
 }
 
 /*

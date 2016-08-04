@@ -90,7 +90,7 @@ void sl_free(struct slab * s, void *oo)
 {
 	struct sl_obj *o = container_of( oo,struct sl_obj, data);
 
-	list_del(&o->n);
+	list_del_init(&o->n);
 	xfree(o);
 }
 
@@ -256,7 +256,7 @@ full_partial:
 no_partial:
 	if (!list_empty(&s->empty_heads)) {
 		h = (void *)s->empty_heads.next;
-		list_del(&h->n);
+		list_del_init(&h->n);
 		list_add(&h->n, &s->partial_heads);
 		s->num_empty_heads--;
 		goto okay;
@@ -276,7 +276,7 @@ no_partial:
  */
 void sl_free(struct slab * s, void *oo)
 {
-	struct sl_obj *o = container_of( oo,struct sl_obj, u.data);
+	struct sl_obj *o = container_of(oo, struct sl_obj, u.data);
 	struct sl_head *h = o->slab;
 
 #ifdef POISON
@@ -285,7 +285,7 @@ void sl_free(struct slab * s, void *oo)
 	o->u.next = h->first_free;
 	h->first_free = o;
 	if (!--h->num_full) {
-		list_del(&h->n);
+		list_del_init(&h->n);
 		if (s->num_empty_heads >= MAX_EMPTY_HEADS)
 			xfree(h);
 		else {
@@ -293,7 +293,7 @@ void sl_free(struct slab * s, void *oo)
 			s->num_empty_heads++;
 		}
 	} else if (!o->u.next) {
-		list_del(&h->n);
+		list_del_init(&h->n);
 		list_add(&h->n, &s->partial_heads);
 	}
 }

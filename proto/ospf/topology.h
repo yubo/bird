@@ -13,8 +13,7 @@
 #define _BIRD_OSPF_TOPOLOGY_H_
 
 struct top_hash_entry {		/* Index for fast mapping (type,rtrid,LSid)->vertex */
-	struct list_head n;
-	struct list_head n_list;
+	struct hlist n;
 	struct list_head cn;		/* For adding into struct list_head of candidates
 				   in intra-area routing table calculation */
 	struct top_hash_entry *next;	/* Next in hash chain */
@@ -199,8 +198,8 @@ void ospf_originate_ext_lsa(struct ospf_proto *p, struct ospf_area *oa,
 			    struct ort * nf, u8 mode, u32 metric, u32 ebit,
 			    ip_addr fwaddr, u32 tag, int pbit);
 
-void ospf_rt_notify(struct proto *P, struct rtable * tbl, struct network * n, struct rte * new,
-		    struct rte * old, struct ea_list * attrs);
+void ospf_rt_notify(struct proto *P, struct rtable * tbl, struct network * n,
+		struct rte * new, struct rte * old, struct ea_list * attrs);
 void ospf_update_topology(struct ospf_proto *p);
 
 struct top_hash_entry *ospf_hash_find(struct top_graph *, u32 domain, u32 lsa,
@@ -210,8 +209,7 @@ struct top_hash_entry *ospf_hash_get(struct top_graph *, u32 domain, u32 lsa,
 void ospf_hash_delete(struct top_graph *, struct top_hash_entry *);
 
 static inline struct top_hash_entry *ospf_hash_find_entry(struct top_graph *f,
-							  struct top_hash_entry
-							  *en)
+		struct top_hash_entry *en)
 {
 	return ospf_hash_find(f, en->domain, en->lsa.id, en->lsa.rt,
 			      en->lsa_type);

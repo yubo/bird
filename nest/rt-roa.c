@@ -316,7 +316,7 @@ void roa_commit(struct config *new, struct config *old)
 
 			/* Free it now */
 			roa_flush(t, ROA_SRC_ANY);
-			list_del(&t->n);
+			list_del_init(&t->n);
 			fib_free(&t->fib);
 			mb_free(t);
 		}

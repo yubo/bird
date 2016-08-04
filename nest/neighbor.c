@@ -218,7 +218,7 @@ neigh_up(struct neighbor *n, struct iface *i, int scope, struct ifa *a)
 	n->ifa = a;
 	n->scope = scope;
 	list_add_tail(&n->if_n, &i->neighbors);
-	list_del(&n->n);
+	list_del_init(&n->n);
 	list_add_tail(&n->n, &neigh_hash_table[neigh_hash(n->proto, &n->addr)]);
 	DBG("Waking up sticky struct neighbor %I\n", n->addr);
 	if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
@@ -228,14 +228,14 @@ neigh_up(struct neighbor *n, struct iface *i, int scope, struct ifa *a)
 static void neigh_down(struct neighbor *n)
 {
 	DBG("Flushing struct neighbor %I on %s\n", n->addr, n->iface->name);
-	list_del(&n->if_n);
+	list_del_init(&n->if_n);
 	if (!(n->flags & NEF_BIND))
 		n->iface = NULL;
 	n->ifa = NULL;
 	n->scope = -1;
 	if (n->proto->neigh_notify && n->proto->core_state != FS_FLUSHING)
 		n->proto->neigh_notify(n);
-	list_del(&n->n);
+	list_del_init(&n->n);
 	if (n->flags & NEF_STICKY) {
 		list_add_tail(&n->n, &sticky_neigh_list);
 
@@ -343,9 +343,9 @@ static inline void neigh_prune_one(struct neighbor *n)
 {
 	if (n->proto->proto_state != PS_DOWN)
 		return;
-	list_del(&n->n);
+	list_del_init(&n->n);
 	if (n->scope >= 0)
-		list_del(&n->if_n);
+		list_del_init(&n->if_n);
 	sl_free(neigh_slab, n);
 }
 

@@ -258,14 +258,14 @@ void tm_start(struct timer *t, unsigned after)
 	if (t->expires == when)
 		return;
 	if (t->expires)
-		list_del(&t->n);
+		list_del_init(&t->n);
 	t->expires = when;
 	if (after <= NEAR_TIMER_LIMIT)
 		tm_insert_near(t);
 	else {
 		if (!first_far_timer || first_far_timer > when)
 			first_far_timer = when;
-		list_add_tail( &t->n,&far_timers);
+		list_add_tail(&t->n, &far_timers);
 	}
 }
 
@@ -279,7 +279,7 @@ void tm_start(struct timer *t, unsigned after)
 void tm_stop(struct timer *t)
 {
 	if (t->expires) {
-		list_del(&t->n);
+		list_del_init(&t->n);
 		t->expires = 0;
 	}
 }
@@ -320,29 +320,24 @@ void io_log_event(void *hook, void *data);
 
 static void tm_shot(void)
 {
-	struct timer *t;
-	struct list_head *n, *m;
+	struct timer *t, *n;
 
 	if (first_far_timer <= now) {
 		bird_clock_t limit = now + NEAR_TIMER_LIMIT;
 		first_far_timer = TIME_INFINITY;
-		n = far_timers.next;
-		while (m = n->next) {
-			t = container_of(n, struct timer, n);
+		list_for_each_entry_safe(t, n, &far_timers, n) {
 			if (t->expires <= limit) {
-				list_del(n);
+				list_del_init(&t->n);
 				tm_insert_near(t);
 			} else if (t->expires < first_far_timer)
 				first_far_timer = t->expires;
-			n = m;
 		}
 	}
-	list_for_each_safe(n, m, &near_timers){
+	list_for_each_entry_safe(t, n, &near_timers, n){
 		int delay;
-		t = container_of(n, struct timer, n);
 		if (t->expires > now)
 			break;
-		list_del(n);
+		list_del_init(&t->n);
 		delay = t->expires - now;
 		t->expires = 0;
 		if (t->recurrent) {
@@ -1043,7 +1038,7 @@ static void sk_free(struct resource *r)
 			current_sock = sk_next(s);
 		if (s == stored_sock)
 			stored_sock = sk_next(s);
-		list_del(&s->n);
+		list_del_init(&s->n);
 	}
 }
 

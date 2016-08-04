@@ -34,22 +34,22 @@ static void ackd_timer_hook(struct timer * t);
 static void init_lists(struct ospf_proto *p, struct ospf_neighbor *n)
 {
 	//s_init_list(&(n->lsrql));
-	INIT_LIST_HEAD(&n->lsrql);
-	INIT_LIST_HEAD(&n->lsrql_list);
-	n->lsrqi = (void *)n->lsrql.next;
+	h_init_list(&(n->lsrql));
+	n->lsrqi = (void *)&n->lsrql;
 	n->lsrqh = ospf_top_new(p, n->pool);
 
 	//s_init_list(&(n->lsrtl));
-	INIT_LIST_HEAD(&n->lsrtl);
-	INIT_LIST_HEAD(&n->lsrtl_list);
+	h_init_list(&(n->lsrtl));
 	n->lsrth = ospf_top_new(p, n->pool);
 }
 
 static void release_lsrtl(struct ospf_proto *p, struct ospf_neighbor *n)
 {
 	struct top_hash_entry *ret, *en;
+	struct list_head *_p;
 
-	list_for_each_entry(ret, &n->lsrtl, n) {
+	list_for_each(_p, &n->lsrtl.n) {
+		ret = (void *)_p;
 		en = ospf_hash_find_entry(p->gr, ret);
 		if (en)
 			en->ret_count--;
@@ -81,6 +81,7 @@ struct ospf_neighbor *ospf_neighbor_new(struct ospf_iface *ifa)
 	struct pool *pool = rp_new(p->p.pool, "OSPF Neighbor");
 	struct ospf_neighbor *n = mb_allocz(pool, sizeof(struct ospf_neighbor));
 
+
 	n->pool = pool;
 	n->ifa = ifa;
 	list_add_tail(&n->n, &ifa->neigh_list);
@@ -88,10 +89,10 @@ struct ospf_neighbor *ospf_neighbor_new(struct ospf_iface *ifa)
 	n->csn = 0;
 	n->state = NEIGHBOR_DOWN;
 
+	h_init_list(&n->dbsi);
 	init_lists(p, n);
 //	s_init(&(n->dbsi), &(p->lsal));
-	list_add(&n->dbsi_list, &p->lsal_list);
-	list_add(&n->dbsi, &p->lsal);
+	h_init(&n->dbsi, &p->lsal);
 
 	INIT_LIST_HEAD(&n->ackl[ACKL_DIRECT]);
 	INIT_LIST_HEAD(&n->ackl[ACKL_DELAY]);
@@ -119,7 +120,7 @@ static void ospf_neigh_down(struct ospf_neighbor *n)
 	}
 
 	//s_get(&(n->dbsi));
-	list_del_init(&n->dbsi);
+	h_get(&(n->dbsi));
 	release_lsrtl(p, n);
 	list_del_init(&n->n);
 	rfree(n->pool);
@@ -245,10 +246,9 @@ void ospf_neigh_sm(struct ospf_neighbor *n, int event)
 
 			/* Reset DB summary struct list_head iterator */
 			//s_get(&(n->dbsi));
-			list_del_init(&n->dbsi);
+			h_get(&(n->dbsi));
 			//s_init(&(n->dbsi), &p->lsal);
-			list_move(&n->dbsi_list, &p->lsal_list);
-			list_add(&n->dbsi, &p->lsal);
+			h_init(&n->dbsi, &p->lsal);
 
 			/* Add MaxAge LSA entries to retransmission struct list_head */
 			ospf_add_flushed_to_lsrt(p, n);
@@ -257,7 +257,7 @@ void ospf_neigh_sm(struct ospf_neighbor *n, int event)
 		break;
 
 	case INM_EXDONE:
-		if (!list_empty(&n->lsrql))
+		if (!list_empty(&n->lsrql.n))
 			ospf_neigh_chstate(n, NEIGHBOR_LOADING);
 		else
 			ospf_neigh_chstate(n, NEIGHBOR_FULL);
@@ -596,7 +596,7 @@ static void lsrq_timer_hook(struct timer * t)
 
 	// OSPF_TRACE(D_EVENTS, "LSRQ struct timer expired for nbr %R on %s", n->rid, n->ifa->ifname);
 
-	if ((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(&n->lsrql))
+	if ((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(&n->lsrql.n))
 		ospf_send_lsreq(p, n);
 }
 
@@ -607,7 +607,7 @@ static void lsrt_timer_hook(struct timer * t)
 
 	// OSPF_TRACE(D_EVENTS, "LSRT struct timer expired for nbr %R on %s", n->rid, n->ifa->ifname);
 
-	if ((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(&n->lsrtl))
+	if ((n->state >= NEIGHBOR_EXCHANGE) && !list_empty(&n->lsrtl.n))
 		ospf_rxmt_lsupd(p, n);
 }
 

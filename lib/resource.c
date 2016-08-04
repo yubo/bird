@@ -127,9 +127,9 @@ void rmove(void *res, struct pool * p)
 	struct resource *r = res;
 
 	if (r) {
-		if (r->n.next)
-			list_del(&r->n);
-		list_add_tail( &r->n,&p->inside);
+		if (!list_empty(&r->n))
+			list_del_init(&r->n);
+		list_add_tail(&r->n, &p->inside);
 	}
 }
 
@@ -150,8 +150,8 @@ void rfree(void *res)
 	if (!r)
 		return;
 
-	if (r->n.next)
-		list_del(&r->n);
+	if (!list_empty(&r->n))
+		list_del_init(&r->n);
 	r->class->free(r);
 	r->class = NULL;
 	xfree(r);
