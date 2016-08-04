@@ -54,6 +54,7 @@ void ospf_send_lsreq(struct ospf_proto *p, struct ospf_neighbor *n)
 	struct top_hash_entry *req;
 	struct ospf_packet *pkt;
 	uint i, lsr_max, length;
+	struct list_head *_p;
 
 	/* RFC 2328 10.9 */
 
@@ -64,11 +65,16 @@ void ospf_send_lsreq(struct ospf_proto *p, struct ospf_neighbor *n)
 	ospf_lsreq_body(p, pkt, &lsrs, &lsr_max);
 
 	i = 0;
-	list_for_each_entry(req, &n->lsrql, n) {
+	list_for_each(_p, &n->lsrql.n) {
 		if (i == lsr_max)
 			break;
 
-		DBG("Requesting %uth LSA: Type: %04u, ID: %R, RT: %R, SN: 0x%x, Age %u\n", i, req->lsa_type, req->lsa.id, req->lsa.rt, req->lsa.sn, req->lsa.age);
+		req = (void *)_p;
+
+		DBG("Requesting %uth LSA: Type: %04u, "
+				"ID: %R, RT: %R, SN: 0x%x, Age %u\n",
+				i, req->lsa_type, req->lsa.id,
+				req->lsa.rt, req->lsa.sn, req->lsa.age);
 
 		u32 etype = lsa_get_etype(&req->lsa, p);
 		lsrs[i].type = htonl(etype);

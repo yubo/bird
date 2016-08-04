@@ -1050,7 +1050,7 @@ static int krt_start(struct proto *P)
 #endif
 
 	if (!krt_sys_start(p)) {
-		list_del(&p->krt_node);
+		list_del_init(&p->krt_node);
 		return PS_START;
 	}
 
@@ -1079,7 +1079,7 @@ static int krt_shutdown(struct proto *P)
 		return PS_DOWN;
 
 	krt_sys_shutdown(p);
-	list_del(&p->krt_node);
+	list_del_init(&p->krt_node);
 
 	return PS_DOWN;
 }

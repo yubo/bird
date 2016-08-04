@@ -52,10 +52,10 @@ struct top_hash_entry *ospf_install_lsa(struct ospf_proto *p,
 
 	en = ospf_hash_get(p->gr, domain, lsa->id, lsa->rt, type);
 
-	if (list_empty(&en->n)) {
-		//s_list_add_tail(en->n ,&p->lsal);
-		list_add_tail(&en->n, &p->lsal);
-		list_del_init(&en->n_list);
+	//if (!SNODE_VALID(en))
+	if (list_empty(&en->n.n)) {
+		//s_add_tail(&p->lsal, SNODE en);
+		h_add_tail(&p->lsal, HLIST en);
 	}
 
 	if ((en->lsa_body == NULL) ||	/* No old LSA */
@@ -283,10 +283,10 @@ struct top_hash_entry *ospf_originate_lsa(struct ospf_proto *p,
 
 	en = ospf_hash_get(p->gr, lsa->dom, lsa->id, p->router_id, lsa->type);
 
-	if (list_empty(&en->n)){
-		list_add_tail(&en->n, &p->lsal);
-		list_del_init(&en->n_list);
-	}
+	//if (!SNODE_VALID(en))
+	if (list_empty(&en->n.n))
+		//s_add_tail(&p->lsal, SNODE en);
+		h_add_tail(&p->lsal, HLIST en);
 
 	if (!en->nf || !en->lsa_body)
 		en->nf = lsa->nf;
@@ -462,14 +462,7 @@ static void ospf_remove_lsa(struct ospf_proto *p, struct top_hash_entry *en)
 	 * Both lsa_body and next_lsa_body are NULL.
 	 */
 	//s_rem_node(SNODE en);
-	struct list_head *next = en->n.next;
-
-	list_del_init(&en->n);
-	if (!list_empty(next)){
-		struct top_hash_entry *next_e;
-		next_e = container_of(next, struct top_hash_entry, n);
-		list_splice_init(&en->n_list, &next_e->n_list);
-	}
+	h_rem_node(HLIST en);
 	ospf_hash_delete(p->gr, en);
 }
 
@@ -489,11 +482,13 @@ static void ospf_remove_lsa(struct ospf_proto *p, struct top_hash_entry *en)
  */
 void ospf_update_lsadb(struct ospf_proto *p)
 {
-	struct top_hash_entry *en, *nxt;
+	struct list_head *_p, *_n;
+	struct top_hash_entry *en;
 	bird_clock_t real_age;
 
 	/*WALK_SLIST_DELSAFE(en, nxt, p->lsal) {*/
-	list_for_each_entry_safe(en, nxt, &p->lsal, n) {
+	list_for_each_safe(_p, _n, &p->lsal.n) {
+		en = (void *)_p;
 		if (en->next_lsa_body)
 			ospf_originate_next_lsa(p, en);
 
@@ -1893,6 +1888,7 @@ struct top_hash_entry *ospf_hash_get(struct top_graph *f, u32 domain, u32 lsa,
 	e = sl_alloc(f->hash_slab);
 	bzero(e, sizeof(struct top_hash_entry));
 
+	h_init_list(&e->n);
 	e->color = OUTSPF;
 	e->dist = LSINFINITY;
 	e->lsa.type_raw = type;

@@ -308,7 +308,7 @@ void cli_set_log_echo(struct cli *c, uint mask, uint size)
 	if (c->ring_buf) {
 		mb_free(c->ring_buf);
 		c->ring_buf = c->ring_end = c->ring_read = c->ring_write = NULL;
-		list_del(&c->n);
+		list_del_init(&c->n);
 	}
 	c->log_mask = mask;
 	if (mask && size) {

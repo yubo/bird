@@ -12,5 +12,6 @@ set args -c ./etc/bird.conf -d
 #b ospf_walk_matching_iface_patts
 #b ospf_rx_hook
 #b ospf_neighbor_new
-b packet.c:384
+#b packet.c:384
+#b hello.c:295
 run

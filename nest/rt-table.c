@@ -614,8 +614,7 @@ struct rte *rt_export_merged(struct announce_hook *ah, struct network * net,
 			continue;
 
 		if (rte_is_reachable(rt))
-			nhs =
-			    mpnh_merge_rta(nhs, rt->attrs,
+			nhs = mpnh_merge_rta(nhs, rt->attrs,
 					   ah->proto->merge_limit);
 
 		if (tmp)
@@ -1800,7 +1799,7 @@ void rt_unlock_table(struct rtable *r)
 		r->config->table = NULL;
 		if (r->hostcache)
 			rt_free_hostcache(r);
-		list_del(&r->n);
+		list_del_init(&r->n);
 		fib_free(&r->fib);
 		rfree(r->rt_event);
 		mb_free(r);
@@ -2061,7 +2060,7 @@ static void hc_delete_hostentry(struct hostcache *hc, struct hostentry *he)
 {
 	rta_free(he->src);
 
-	list_del(&he->ln);
+	list_del_init(&he->ln);
 	hc_remove(hc, he);
 	sl_free(hc->slab, he);
 

@@ -173,13 +173,16 @@ static void ospf_area_add(struct ospf_proto *p, struct ospf_area_config *ac)
 
 static void ospf_flush_area(struct ospf_proto *p, u32 areaid)
 {
+	struct list_head *l;
 	struct top_hash_entry *en;
 
 	//WALK_SLIST(en, p->lsal)
-	list_for_each_entry(en, &p->lsal, n)
-	    if ((LSA_SCOPE(en->lsa_type) == LSA_SCOPE_AREA)
-		&& (en->domain == areaid))
-		ospf_flush_lsa(p, en);
+	list_for_each(l, &p->lsal.n){
+		en = (struct top_hash_entry *)l;
+		if ((LSA_SCOPE(en->lsa_type) == LSA_SCOPE_AREA)
+				&& (en->domain == areaid))
+			ospf_flush_lsa(p, en);
+	}
 }
 
 static void ospf_area_remove(struct ospf_area *oa)
@@ -248,8 +251,8 @@ log(L_TRACE "---------- ospf_start");
 	fib_init(&p->rtf, P->pool, sizeof(struct ort), 0, ospf_rt_initort);
 	p->areano = 0;
 	p->gr = ospf_top_new(p, P->pool);
-	INIT_LIST_HEAD(&p->lsal);
-	INIT_LIST_HEAD(&p->lsal_list);
+	//s_init_list(&(p->lsal));
+	h_init_list(&(p->lsal));
 
 	p->flood_event = ev_new(P->pool);
 	p->flood_event->hook = ospf_flood_event;
@@ -305,8 +308,6 @@ static struct proto *ospf_init(struct proto_config *c)
 {
 	struct ospf_config *oc = (struct ospf_config *)c;
 	struct proto *P = proto_new(c, sizeof(struct ospf_proto));
-	struct ospf_proto *p = (struct ospf_proto *)P;
-log(L_TRACE "---------- ospf_init");
 
 	P->accept_ra_types = RA_OPTIMAL;
 	P->rt_notify = ospf_rt_notify;
@@ -1147,10 +1148,13 @@ void ospf_sh_state(struct proto *P, int verbose, int reachable)
 	struct top_hash_entry *hex[verbose ? num : 0];
 	struct top_hash_entry *he;
 	struct top_hash_entry *cnode = NULL;
+	struct list_head *_p;
 
 	j1 = jx = 0;
-	list_for_each_entry(he, &p->lsal, n) {
+	list_for_each(_p, &p->lsal.n) {
 		int accept;
+
+		he = (struct top_hash_entry *)_p;
 
 		if (he->lsa.age == LSA_MAXAGE)
 			continue;
@@ -1354,11 +1358,14 @@ void ospf_sh_lsadb(struct lsadb_show_data *ld)
 
 	struct top_hash_entry *hea[num];
 	struct top_hash_entry *he;
+	struct list_head * _p;
 
 	j = 0;
-	list_for_each_entry(he, &p->lsal, n)
-	    if (he->lsa_body)
-		hea[j++] = he;
+	list_for_each(_p, &p->lsal.n){
+		he = (struct top_hash_entry *)p;
+		if (he->lsa_body)
+			hea[j++] = he;
+	}
 
 	ASSERT(j <= num);
 

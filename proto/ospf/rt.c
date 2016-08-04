@@ -407,9 +407,9 @@ add_network(struct ospf_area *oa, ip_addr px, int pxlen, int metric,
 	};
 
 	if (pxlen < 0 || pxlen > MAX_PREFIX_LENGTH) {
-		log(L_WARN
-		    "%s: Invalid prefix in LSA (Type: %04x, Id: %R, Rt: %R)",
-		    p->p.name, en->lsa_type, en->lsa.id, en->lsa.rt);
+		log(L_WARN "%s: Invalid prefix in LSA (Type: %04x, "
+				"Id: %R, Rt: %R)", p->p.name, en->lsa_type,
+				en->lsa.id, en->lsa.rt);
 		return;
 	}
 
@@ -423,12 +423,10 @@ add_network(struct ospf_area *oa, ip_addr px, int pxlen, int metric,
 		 */
 
 		struct ospf_iface *ifa;
-		ifa =
-		    ospf_is_v2(p) ? rt_pos_to_ifa(oa, pos) : px_pos_to_ifa(oa,
-									   pos);
-		nf.nhs =
-		    ifa ? new_nexthop(p, IPA_NONE, ifa->iface,
-				      ifa->ecmp_weight) : NULL;
+		ifa = ospf_is_v2(p) ? rt_pos_to_ifa(oa, pos) :
+			px_pos_to_ifa(oa, pos);
+		nf.nhs = ifa ? new_nexthop(p, IPA_NONE, ifa->iface,
+			ifa->ecmp_weight) : NULL;
 	}
 
 	ri_install_net(p, px, pxlen, &nf);
@@ -544,9 +542,11 @@ spfa_process_prefixes(struct ospf_proto *p, struct ospf_area *oa)
 	u16 metric;
 	u32 *buf;
 	int i;
+	struct list_head *_p;
 
 	/*WALK_SLIST(en, p->lsal) {*/
-	list_for_each_entry(en, &p->lsal, n) {
+	list_for_each(_p, &p->lsal.n) {
+		en = (void *)_p;
 		if (en->lsa_type != LSA_T_PREFIX)
 			continue;
 
@@ -739,13 +739,15 @@ static void ospf_rt_sum(struct ospf_area *oa)
 	struct ort *abr;
 	int pxlen = -1, type = -1;
 	u8 pxopts;
+	struct list_head *_p;
 
 	OSPF_TRACE(D_EVENTS,
 		   "Starting routing table calculation for inter-area (area %R)",
 		   oa->areaid);
 
 	/*WALK_SLIST(en, p->lsal) {*/
-	list_for_each_entry(en, &p->lsal, n) {
+	list_for_each(_p, &p->lsal.n) {
+		en = (void *)_p;
 		if ((en->lsa_type != LSA_T_SUM_RT)
 		    && (en->lsa_type != LSA_T_SUM_NET))
 			continue;
@@ -840,11 +842,13 @@ static void ospf_rt_sum_tr(struct ospf_area *oa)
 	u32 dst_rid, metric, options;
 	int pxlen;
 	u8 pxopts;
+	struct list_head *_p;
 
 	if (!bb)
 		return;
 
-	list_for_each_entry(en, &p->lsal, n) {
+	list_for_each(_p, &p->lsal.n) {
+		en = (void *)_p;
 		if ((en->lsa_type != LSA_T_SUM_RT)
 		    && (en->lsa_type != LSA_T_SUM_NET))
 			continue;
@@ -1388,11 +1392,13 @@ static void ospf_ext_spf(struct ospf_proto *p)
 	ip_addr rtid;
 	u32 br_metric;
 	struct ospf_area *atmp;
+	struct list_head *_p;
 
 	OSPF_TRACE(D_EVENTS,
 		   "Starting routing table calculation for ext routes");
 
-	list_for_each_entry(en, &p->lsal, n) {
+	list_for_each(_p, &p->lsal.n) {
+		en = (void *)_p;
 		/* 16.4. (1) */
 		if ((en->lsa_type != LSA_T_EXT) && (en->lsa_type != LSA_T_NSSA))
 			continue;
@@ -1527,6 +1533,7 @@ void ospf_rt_reset(struct ospf_proto *p)
 	struct top_hash_entry *en;
 	struct area_net *anet;
 	struct ort *ri;
+	struct list_head *_p;
 
 	/* Reset old routing table */
 	FIB_WALK(&p->rtf, nftmp) {
@@ -1537,7 +1544,8 @@ void ospf_rt_reset(struct ospf_proto *p)
 	FIB_WALK_END;
 
 	/* Reset SPF data in LSA db */
-	list_for_each_entry(en, &p->lsal, n) {
+	list_for_each(_p, &p->lsal.n) {
+		en = (void *)_p;
 		en->color = OUTSPF;
 		en->dist = LSINFINITY;
 		en->nhs = NULL;
@@ -1965,7 +1973,10 @@ again2:
 	}
 
 	/* Cleanup stale LSAs */
-	list_for_each_entry(en, &p->lsal, n)
-	    if (en->mode == LSA_M_STALE)
-		ospf_flush_lsa(p, en);
+	struct list_head *_p;
+	list_for_each(_p, &p->lsal.n){
+		en = (void *)_p;
+		if (en->mode == LSA_M_STALE)
+			ospf_flush_lsa(p, en);
+	}
 }

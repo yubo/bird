@@ -73,8 +73,8 @@ static void proto_relink(struct proto *p)
 		ASSERT(0);
 	}
 
-	list_del(&p->n);
-	list_add_tail( &p->n,l);
+	list_del_init(&p->n);
+	list_add_tail(&p->n, l);
 }
 
 static void proto_log_state_change(struct proto *p)
@@ -215,7 +215,7 @@ static void proto_unlink_ahooks(struct proto *p)
 
 	if (p->rt_notify)
 		for (h = p->ahooks; h; h = h->next)
-			list_del(&h->n);
+			list_del_init(&h->n);
 }
 
 static void proto_free_ahooks(struct proto *p)
@@ -586,8 +586,8 @@ static void proto_rethink_goal(struct proto *p)
 		DBG("%s has shut down for reconfiguration\n", p->name);
 		p->cf->proto = NULL;
 		config_del_obstacle(p->cf->global);
-		list_del(&p->n);
-		list_del(&p->glob_node);
+		list_del_init(&p->n);
+		list_del_init(&p->glob_node);
 		mb_free(p);
 		if (!nc)
 			return;

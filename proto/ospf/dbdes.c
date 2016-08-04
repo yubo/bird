@@ -128,16 +128,18 @@ static void ospf_prepare_dbdes(struct ospf_proto *p, struct ospf_neighbor *n)
 	/* Prepare DBDES body */
 	if (!(n->myimms & DBDES_I) && (n->myimms & DBDES_M)) {
 		struct ospf_lsa_header *lsas;
-		struct top_hash_entry *en;
+		struct top_hash_entry *en, *h;
 		uint i = 0, lsa_max;
 
 		ospf_dbdes_body(p, pkt, &lsas, &lsa_max);
 		//en = (void *)s_get(&(n->dbsi));
-		en = (struct top_hash_entry *)n->dbsi_list.next;
-		list_del_init(&n->dbsi);
+		en = (void *)h_get(&(n->dbsi));
+		h = en;
+
 
 		while (i < lsa_max) {
-			if (list_empty(&en->n)) {
+			//if (!SNODE_VALID(en)) {
+			if (en == h) {
 				n->myimms &= ~DBDES_M;	/* Unset More bit */
 				break;
 			}
@@ -149,12 +151,11 @@ static void ospf_prepare_dbdes(struct ospf_proto *p, struct ospf_neighbor *n)
 				i++;
 			}
 
-			en = container_of(en->n_list.next, struct top_hash_entry, n_list);
+			en = HLIST_NEXT(en);
 		}
 
 		//s_put(&(n->dbsi), SNODE en);
-		list_move(&n->dbsi_list, &en->n_list);
-		list_add(&en->n, &n->dbsi);
+		h_put(&(n->dbsi), HLIST en);
 
 		length += i * sizeof(struct ospf_lsa_header);
 	}
@@ -255,17 +256,17 @@ ospf_process_dbdes(struct ospf_proto *p, struct ospf_packet *pkt,
 				    lsa_type);
 		if (!en || (lsa_comp(&lsa, &(en->lsa)) == CMP_NEWER)) {
 			/* This should be splitted to ospf_lsa_lsrq_up() */
-			req =
-			    ospf_hash_get(n->lsrqh, lsa_domain, lsa.id, lsa.rt,
-					  lsa_type);
+			req = ospf_hash_get(n->lsrqh, lsa_domain, lsa.id,
+					lsa.rt, lsa_type);
 
-			if (list_empty(&req->n)){
-				//s_add_tail(&req->n, &n->lsrql);
-				list_add_tail(&req->n, &n->lsrql);
-				list_del_init(&req->n_list);
+			//if (!SNODE_VALID(req))
+			if (list_empty(&req->n.n)){
+				//s_add_tail(&n->lsrql, SNODE req);
+				h_add_tail(&n->lsrql, HLIST req);
 			}
 
-			if (list_empty(&n->lsrqi->n))
+			//if (!SNODE_VALID(n->lsrqi))
+			if (n->lsrqi == (void *)&n->lsrql)
 				n->lsrqi = req;
 
 			req->lsa = lsa;

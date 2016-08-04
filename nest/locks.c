@@ -59,7 +59,7 @@ static void olock_free(struct resource *r)
 		break;
 	case OLOCK_STATE_LOCKED:
 	case OLOCK_STATE_EVENT:
-		list_del(&l->n);
+		list_del_init(&l->n);
 		/* check it */
 		/*n = HEAD(l->waiters);
 		if (!list_empty(&n->next)) {*/
@@ -67,7 +67,7 @@ static void olock_free(struct resource *r)
 			DBG("olock: -> %p becomes locked\n", n);
 			n = l->waiters.next;
 			q = container_of(n, struct object_lock, n);
-			list_del(n);
+			list_del_init(n);
 			/*add_tail_list(&q->waiters, &l->waiters);*/
 			list_splice_tail(&l->waiters, &q->waiters);
 			q->state = OLOCK_STATE_EVENT;
@@ -76,7 +76,7 @@ static void olock_free(struct resource *r)
 		}
 		break;
 	case OLOCK_STATE_WAITING:
-		list_del(&l->n);
+		list_del_init(&l->n);
 		break;
 	default:
 		ASSERT(0);
@@ -167,7 +167,7 @@ static void olock_run_event(void *unused UNUSED)
 			break;
 		DBG("olock: %p locked\n", q);
 		q->state = OLOCK_STATE_LOCKED;
-		list_del(&q->n);
+		list_del_init(&q->n);
 		list_add_tail(&q->n, &olock_list);
 		q->hook(q);
 	}
