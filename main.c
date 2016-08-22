@@ -34,8 +34,8 @@
 #include "conf/conf.h"
 #include "filter/filter.h"
 
-#include "unix.h"
-#include "krt.h"
+#include "lib/unix.h"
+#include "lib/krt.h"
 
 /*
  *	Debugging

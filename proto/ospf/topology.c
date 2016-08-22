@@ -1687,7 +1687,10 @@ static void ospf_top_ht_alloc(struct top_graph *f)
 		f->hash_entries_min = 0;
 	else
 		f->hash_entries_min = f->hash_size HASH_LO_MARK;
-	DBG("Allocating OSPF hash of order %d: %d hash_entries, %d low, %d high\n", f->hash_order, f->hash_size, f->hash_entries_min, f->hash_entries_max);
+	DBG("Allocating OSPF hash of order %d: %d hash_entries, "
+			"%d low, %d high\n",
+			f->hash_order, f->hash_size, f->hash_entries_min,
+			f->hash_entries_max);
 	f->hash_table =
 	    mb_alloc(f->pool, f->hash_size * sizeof(struct top_hash_entry *));
 	bzero(f->hash_table, f->hash_size * sizeof(struct top_hash_entry *));

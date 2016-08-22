@@ -1,6 +1,7 @@
 *.a
 *.swp
 *.sh
+*.cap
 G*
 
 CMakeCache.txt

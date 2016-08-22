@@ -38,3 +38,7 @@ add_subdirectory(lib)
 add_subdirectory(nest)
 add_subdirectory(filter)
 add_subdirectory(proto)
+
+
+add_executable(bird main.c)
+target_link_libraries(bird bird-static nest-static conf-static proto-static filter-static rt)

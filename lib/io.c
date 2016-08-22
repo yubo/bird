@@ -1365,11 +1365,10 @@ int sk_open(struct birdsock *s)
 
 #ifdef CONFIG_NO_IFACE_BIND
 			/* Workaround missing ability to bind to an iface */
-			if ((s->type == SK_UDP) && s->iface
-			    && ipa_zero(bind_addr)) {
-				if (setsockopt
-				    (fd, SOL_SOCKET, SO_REUSEPORT, &y,
-				     sizeof(y)) < 0)
+			if ((s->type == SK_UDP) && s->iface &&
+					ipa_zero(bind_addr)) {
+				if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
+							&y, sizeof(y)) < 0)
 					ERR2("SO_REUSEPORT");
 			}
 #endif
