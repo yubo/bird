@@ -71,7 +71,7 @@ void ospf_send_lsreq(struct ospf_proto *p, struct ospf_neighbor *n)
 
 		req = (void *)_p;
 
-		log(L_TRACE "Requesting %uth LSA: Type: %04u, "
+		DBG("Requesting %uth LSA: Type: %04u, "
 				"ID: %R, RT: %R, SN: 0x%x, Age %u\n",
 				i, req->lsa_type, req->lsa.id,
 				req->lsa.rt, req->lsa.sn, req->lsa.age);
