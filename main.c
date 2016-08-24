@@ -579,9 +579,11 @@ static void signal_init(void)
 	sa.sa_handler = handle_sigterm;
 	sa.sa_flags = SA_RESTART;
 	sigaction(SIGTERM, &sa, NULL);
+	/*
 	sa.sa_handler = watchdog_sigalrm;
 	sa.sa_flags = 0;
 	sigaction(SIGALRM, &sa, NULL);
+	*/
 	signal(SIGPIPE, SIG_IGN);
 }
 
@@ -736,6 +738,8 @@ int main(int argc, char **argv)
 		dmalloc_debug(0x2f03d00);
 #endif
 
+	uloop_init();
+
 	parse_args(argc, argv);
 	if (debug_flag == 1)
 		log_init_debug("");
@@ -806,6 +810,8 @@ int main(int argc, char **argv)
 	log(L_INFO "Started");
 	DBG("Entering I/O loop.\n");
 
-	io_loop();
+	uloop_run();
+	uloop_done();
+
 	bug("I/O loop died");
 }

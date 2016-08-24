@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include "lib/resource.h"
+#include "libubox/uloop.h"
 
 typedef time_t bird_clock_t;	/* Use instead of time_t */
 
@@ -23,6 +24,7 @@ struct timer {
 	unsigned recurrent;	/* Timer recurrence */
 	struct list_head n;		/* Internal link */
 	bird_clock_t expires;	/* 0=inactive */
+	struct uloop_timeout timeout;
 };
 
 struct timer *tm_new(struct pool *);

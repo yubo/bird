@@ -47,12 +47,13 @@ struct birdsock {
 
 	int af;			/* Address family (AF_INET, AF_INET6 or 0 for non-IP) of fd */
 	int fd;			/* System-dependent data */
-	int index;		/* Index in poll struct buffer */
+//	int index;		/* Index in poll struct buffer */
 	int rcv_ttl;		/* TTL of last received datagram */
 	struct list_head n;
 	void *rbuf_alloc, *tbuf_alloc;
 	char *password;		/* Password for MD5 authentication */
 	char *err;		/* Error message */
+	struct uloop_fd sock;
 };
 
 struct birdsock *sock_new(struct pool *);	/* Allocate new socket */
@@ -106,7 +107,7 @@ extern int sk_priority_control;	/* Suggested priority for control traffic, shoul
 #define SKF_BIND	0x10	/* Bind datagram socket to given source address */
 #define SKF_HIGH_PORT	0x20	/* Choose port from high range if possible */
 
-#define SKF_THREAD	0x100	/* Socked used in thread, Do not add to main loop */
+//#define SKF_THREAD	0x100	/* Socked used in thread, Do not add to main loop */
 #define SKF_TRUNCATED	0x200	/* Received packet was truncated, set by IO layer */
 #define SKF_HDRINCL	0x400	/* Used internally */
 #define SKF_PKTINFO	0x800	/* Used internally */
@@ -116,7 +117,7 @@ extern int sk_priority_control;	/* Suggested priority for control traffic, shoul
  */
 
 #define SK_TCP_PASSIVE	0	/* ?  *  -  -  -  ?   -      */
-#define SK_TCP_ACTIVE	1	/* ?  ?  *  *  -  ?   -      */
+//#define SK_TCP_ACTIVE	1	/* ?  ?  *  *  -  ?   -      */
 #define SK_TCP		2
 #define SK_UDP		3	/* ?  ?  ?  ?  ?  ?   ?      */
 #define SK_IP		5	/* ?  -  ?  *  ?  ?   ?      */

@@ -6,14 +6,12 @@
  *	Can be freely distributed and used under the terms of the GNU GPL.
  */
 
-
 #ifndef HAVE_STRUCT_IP_MREQN
 /* Several versions of glibc don't define this structure, so we have to do it ourselves */
-struct ip_mreqn
-{
-  struct in_addr imr_multiaddr;			/* IP multicast address of group */
-  struct in_addr imr_address;			/* local IP address of interface */
-  int		 imr_ifindex;			/* Interface index */
+struct ip_mreqn {
+	struct in_addr imr_multiaddr;	/* IP multicast address of group */
+	struct in_addr imr_address;	/* local IP address of interface */
+	int imr_ifindex;	/* Interface index */
 };
 #endif
 
@@ -29,26 +27,23 @@ struct ip_mreqn
 #define IPV6_MINHOPCOUNT 73
 #endif
 
-
 #ifndef TCP_MD5SIG
 
 #define TCP_MD5SIG  14
 #define TCP_MD5SIG_MAXKEYLEN 80
 
 struct tcp_md5sig {
-  struct  sockaddr_storage tcpm_addr;             /* address associated */
-  u16   __tcpm_pad1;                              /* zero */
-  u16   tcpm_keylen;                              /* key length */
-  u32   __tcpm_pad2;                              /* zero */
-  u8    tcpm_key[TCP_MD5SIG_MAXKEYLEN];           /* key (binary) */
+	struct sockaddr_storage tcpm_addr;	/* address associated */
+	u16 __tcpm_pad1;	/* zero */
+	u16 tcpm_keylen;	/* key length */
+	u32 __tcpm_pad2;	/* zero */
+	u8 tcpm_key[TCP_MD5SIG_MAXKEYLEN];	/* key (binary) */
 };
 
 #endif
 
-
 /* Linux does not care if sa_len is larger than needed */
 #define SA_LEN(x) sizeof(struct sockaddr_bird)
-
 
 /*
  *	Linux IPv4 multicast syscalls
@@ -57,48 +52,44 @@ struct tcp_md5sig {
 #define INIT_MREQ4(maddr,ifa) \
   { .imr_multiaddr = ipa_to_in4(maddr), .imr_ifindex = ifa->index }
 
-static inline int
-sk_setup_multicast4(struct birdsock *s)
+static inline int sk_setup_multicast4(struct birdsock *s)
 {
-  struct ip_mreqn mr = { .imr_ifindex = s->iface->index };
-  int ttl = s->ttl;
-  int n = 0;
+	struct ip_mreqn mr = {.imr_ifindex = s->iface->index };
+	int ttl = s->ttl;
+	int n = 0;
 
-  /* This defines where should we send _outgoing_ multicasts */
-  if (setsockopt(s->fd, SOL_IP, IP_MULTICAST_IF, &mr, sizeof(mr)) < 0)
-    ERR("IP_MULTICAST_IF");
+	/* This defines where should we send _outgoing_ multicasts */
+	if (setsockopt(s->fd, SOL_IP, IP_MULTICAST_IF, &mr, sizeof(mr)) < 0)
+		ERR("IP_MULTICAST_IF");
 
-  if (setsockopt(s->fd, SOL_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
-    ERR("IP_MULTICAST_TTL");
+	if (setsockopt(s->fd, SOL_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
+		ERR("IP_MULTICAST_TTL");
 
-  if (setsockopt(s->fd, SOL_IP, IP_MULTICAST_LOOP, &n, sizeof(n)) < 0)
-    ERR("IP_MULTICAST_LOOP");
+	if (setsockopt(s->fd, SOL_IP, IP_MULTICAST_LOOP, &n, sizeof(n)) < 0)
+		ERR("IP_MULTICAST_LOOP");
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_join_group4(struct birdsock *s, ip_addr maddr)
+static inline int sk_join_group4(struct birdsock *s, ip_addr maddr)
 {
-  struct ip_mreqn mr = INIT_MREQ4(maddr, s->iface);
+	struct ip_mreqn mr = INIT_MREQ4(maddr, s->iface);
 
-  if (setsockopt(s->fd, SOL_IP, IP_ADD_MEMBERSHIP, &mr, sizeof(mr)) < 0)
-    ERR("IP_ADD_MEMBERSHIP");
+	if (setsockopt(s->fd, SOL_IP, IP_ADD_MEMBERSHIP, &mr, sizeof(mr)) < 0)
+		ERR("IP_ADD_MEMBERSHIP");
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_leave_group4(struct birdsock *s, ip_addr maddr)
+static inline int sk_leave_group4(struct birdsock *s, ip_addr maddr)
 {
-  struct ip_mreqn mr = INIT_MREQ4(maddr, s->iface);
+	struct ip_mreqn mr = INIT_MREQ4(maddr, s->iface);
 
-  if (setsockopt(s->fd, SOL_IP, IP_DROP_MEMBERSHIP, &mr, sizeof(mr)) < 0)
-    ERR("IP_DROP_MEMBERSHIP");
+	if (setsockopt(s->fd, SOL_IP, IP_DROP_MEMBERSHIP, &mr, sizeof(mr)) < 0)
+		ERR("IP_DROP_MEMBERSHIP");
 
-  return 0;
+	return 0;
 }
-
 
 /*
  *	Linux IPv4 packet control messages
@@ -109,163 +100,154 @@ sk_leave_group4(struct birdsock *s, ip_addr maddr)
 #define CMSG4_SPACE_PKTINFO CMSG_SPACE(sizeof(struct in_pktinfo))
 #define CMSG4_SPACE_TTL CMSG_SPACE(sizeof(int))
 
-static inline int
-sk_request_cmsg4_pktinfo(struct birdsock *s)
+static inline int sk_request_cmsg4_pktinfo(struct birdsock *s)
 {
-  int y = 1;
+	int y = 1;
 
-  if (setsockopt(s->fd, SOL_IP, IP_PKTINFO, &y, sizeof(y)) < 0)
-    ERR("IP_PKTINFO");
+	if (setsockopt(s->fd, SOL_IP, IP_PKTINFO, &y, sizeof(y)) < 0)
+		ERR("IP_PKTINFO");
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_request_cmsg4_ttl(struct birdsock *s)
+static inline int sk_request_cmsg4_ttl(struct birdsock *s)
 {
-  int y = 1;
+	int y = 1;
 
-  if (setsockopt(s->fd, SOL_IP, IP_RECVTTL, &y, sizeof(y)) < 0)
-    ERR("IP_RECVTTL");
+	if (setsockopt(s->fd, SOL_IP, IP_RECVTTL, &y, sizeof(y)) < 0)
+		ERR("IP_RECVTTL");
 
-  return 0;
+	return 0;
 }
 
 static inline void
 sk_process_cmsg4_pktinfo(struct birdsock *s, struct cmsghdr *cm)
 {
-  if (cm->cmsg_type == IP_PKTINFO)
-  {
-    struct in_pktinfo *pi = (struct in_pktinfo *) CMSG_DATA(cm);
-    s->laddr = ipa_from_in4(pi->ipi_addr);
-    s->lifindex = pi->ipi_ifindex;
-  }
+	if (cm->cmsg_type == IP_PKTINFO) {
+		struct in_pktinfo *pi = (struct in_pktinfo *)CMSG_DATA(cm);
+		s->laddr = ipa_from_in4(pi->ipi_addr);
+		s->lifindex = pi->ipi_ifindex;
+	}
+}
+
+static inline void sk_process_cmsg4_ttl(struct birdsock *s, struct cmsghdr *cm)
+{
+	if (cm->cmsg_type == IP_TTL)
+		s->rcv_ttl = *(int *)CMSG_DATA(cm);
 }
 
 static inline void
-sk_process_cmsg4_ttl(struct birdsock *s, struct cmsghdr *cm)
+sk_prepare_cmsgs4(struct birdsock *s, struct msghdr *msg, void *cbuf,
+		  size_t cbuflen)
 {
-  if (cm->cmsg_type == IP_TTL)
-    s->rcv_ttl = * (int *) CMSG_DATA(cm);
+	struct cmsghdr *cm;
+	struct in_pktinfo *pi;
+	int controllen = 0;
+
+	msg->msg_control = cbuf;
+	msg->msg_controllen = cbuflen;
+
+	cm = CMSG_FIRSTHDR(msg);
+	cm->cmsg_level = SOL_IP;
+	cm->cmsg_type = IP_PKTINFO;
+	cm->cmsg_len = CMSG_LEN(sizeof(*pi));
+	controllen += CMSG_SPACE(sizeof(*pi));
+
+	pi = (struct in_pktinfo *)CMSG_DATA(cm);
+	pi->ipi_ifindex = s->iface ? s->iface->index : 0;
+	pi->ipi_spec_dst = ipa_to_in4(s->saddr);
+	pi->ipi_addr = ipa_to_in4(IPA_NONE);
+
+	msg->msg_controllen = controllen;
 }
-
-static inline void
-sk_prepare_cmsgs4(struct birdsock *s, struct msghdr *msg, void *cbuf, size_t cbuflen)
-{
-  struct cmsghdr *cm;
-  struct in_pktinfo *pi;
-  int controllen = 0;
-
-  msg->msg_control = cbuf;
-  msg->msg_controllen = cbuflen;
-
-  cm = CMSG_FIRSTHDR(msg);
-  cm->cmsg_level = SOL_IP;
-  cm->cmsg_type = IP_PKTINFO;
-  cm->cmsg_len = CMSG_LEN(sizeof(*pi));
-  controllen += CMSG_SPACE(sizeof(*pi));
-
-  pi = (struct in_pktinfo *) CMSG_DATA(cm);
-  pi->ipi_ifindex = s->iface ? s->iface->index : 0;
-  pi->ipi_spec_dst = ipa_to_in4(s->saddr);
-  pi->ipi_addr = ipa_to_in4(IPA_NONE);
-
-  msg->msg_controllen = controllen;
-}
-
 
 /*
  *	Miscellaneous Linux socket syscalls
  */
 
 int
-sk_set_md5_auth(struct birdsock *s, ip_addr local UNUSED, ip_addr remote, struct iface *ifa, char *passwd, int setkey UNUSED)
+sk_set_md5_auth(struct birdsock *s, ip_addr local UNUSED, ip_addr remote,
+		struct iface *ifa, char *passwd, int setkey UNUSED)
 {
-  struct tcp_md5sig md5;
+	struct tcp_md5sig md5;
 
-  memset(&md5, 0, sizeof(md5));
-  sockaddr_fill((struct sockaddr_bird *) &md5.tcpm_addr, s->af, remote, ifa, 0);
+	memset(&md5, 0, sizeof(md5));
+	sockaddr_fill((struct sockaddr_bird *)&md5.tcpm_addr, s->af, remote,
+		      ifa, 0);
 
-  if (passwd)
-  {
-    int len = strlen(passwd);
+	if (passwd) {
+		int len = strlen(passwd);
 
-    if (len > TCP_MD5SIG_MAXKEYLEN)
-      ERR_MSG("The password for TCP MD5 Signature is too long");
+		if (len > TCP_MD5SIG_MAXKEYLEN)
+			ERR_MSG
+			    ("The password for TCP MD5 Signature is too long");
 
-    md5.tcpm_keylen = len;
-    memcpy(&md5.tcpm_key, passwd, len);
-  }
+		md5.tcpm_keylen = len;
+		memcpy(&md5.tcpm_key, passwd, len);
+	}
 
-  if (setsockopt(s->fd, SOL_TCP, TCP_MD5SIG, &md5, sizeof(md5)) < 0)
-  {
-    if (errno == ENOPROTOOPT)
-      ERR_MSG("Kernel does not support TCP MD5 signatures");
-    else
-      ERR("TCP_MD5SIG");
-  }
+	if (setsockopt(s->fd, SOL_TCP, TCP_MD5SIG, &md5, sizeof(md5)) < 0) {
+		if (errno == ENOPROTOOPT)
+			ERR_MSG("Kernel does not support TCP MD5 signatures");
+		else
+			ERR("TCP_MD5SIG");
+	}
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_set_min_ttl4(struct birdsock *s, int ttl)
+static inline int sk_set_min_ttl4(struct birdsock *s, int ttl)
 {
-  if (setsockopt(s->fd, SOL_IP, IP_MINTTL, &ttl, sizeof(ttl)) < 0)
-  {
-    if (errno == ENOPROTOOPT)
-      ERR_MSG("Kernel does not support IPv4 TTL security");
-    else
-      ERR("IP_MINTTL");
-  }
+	if (setsockopt(s->fd, SOL_IP, IP_MINTTL, &ttl, sizeof(ttl)) < 0) {
+		if (errno == ENOPROTOOPT)
+			ERR_MSG("Kernel does not support IPv4 TTL security");
+		else
+			ERR("IP_MINTTL");
+	}
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_set_min_ttl6(struct birdsock *s, int ttl)
+static inline int sk_set_min_ttl6(struct birdsock *s, int ttl)
 {
-  if (setsockopt(s->fd, SOL_IPV6, IPV6_MINHOPCOUNT, &ttl, sizeof(ttl)) < 0)
-  {
-    if (errno == ENOPROTOOPT)
-      ERR_MSG("Kernel does not support IPv6 TTL security");
-    else
-      ERR("IPV6_MINHOPCOUNT");
-  }
+	if (setsockopt(s->fd, SOL_IPV6, IPV6_MINHOPCOUNT, &ttl, sizeof(ttl)) <
+	    0) {
+		if (errno == ENOPROTOOPT)
+			ERR_MSG("Kernel does not support IPv6 TTL security");
+		else
+			ERR("IPV6_MINHOPCOUNT");
+	}
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_disable_mtu_disc4(struct birdsock *s)
+static inline int sk_disable_mtu_disc4(struct birdsock *s)
 {
-  int dont = IP_PMTUDISC_DONT;
+	int dont = IP_PMTUDISC_DONT;
 
-  if (setsockopt(s->fd, SOL_IP, IP_MTU_DISCOVER, &dont, sizeof(dont)) < 0)
-    ERR("IP_MTU_DISCOVER");
+	if (setsockopt(s->fd, SOL_IP, IP_MTU_DISCOVER, &dont, sizeof(dont)) < 0)
+		ERR("IP_MTU_DISCOVER");
 
-  return 0;
+	return 0;
 }
 
-static inline int
-sk_disable_mtu_disc6(struct birdsock *s)
+static inline int sk_disable_mtu_disc6(struct birdsock *s)
 {
-  int dont = IPV6_PMTUDISC_DONT;
+	int dont = IPV6_PMTUDISC_DONT;
 
-  if (setsockopt(s->fd, SOL_IPV6, IPV6_MTU_DISCOVER, &dont, sizeof(dont)) < 0)
-    ERR("IPV6_MTU_DISCOVER");
+	if (setsockopt(s->fd, SOL_IPV6, IPV6_MTU_DISCOVER, &dont, sizeof(dont))
+	    < 0)
+		ERR("IPV6_MTU_DISCOVER");
 
-  return 0;
+	return 0;
 }
 
 int sk_priority_control = 7;
 
-static inline int
-sk_set_priority(struct birdsock *s, int prio)
+static inline int sk_set_priority(struct birdsock *s, int prio)
 {
-  if (setsockopt(s->fd, SOL_SOCKET, SO_PRIORITY, &prio, sizeof(prio)) < 0)
-    ERR("SO_PRIORITY");
+	if (setsockopt(s->fd, SOL_SOCKET, SO_PRIORITY, &prio, sizeof(prio)) < 0)
+		ERR("SO_PRIORITY");
 
-  return 0;
+	return 0;
 }
-

@@ -40,6 +40,9 @@
 
 #include "lib/unix.h"
 #include "lib/sysio.h"
+#include "conf/conf.h"
+
+#include "libubox/usock.h"
 
 /* Maximum number of calls of tx handler for one socket in one
  * poll iteration. Should be small enough to not monopolize CPU by
@@ -51,6 +54,29 @@
    iteration. RX callbacks are often much more costly so we limit
    this to gen small latencies */
 #define MAX_RX_STEPS 4
+
+#define HAVE_UBOX
+#define EVENT_LOOPTIME 1000 /* ms */
+
+#define EVENT_LOG_LENGTH 32
+
+
+static int sk_read(struct birdsock *s, int revents);
+static int sk_write(struct birdsock *s);
+void io_log_event(void *hook, void *data);
+
+struct event_log_entry {
+	void *hook;
+	void *data;
+	btime timestamp;
+	btime duration;
+};
+
+static struct event_log_entry event_log[EVENT_LOG_LENGTH];
+static struct event_log_entry *event_open;
+static int event_log_pos, event_log_num;
+static btime last_time;
+
 
 /*
  *	Tracked Files
@@ -115,28 +141,9 @@ void *tracked_fopen(struct pool *p, char *name, char *mode)
  * for the other fields see |timer.h|.
  */
 
-#define NEAR_TIMER_LIMIT 4
-
-static struct list_head near_timers, far_timers;
-static bird_clock_t first_far_timer = TIME_INFINITY;
-
-/* now must be different from 0, because 0 is a special value in timer->expires */
 bird_clock_t now = 1, now_real, boot_time;
 
-static void update_times_plain(void)
-{
-	bird_clock_t new_time = time(NULL);
-	int delta = new_time - now_real;
-
-	if ((delta >= 0) && (delta < 60))
-		now += delta;
-	else if (now_real != 0)
-		log(L_WARN "Time jump, delta %d s", delta);
-
-	now_real = new_time;
-}
-
-static void update_times_gettime(void)
+static inline void update_times(void)
 {
 	struct timespec ts;
 	int rv;
@@ -145,6 +152,7 @@ static void update_times_gettime(void)
 	if (rv != 0)
 		die("clock_gettime: %m");
 
+
 	if (ts.tv_sec != now) {
 		if (ts.tv_sec < now)
 			log(L_ERR "Monotonic struct timer is broken");
@@ -152,24 +160,18 @@ static void update_times_gettime(void)
 		now = ts.tv_sec;
 		now_real = time(NULL);
 	}
-}
 
-static int clock_monotonic_available;
+	last_time = ((s64) ts.tv_sec S) + (ts.tv_nsec / 1000);
+	if (event_open) {
+		event_open->duration = last_time - event_open->timestamp;
 
-static inline void update_times(void)
-{
-	if (clock_monotonic_available)
-		update_times_gettime();
-	else
-		update_times_plain();
-}
+		if (event_open->duration > config->latency_limit)
+			log(L_WARN "Event 0x%p 0x%p took %d ms",
+			    event_open->hook, event_open->data,
+			    (int)(event_open->duration TO_MS));
 
-static inline void init_times(void)
-{
-	struct timespec ts;
-	clock_monotonic_available = (clock_gettime(CLOCK_MONOTONIC, &ts) == 0);
-	if (!clock_monotonic_available)
-		log(L_WARN "Monotonic struct timer is missing");
+		event_open = NULL;
+	}
 }
 
 static void tm_free(struct resource *r)
@@ -217,18 +219,17 @@ struct timer *tm_new(struct pool *p)
 	return t;
 }
 
-static inline void tm_insert_near(struct timer *t)
+static void tm_cb(struct uloop_timeout *timeout)
 {
-	/*struct list_head *n = near_timers.next;
+	struct timer *t = container_of(timeout, struct timer, timeout);
 
-	while (n->next && (container_of(n, struct timer, n)->expires < t->expires))
-		 n = n->next;*/
+	update_times();
 
-	struct timer *p;
-	list_for_each_entry(p, &near_timers, n)
-		if(p->expires >= t->expires)
-			break;
-	list_add(&t->n, p->n.prev);
+	if (t->recurrent){
+		uloop_timeout_set(&t->timeout, t->recurrent * 1000);
+	}
+	io_log_event(t->hook, t->data);
+	t->hook(t);
 }
 
 /**
@@ -250,23 +251,8 @@ static inline void tm_insert_near(struct timer *t)
  */
 void tm_start(struct timer *t, unsigned after)
 {
-	bird_clock_t when;
-
-	if (t->randomize)
-		after += random() % (t->randomize + 1);
-	when = now + after;
-	if (t->expires == when)
-		return;
-	if (t->expires)
-		list_del_init(&t->n);
-	t->expires = when;
-	if (after <= NEAR_TIMER_LIMIT)
-		tm_insert_near(t);
-	else {
-		if (!first_far_timer || first_far_timer > when)
-			first_far_timer = when;
-		list_add_tail(&t->n, &far_timers);
-	}
+	uloop_timeout_set(&t->timeout, after * 1000);
+	t->timeout.cb = tm_cb;
 }
 
 /**
@@ -278,78 +264,14 @@ void tm_start(struct timer *t, unsigned after)
  */
 void tm_stop(struct timer *t)
 {
-	if (t->expires) {
-		list_del_init(&t->n);
-		t->expires = 0;
-	}
-}
-
-static void tm_dump_them(char *name, struct list_head *l)
-{
-	struct list_head *n;
-	struct timer *t;
-
-	debug("%s timers:\n", name);
-	list_for_each(n, l) {
-		t = container_of(n, struct timer, n);
-		debug("%p ", t);
-		tm_dump(&t->r);
-	}
-	debug("\n");
+	uloop_timeout_cancel(&t->timeout);
 }
 
 void tm_dump_all(void)
 {
-	tm_dump_them("Near", &near_timers);
-	tm_dump_them("Far", &far_timers);
+	debug("not support\n");
 }
 
-static inline time_t tm_first_shot(void)
-{
-	time_t x = first_far_timer;
-
-	if (!list_empty(&near_timers)) {
-		struct timer *t = container_of(near_timers.next, struct timer, n);
-		if (t->expires < x)
-			x = t->expires;
-	}
-	return x;
-}
-
-void io_log_event(void *hook, void *data);
-
-static void tm_shot(void)
-{
-	struct timer *t, *n;
-
-	if (first_far_timer <= now) {
-		bird_clock_t limit = now + NEAR_TIMER_LIMIT;
-		first_far_timer = TIME_INFINITY;
-		list_for_each_entry_safe(t, n, &far_timers, n) {
-			if (t->expires <= limit) {
-				list_del_init(&t->n);
-				tm_insert_near(t);
-			} else if (t->expires < first_far_timer)
-				first_far_timer = t->expires;
-		}
-	}
-	list_for_each_entry_safe(t, n, &near_timers, n){
-		int delay;
-		if (t->expires > now)
-			break;
-		list_del_init(&t->n);
-		delay = t->expires - now;
-		t->expires = 0;
-		if (t->recurrent) {
-			int i = t->recurrent - delay;
-			if (i < 0)
-				i = 0;
-			tm_start(t, i);
-		}
-		io_log_event(t->hook, t->data);
-		t->hook(t);
-	}
-}
 
 /**
  * tm_parse_datetime - parse a date and time
@@ -417,7 +339,6 @@ static void tm_format_reltime(char *x, struct tm *tm, bird_clock_t delta)
 		bsprintf(x, "%d", tm->tm_year + 1900);
 }
 
-#include "conf/conf.h"
 
 /**
  * tm_format_datetime - convert date and time to textual representation
@@ -480,9 +401,9 @@ void tm_format_datetime(char *x, struct timeformat *fmt_spec, bird_clock_t t)
 
 static inline int sockaddr_length(int af)
 {
-	return (af ==
-		AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct
-							       sockaddr_in6);
+	return (af == AF_INET)
+		? sizeof(struct sockaddr_in)
+		: sizeof(struct sockaddr_in6);
 }
 
 static inline void
@@ -988,17 +909,15 @@ void sk_log_error(struct birdsock *s, const char *p)
  *	Actual struct birdsock code
  */
 
-static struct list_head sock_list;
-static struct birdsock *current_sock;
-static struct birdsock *stored_sock;
-
+//static struct list_head sock_list;
+/*
 static inline struct birdsock *sk_next(struct birdsock *s)
 {
 	if (list_is_last(&s->n, &sock_list))
 		return NULL;
 	else
 		return container_of(s->n.next, struct birdsock, n);
-}
+}*/
 
 static void sk_alloc_bufs(struct birdsock *s)
 {
@@ -1027,19 +946,9 @@ static void sk_free(struct resource *r)
 	struct birdsock *s = (struct birdsock *)r;
 
 	sk_free_bufs(s);
-	if (s->fd >= 0) {
-		close(s->fd);
-
-		/* FIXME: we should call sk_stop() for SKF_THREAD sockets */
-		if (s->flags & SKF_THREAD)
-			return;
-
-		if (s == current_sock)
-			current_sock = sk_next(s);
-		if (s == stored_sock)
-			stored_sock = sk_next(s);
-		list_del_init(&s->n);
-	}
+	if (s->sock.fd >= 0)
+		close(s->sock.fd);
+	uloop_fd_delete(&s->sock);
 }
 
 void sk_set_rbsize(struct birdsock *s, uint val)
@@ -1221,23 +1130,61 @@ static int sk_setup(struct birdsock *s)
 	return 0;
 }
 
-static void sk_insert(struct birdsock *s)
+static void sk_cb(struct uloop_fd *sock, unsigned int events)
 {
-	list_add_tail(&s->n, &sock_list);
+	int e;
+	int steps;
+	struct birdsock *s;
+
+	s = container_of(sock, struct birdsock, sock);
+	steps = MAX_STEPS;
+	update_times();
+
+	log(L_ERR "events: 0x%x", events);
+
+	if ((events & ULOOP_READ) && s->rx_hook){
+		do {
+			steps--;
+			io_log_event(s->rx_hook, s->data);
+			e = sk_read(s, events);
+		} while (e && s->rx_hook && steps);
+	}
+
+	steps = MAX_STEPS;
+	if ((events & ULOOP_WRITE) && s->tx_hook){
+		do {
+			steps--;
+			io_log_event(s->tx_hook, s->data);
+			e = sk_write(s);
+		} while (e && steps);
+	}
+
 }
 
-static void sk_tcp_connected(struct birdsock *s)
+static void sk_insert(struct birdsock *s)
 {
-	struct sockaddr_bird sa;
-	int sa_len = sizeof(sa);
+	int ret;
+	unsigned int flags = 0;
 
-	if ((getsockname(s->fd, &sa.sa, &sa_len) < 0) ||
-	    (sockaddr_read(&sa, s->af, &s->saddr, &s->iface, &s->sport) < 0))
-		log(L_WARN "SOCK: Cannot get local IP address for TCP>");
+	if (s->rx_hook){
+		flags |= ULOOP_READ;
+	}
+	if (s->tx_hook && s->ttx != s->tpos){
+		flags |= ULOOP_WRITE;
+	}
 
-	s->type = SK_TCP;
-	sk_alloc_bufs(s);
-	s->tx_hook(s);
+	if (flags){
+		s->sock.cb = sk_cb;
+		s->sock.fd = s->fd;
+		ret = uloop_fd_add(&s->sock,
+				flags | ULOOP_EDGE_TRIGGER
+				| USOCK_NOCLOEXEC);
+		if (ret == -1){
+			log(L_ERR "uloop_fd_add fd %d error(%d:%s)",
+					s->sock.fd, errno, strerror(errno));
+			s->err_hook(s, errno);
+		}
+	}
 }
 
 static int sk_passive_connected(struct birdsock *s, int type)
@@ -1312,8 +1259,8 @@ int sk_open(struct birdsock *s)
 	struct sockaddr_bird sa;
 
 	switch (s->type) {
-	case SK_TCP_ACTIVE:
-		s->ttx = "";	/* Force s->ttx != s->tpos */
+	//case SK_TCP_ACTIVE:
+	//	s->ttx = "";	/* Force s->ttx != s->tpos */
 		/* Fall thru */
 	case SK_TCP_PASSIVE:
 		fd = socket(af, SOCK_STREAM, IPPROTO_TCP);
@@ -1359,18 +1306,17 @@ int sk_open(struct birdsock *s)
 		if (bind_port) {
 			int y = 1;
 
-			if (setsockopt
-			    (fd, SOL_SOCKET, SO_REUSEADDR, &y, sizeof(y)) < 0)
+			if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &y,
+						sizeof(y)) < 0)
 				ERR2("SO_REUSEADDR");
 
 #ifdef CONFIG_NO_IFACE_BIND
 			/* Workaround missing ability to bind to an iface */
 			if ((s->type == SK_UDP) && s->iface &&
-					ipa_zero(bind_addr)) {
+					ipa_zero(bind_addr))
 				if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT,
 							&y, sizeof(y)) < 0)
 					ERR2("SO_REUSEPORT");
-			}
 #endif
 		} else if (s->flags & SKF_HIGH_PORT)
 			if (sk_set_high_port(s) < 0)
@@ -1382,21 +1328,11 @@ int sk_open(struct birdsock *s)
 	}
 
 	if (s->password)
-		if (sk_set_md5_auth
-		    (s, s->saddr, s->daddr, s->iface, s->password, 0) < 0)
+		if (sk_set_md5_auth(s, s->saddr, s->daddr, s->iface,
+					s->password, 0) < 0)
 			goto err;
 
 	switch (s->type) {
-	case SK_TCP_ACTIVE:
-		sockaddr_fill(&sa, af, s->daddr, s->iface, s->dport);
-		if (connect(fd, &sa.sa, SA_LEN(sa)) >= 0)
-			sk_tcp_connected(s);
-		else if (errno != EINTR && errno != EAGAIN
-			 && errno != EINPROGRESS && errno != ECONNREFUSED
-			 && errno != EHOSTUNREACH && errno != ENETUNREACH)
-			ERR2("connect");
-		break;
-
 	case SK_TCP_PASSIVE:
 		if (listen(fd, 8) < 0)
 			ERR2("listen");
@@ -1409,8 +1345,7 @@ int sk_open(struct birdsock *s)
 		sk_alloc_bufs(s);
 	}
 
-	if (!(s->flags & SKF_THREAD))
-		sk_insert(s);
+	sk_insert(s);
 	return 0;
 
 err:
@@ -1430,8 +1365,8 @@ int sk_open_unix(struct birdsock *s, char *name)
 	if (fd < 0)
 		return -1;
 
-	if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
-		return -1;
+	/*if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
+		return -1;*/
 
 	/* Path length checked in test_old_bird() */
 	sa.sun_family = AF_UNIX;
@@ -1683,7 +1618,7 @@ sk_send_full(struct birdsock *s, unsigned len, struct iface *ifa,
 
  /* sk_read() and sk_write() are called from BFD's struct event loop */
 
-int sk_read(struct birdsock *s, int revents)
+static int sk_read(struct birdsock *s, int revents)
 {
 	int c;
 
@@ -1713,8 +1648,7 @@ int sk_read(struct birdsock *s, int revents)
 			s->rpos += c;
 			if (s->rx_hook(s, s->rpos - s->rbuf)) {
 				/* We need to be careful since the socket could have been deleted by the hook */
-				if (current_sock == s)
-					s->rpos = s->rbuf;
+				s->rpos = s->rbuf;
 			}
 			return 1;
 		}
@@ -1738,29 +1672,14 @@ int sk_read(struct birdsock *s, int revents)
 	}
 }
 
-int sk_write(struct birdsock *s)
+static int sk_write(struct birdsock *s)
 {
-	struct sockaddr_bird sa;
-	switch (s->type) {
-	case SK_TCP_ACTIVE:
-		sockaddr_fill(&sa, s->af, s->daddr, s->iface, s->dport);
-
-		if (connect(s->fd, &sa.sa, SA_LEN(sa)) >= 0
-		    || errno == EISCONN)
-			sk_tcp_connected(s);
-		else if (errno != EINTR && errno != EAGAIN
-			 && errno != EINPROGRESS)
-			s->err_hook(s, errno);
-		return 0;
-
-	default:
-		if (s->ttx != s->tpos && sk_maybe_write(s) > 0) {
-			if (s->tx_hook)
-				s->tx_hook(s);
-			return 1;
-		}
-		return 0;
+	if (s->ttx != s->tpos && sk_maybe_write(s) > 0) {
+		if (s->tx_hook)
+			s->tx_hook(s);
+		return 1;
 	}
+	return 0;
 }
 
 void sk_err(struct birdsock *s, int revents)
@@ -1777,66 +1696,13 @@ void sk_err(struct birdsock *s, int revents)
 
 void sk_dump_all(void)
 {
-	struct birdsock *s;
-
-	debug("Open sockets:\n");
-	list_for_each_entry(s, &sock_list, n) {
-		debug("%p ", s);
-		sk_dump(&s->r);
-	}
-	debug("\n");
+	debug("Open sockets: not support\n");
 }
 
 /*
  *	Internal struct event log and watchdog
  */
 
-#define EVENT_LOG_LENGTH 32
-
-struct event_log_entry {
-	void *hook;
-	void *data;
-	btime timestamp;
-	btime duration;
-};
-
-static struct event_log_entry event_log[EVENT_LOG_LENGTH];
-static struct event_log_entry *event_open;
-static int event_log_pos, event_log_num, watchdog_active;
-static btime last_time;
-static btime loop_time;
-
-static void io_update_time(void)
-{
-	struct timespec ts;
-	int rv;
-
-	if (!clock_monotonic_available)
-		return;
-
-	/*
-	 * This is third time-tracking procedure (after update_times() above and
-	 * times_update() in BFD), dedicated to internal struct event log and latency
-	 * tracking. Hopefully, we consolidate these sometimes.
-	 */
-
-	rv = clock_gettime(CLOCK_MONOTONIC, &ts);
-	if (rv < 0)
-		die("clock_gettime: %m");
-
-	last_time = ((s64) ts.tv_sec S) + (ts.tv_nsec / 1000);
-
-	if (event_open) {
-		event_open->duration = last_time - event_open->timestamp;
-
-		if (event_open->duration > config->latency_limit)
-			log(L_WARN "Event 0x%p 0x%p took %d ms",
-			    event_open->hook, event_open->data,
-			    (int)(event_open->duration TO_MS));
-
-		event_open = NULL;
-	}
-}
 
 /**
  * io_log_event - mark approaching struct event into struct event log
@@ -1849,9 +1715,6 @@ static void io_update_time(void)
  */
 void io_log_event(void *hook, void *data)
 {
-	if (config->latency_debug)
-		io_update_time();
-
 	struct event_log_entry *en = event_log + event_log_pos;
 
 	en->hook = hook;
@@ -1866,73 +1729,6 @@ void io_log_event(void *hook, void *data)
 	event_open = config->latency_debug ? en : NULL;
 }
 
-static inline void io_close_event(void)
-{
-	if (event_open)
-		io_update_time();
-}
-
-void io_log_dump(void)
-{
-	struct event_log_entry *en;
-	int i;
-
-	log(L_DEBUG "Event log:");
-	for (i = 0; i < EVENT_LOG_LENGTH; i++) {
-		en = event_log + (event_log_pos + i) % EVENT_LOG_LENGTH;
-		if (en->hook)
-			log(L_DEBUG "  Event 0x%p 0x%p at %8d for %d ms",
-			    en->hook, en->data,
-			    (int)((last_time - en->timestamp) TO_MS),
-			    (int)(en->duration TO_MS));
-	}
-}
-
-void watchdog_sigalrm(int sig UNUSED)
-{
-	/* Update last_time and duration, but skip latency check */
-	config->latency_limit = 0xffffffff;
-	io_update_time();
-
-	/* We want core dump */
-	abort();
-}
-
-static inline void watchdog_start1(void)
-{
-	io_update_time();
-
-	loop_time = last_time;
-}
-
-static inline void watchdog_start(void)
-{
-	io_update_time();
-
-	loop_time = last_time;
-	event_log_num = 0;
-
-	if (config->watchdog_timeout) {
-		alarm(config->watchdog_timeout);
-		watchdog_active = 1;
-	}
-}
-
-static inline void watchdog_stop(void)
-{
-	io_update_time();
-
-	if (watchdog_active) {
-		alarm(0);
-		watchdog_active = 0;
-	}
-
-	btime duration = last_time - loop_time;
-	if (duration > config->watchdog_warning)
-		log(L_WARN "I/O loop cycle took %d ms for %d events",
-		    (int)(duration TO_MS), event_log_num);
-}
-
 /*
  *	Main I/O Loop
  */
@@ -1940,18 +1736,49 @@ static inline void watchdog_stop(void)
 volatile int async_config_flag;	/* Asynchronous reconfiguration/dump scheduled */
 volatile int async_dump_flag;
 
+#ifdef HAVE_UBOX
+static struct uloop_timeout event_timer;
+
+static void event_timer_cb(struct uloop_timeout *timeout)
+{
+	update_times();
+	uloop_timeout_set(timeout, EVENT_LOOPTIME);
+
+	ev_run_list(&global_event_list);
+
+	if (async_config_flag) {
+		io_log_event(async_config, NULL);
+		async_config();
+		async_config_flag = 0;
+	}
+
+	if (async_dump_flag) {
+		io_log_event(async_dump, NULL);
+		async_dump();
+		async_dump_flag = 0;
+	}
+
+	if (async_shutdown_flag) {
+		io_log_event(async_shutdown, NULL);
+		async_shutdown();
+		async_shutdown_flag = 0;
+	}
+}
+#endif
+
 void io_init(void)
 {
-	INIT_LIST_HEAD(&near_timers);
-	INIT_LIST_HEAD(&far_timers);
-	INIT_LIST_HEAD(&sock_list);
-	INIT_LIST_HEAD(&global_event_list);
 	krt_io_init();
-	init_times();
 	update_times();
-	boot_time = now;
-	srandom((int)now_real);
+
+	INIT_LIST_HEAD(&global_event_list);
+	event_timer.cb = event_timer_cb;
+	uloop_timeout_set(&event_timer, EVENT_LOOPTIME);
 }
+
+
+
+#if 0
 
 static int short_loops = 0;
 #define SHORT_LOOP_MAX 10
@@ -1969,15 +1796,7 @@ void io_loop(void)
 	for (;;) {
 		events = ev_run_list(&global_event_list);
 timers:
-		update_times();
-		tout = tm_first_shot();
-		if (tout <= now) {
-			tm_shot();
-			goto timers;
-		}
 		poll_tout = (events ? 0 : MIN(tout - now, 3)) * 1000;	/* Time in milliseconds */
-
-		io_close_event();
 
 		nfds = 0;
 		list_for_each_entry(s, &sock_list, n) {
@@ -2120,6 +1939,7 @@ next2:				;
 		}
 	}
 }
+#endif
 
 void test_old_bird(char *path)
 {

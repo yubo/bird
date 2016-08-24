@@ -5289,7 +5289,7 @@ yyreduce:
 
 	case 250:
 		{
-			io_log_dump();
+			//io_log_dump();
 			cli_msg(0, "");
 		}
 		break;

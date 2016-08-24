@@ -7,7 +7,7 @@
 #
 cmake_minimum_required(VERSION 2.6)
 
-add_definitions(-I${CMAKE_CURRENT_SOURCE_DIR})
+add_definitions(-I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR}/libubox/include)
 
 add_definitions(-pthread -Wall -Wstrict-prototypes -Wno-parentheses -Wno-pointer-sign -fno-strict-aliasing -fno-strict-overflow)
 
@@ -38,7 +38,8 @@ add_subdirectory(lib)
 add_subdirectory(nest)
 add_subdirectory(filter)
 add_subdirectory(proto)
+add_subdirectory(libubox)
 
 
 add_executable(bird main.c)
-target_link_libraries(bird bird-static nest-static conf-static proto-static filter-static rt)
+target_link_libraries(bird ubox-static bird-static nest-static conf-static proto-static filter-static rt)

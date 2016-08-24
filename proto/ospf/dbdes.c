@@ -133,13 +133,13 @@ static void ospf_prepare_dbdes(struct ospf_proto *p, struct ospf_neighbor *n)
 
 		ospf_dbdes_body(p, pkt, &lsas, &lsa_max);
 		//en = (void *)s_get(&(n->dbsi));
-		en = (void *)h_get(&(n->dbsi));
+		en = container_of(h_get(&n->dbsi), struct top_hash_entry, n);
 		h = en;
 
 
 		while (i < lsa_max) {
 			//if (!SNODE_VALID(en)) {
-			if (en == h) {
+			if (HLIST_NEXT(en) == h) {
 				n->myimms &= ~DBDES_M;	/* Unset More bit */
 				break;
 			}
@@ -266,7 +266,7 @@ ospf_process_dbdes(struct ospf_proto *p, struct ospf_packet *pkt,
 			}
 
 			//if (!SNODE_VALID(n->lsrqi))
-			if (n->lsrqi == (void *)&n->lsrql)
+			if (HLIST_NEXT(&n->lsrqi->n) == &n->lsrql)
 				n->lsrqi = req;
 
 			req->lsa = lsa;
