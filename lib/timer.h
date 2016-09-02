@@ -52,8 +52,9 @@ static inline void tm_start_max(struct timer * t, unsigned after)
 	tm_start(t, (rem > after) ? rem : after);
 }
 
-static inline struct timer *tm_new_set(struct pool *p, void (*hook) (struct timer *),
-				void *data, unsigned rand, unsigned rec)
+static inline struct timer *tm_new_set(struct pool *p,
+		void (*hook) (struct timer *), void *data, unsigned rand,
+		unsigned rec)
 {
 	struct timer *t = tm_new(p);
 	t->hook = hook;

@@ -235,9 +235,14 @@ struct proto_config *kif_init_config(int class)
 	if (kif_cf)
 		cf_error("Kernel device protocol already defined");
 
-	kif_cf =
-	    (struct kif_config *)proto_config_new(&proto_unix_iface, class);
+#ifdef HAVE_DPDK
+	kif_cf = (struct kif_config *)proto_config_new(&proto_dpdk_iface,
+			class);
+#else
+	kif_cf = (struct kif_config *)proto_config_new(&proto_unix_iface,
+			class);
 	kif_cf->scan_time = 60;
+#endif
 	INIT_LIST_HEAD(&kif_cf->primary);
 
 	kif_sys_init_config(kif_cf);
@@ -803,8 +808,8 @@ void krt_got_route_async(struct krt_proto *p, struct rte *e, int new)
 
 #ifdef CONFIG_ALL_TABLES_AT_ONCE
 
-static struct timer *krt_scan_timer;
-static int krt_scan_count;
+static struct timer *rt_scan_timer;
+static int rt_scan_count;
 
 static void krt_scan(struct timer *t UNUSED)
 {
@@ -826,28 +831,28 @@ static void krt_scan(struct timer *t UNUSED)
 
 static void krt_scan_timer_start(struct krt_proto *p)
 {
-	if (!krt_scan_count)
-		krt_scan_timer =
+	if (!rt_scan_count)
+		rt_scan_timer =
 		    tm_new_set(krt_pool, krt_scan, NULL, 0, KRT_CF->scan_time);
 
-	krt_scan_count++;
+	rt_scan_count++;
 
-	tm_start(krt_scan_timer, 1);
+	tm_start(rt_scan_timer, 1);
 }
 
 static void krt_scan_timer_stop(struct krt_proto *p)
 {
-	krt_scan_count--;
+	rt_scan_count--;
 
-	if (!krt_scan_count) {
-		rfree(krt_scan_timer);
-		krt_scan_timer = NULL;
+	if (!rt_scan_count) {
+		rfree(rt_scan_timer);
+		rt_scan_timer = NULL;
 	}
 }
 
 static void krt_scan_timer_kick(struct krt_proto *p UNUSED)
 {
-	tm_start(krt_scan_timer, 0);
+	tm_start(rt_scan_timer, 0);
 }
 
 #else
@@ -1109,8 +1114,8 @@ static void krt_postconfig(struct proto_config *C)
 
 #ifdef CONFIG_ALL_TABLES_AT_ONCE
 	if (krt_cf->scan_time != c->scan_time)
-		cf_error
-		    ("All kernel syncers must use the same table scan interval");
+		cf_error("All kernel syncers must use the "
+				"same table scan interval");
 #endif
 
 	if (C->table->krt_attached)
@@ -1127,10 +1132,14 @@ struct proto_config *krt_init_config(int class)
 		cf_error("Kernel protocol already defined");
 #endif
 
-	krt_cf =
-	    (struct krt_config *)proto_config_new(&proto_unix_kernel, class);
+#ifdef HAVE_DPDK
+	kif_cf = (struct kif_config *)proto_config_new(&proto_dpdk_kernel,
+			class);
+#else
+	kif_cf = (struct kif_config *)proto_config_new(&proto_unix_kernel,
+			class);
 	krt_cf->scan_time = 60;
-
+#endif
 	krt_sys_init_config(krt_cf);
 	return (struct proto_config *)krt_cf;
 }
@@ -1182,3 +1191,163 @@ struct protocol proto_unix_kernel = {
 	.dump_attrs = krt_dump_attrs,
 #endif
 };
+
+
+#ifdef HAVE_DPDK
+
+static struct proto *dpdk_if_init(struct proto_config *c)
+{
+	struct kif_proto *p = proto_new(c, sizeof(struct kif_proto));
+
+	return &p->p;
+}
+
+static int dpdk_if_start(struct proto *P)
+{
+	// dpdk_if_scan_timer mv to dpdk_rt_scan_timer
+	return PS_UP;
+}
+
+static int dpdk_if_shutdown(struct proto *P)
+{
+	return PS_DOWN;
+}
+
+struct protocol proto_dpdk_iface = {
+	.name = "Device",
+	.template = "device%d",
+	.preference = DEF_PREF_DIRECT,
+	.config_size = sizeof(struct kif_config),
+	.init = dpdk_if_init,
+	.start = dpdk_if_start,
+	.shutdown = dpdk_if_shutdown
+};
+
+static struct proto *dpdk_rt_init(struct proto_config *C)
+{
+	struct krt_proto *p = proto_new(C, sizeof(struct krt_proto));
+	struct krt_config *c = (struct krt_config *)C;
+
+	p->p.accept_ra_types = c->merge_paths ? RA_MERGED : RA_OPTIMAL;
+	p->p.merge_limit = c->merge_paths;
+	p->p.import_control = krt_import_control;
+	p->p.rt_notify = dpdk_rt_notify;
+	p->p.if_notify = dpdk_if_notify;
+	p->p.reload_routes = krt_reload_routes;
+	p->p.feed_end = krt_feed_end;
+	p->p.make_tmp_attrs = krt_make_tmp_attrs;
+	p->p.store_tmp_attrs = krt_store_tmp_attrs;
+	p->p.rte_same = krt_rte_same;
+
+	krt_sys_init(p);
+	return &p->p;
+}
+
+static void dpdk_if_scan(struct timer *t UNUSED)
+{
+	struct krt_proto *p;
+
+	KRT_TRACE(p, D_EVENTS, "Scanning interfaces");
+
+	if_start_update();
+	/* 
+	 * foreach if as ifs {
+	 * 	init_if
+	 * 	nl_parse_link(if)
+			ifi = if_update(&f);
+	 * }
+	 * for each addrs as addr {
+	 * 	init_if_addr
+	 * 	nl_parse_addr(addr)
+			ifa_update(&ifa);
+	 * }
+	 */
+
+	if_end_update();
+}
+
+static void dpdk_if_force_scan(void)
+{
+	dpdk_if_scan(kif_scan_timer);
+}
+
+static void dpdk_rt_scan(struct timer *t UNUSED)
+{
+	struct krt_proto *p;
+
+	dpdk_if_force_scan();
+
+	/* We need some struct list_head to decide whether to print the debug messages or not */
+	p = container_of(krt_proto_list.next, struct krt_proto, krt_node);
+	KRT_TRACE(p, D_EVENTS, "Scanning routing table");
+
+	/*
+	 * todo
+	 * foreach rt as rtu {
+	 * 	nl_parse_route(rt)
+	 * }
+	 */
+
+	struct krt_proto *q;
+	list_for_each_entry(q, &krt_proto_list, krt_node) {
+		krt_prune(p);
+	}
+}
+
+static void dpdk_rt_scan_timer_start(struct krt_proto *p)
+{
+	if (!rt_scan_count)
+		rt_scan_timer = tm_new_set(krt_pool, dpdk_rt_scan,
+				NULL, 0, 0);
+
+	rt_scan_count++;
+
+	tm_start(rt_scan_timer, 1);
+}
+
+
+static int dpdk_rt_start(struct proto *P)
+{
+	struct krt_proto *p = (struct krt_proto *)P;
+
+	list_add_tail( &p->krt_node,&krt_proto_list);
+
+	// setup route
+	dpdk_rt_scan_timer_start(p);
+
+	return PS_UP;
+}
+
+static int dpdk_rt_shutdown(struct proto *P)
+{
+	struct krt_proto *p = (struct krt_proto *)P;
+
+
+	p->ready = 0;
+	p->initialized = 0;
+
+	krt_sys_shutdown(p);
+	list_del_init(&p->krt_node);
+
+	return PS_DOWN;
+}
+
+struct protocol proto_dpdk_kernel = {
+	.name = "Dpdk",
+	.template = "dpdk%d",
+	.attr_class = EAP_KRT,
+	.preference = DEF_PREF_INHERITED,
+	.config_size = sizeof(struct krt_config),
+	.preconfig = krt_preconfig,
+	.postconfig = krt_postconfig,
+	.init = dpdk_rt_init,
+	.start = dpdk_rt_start,
+	.shutdown = dpdk_rt_shutdown,
+#ifdef KRT_ALLOW_LEARN
+	.dump = krt_dump,
+	.dump_attrs = krt_dump_attrs,
+#endif
+};
+
+
+#endif

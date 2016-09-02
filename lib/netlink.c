@@ -1347,9 +1347,8 @@ void krt_sys_copy_config(struct krt_config *d, struct krt_config *s)
 
 static const char *krt_metrics_names[KRT_METRICS_MAX] = {
 	NULL, "lock", "mtu", "window", "rtt", "rttvar", "sstresh", "cwnd",
-	    "advmss",
-	"reordering", "hoplimit", "initcwnd", "features", "rto_min", "initrwnd",
-	    "quickack"
+	"advmss", "reordering", "hoplimit", "initcwnd", "features", "rto_min",
+	"initrwnd", "quickack"
 };
 
 static const char *krt_features_names[KRT_FEATURES_MAX] = {

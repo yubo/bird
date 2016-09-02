@@ -40,6 +40,7 @@ struct kif_proto;
 /* krt.c */
 
 extern struct protocol proto_unix_kernel;
+extern struct protocol proto_dpdk;
 
 struct krt_config {
   struct proto_config c;

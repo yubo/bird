@@ -16,5 +16,7 @@ set args -c ./etc/bird.conf -d
 #b hello.c:295
 #b sk_insert
 #b sk_cb
-b config_commit
+#b config_commit
+#b cf-parse.tab.c:4229
+b krt_init_config
 run
