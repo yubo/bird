@@ -1,4 +1,6 @@
 file ./bin/bird
+#b dpdk_dump
+#b io.c:1282
 set args -c ./etc/bird.conf -d
 #b ospf_sk_open
 #b ospf_rx_hook
@@ -18,5 +20,13 @@ set args -c ./etc/bird.conf -d
 #b sk_cb
 #b config_commit
 #b cf-parse.tab.c:4229
-b krt_init_config
+#b krt_init_config
+#b socket
+#b setsockopt
+#b epoll_ctl
+#b ospf_rx_hook
+#b rte_update
+#b rt-table.c:270
+#b io.c:905
+b sk_setup_multicast4
 run

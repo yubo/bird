@@ -834,7 +834,7 @@ void protos_dump_all(void)
  */
 void proto_build(struct protocol *p)
 {
-	list_add_tail( &p->n,&protocol_list);
+	list_add_tail(&p->n, &protocol_list);
 	if (p->attr_class) {
 		ASSERT(!attr_class_to_protocol[p->attr_class]);
 		attr_class_to_protocol[p->attr_class] = p;
@@ -873,6 +873,9 @@ void protos_build(void)
 #endif
 #ifdef CONFIG_OSPF
 	proto_build(&proto_ospf);
+#endif
+#ifdef CONFIG_DPDK
+	proto_build(&proto_dpdk);
 #endif
 #ifdef CONFIG_PIPE
 	proto_build(&proto_pipe);

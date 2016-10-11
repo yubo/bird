@@ -534,4 +534,12 @@ struct prefix {
 	uint len;
 };
 
+struct ip_prefix {
+	ip_addr ip;	/* ip address of this host */
+	ip_addr prefix;	/* network prefix */
+	uint pxlen;	/* prefix length */
+	ip_addr brd;	/* broadcaast address */
+};
+
+
 #endif

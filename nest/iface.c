@@ -312,7 +312,7 @@ struct iface *if_update(struct iface *new)
 newif:
 	INIT_LIST_HEAD(&i->neighbors);
 	i->flags |= IF_UPDATED | IF_TMP_DOWN;	/* Tmp down as we don't have addresses yet */
-	list_add_tail( &i->n,&iface_list);
+	list_add_tail(&i->n, &iface_list);
 	return i;
 }
 
@@ -340,11 +340,11 @@ void if_end_update(void)
 	struct ifa *a, *b;
 
 	list_for_each_entry(i, &iface_list, n) {
-		if (!(i->flags & IF_UPDATED))
+		if (!(i->flags & IF_UPDATED)) {
 			if_change_flags(i,
-					(i->
-					 flags & ~IF_ADMIN_UP) | IF_SHUTDOWN);
-		else {
+					(i-> flags & ~IF_ADMIN_UP)
+					| IF_SHUTDOWN);
+		} else {
 			list_for_each_entry_safe(a, b, &i->addrs, n)
 			    if (!(a->flags & IF_UPDATED))
 				ifa_delete(a);

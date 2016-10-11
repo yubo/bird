@@ -523,6 +523,7 @@ ospf_iface_new(struct ospf_area *oa, struct ifa *addr,
 	struct ospf_iface *ifa;
 	struct pool *pool;
 
+log(L_TRACE "---------- ospf_iface_new %s", iface->name);
 	if (ospf_is_v3(p))
 		OSPF_TRACE(D_EVENTS, "Adding interface %s (IID %d) to area %R",
 			   iface->name, ip->instance_id, oa->areaid);
@@ -621,7 +622,7 @@ ospf_iface_new(struct ospf_area *oa, struct ifa *addr,
 		add_nbma_node(ifa, nb, 0);
 	}
 
-	list_add_tail( &ifa->n,&oa->po->iface_list);
+	list_add_tail(&ifa->n, &oa->po->iface_list);
 
 	struct object_lock *lock = olock_new(pool);
 	lock->addr = ospf_is_v2(p) ? ifa->addr->prefix : IPA_NONE;
@@ -1046,6 +1047,8 @@ void ospf_ifa_notify2(struct proto *P, uint flags, struct ifa *a)
 {
 	struct ospf_proto *p = (struct ospf_proto *)P;
 
+	DBG("ospf_ifa_notify2: ifa ip addr %I\n", a->ip.addr);
+
 	if (a->flags & IA_SECONDARY)
 		return;
 
@@ -1234,9 +1237,8 @@ ospf_iface_notify(struct ospf_proto *p, uint flags, struct ospf_iface *ifa)
 	}
 
 	if (flags & IF_CHANGE_LINK)
-		ospf_iface_sm(ifa,
-			      (ifa->iface->
-			       flags & IF_LINK_UP) ? ISM_UNLOOP : ISM_LOOP);
+		ospf_iface_sm(ifa, (ifa->iface->flags & IF_LINK_UP)
+				? ISM_UNLOOP : ISM_LOOP);
 
 	if (flags & IF_CHANGE_MTU)
 		ospf_iface_change_mtu(p, ifa);

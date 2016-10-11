@@ -1934,7 +1934,12 @@ again1:
 				e->net = ne;
 				e->pref = p->p.preference;
 
-				DBG("Mod struct rte type %d - %I/%d via %I on iface %s, met %d\n", a0.source, nf->fn.prefix, nf->fn.pxlen, a0.gw, a0.iface ? a0.iface->name : "(none)", nf->n.metric1);
+				DBG("Mod struct rte type %d - %I/%d via %I on "
+					"iface %s, met %d\n",
+					a0.source, nf->fn.prefix,
+					nf->fn.pxlen, a0.gw,
+					a0.iface ? a0.iface->name : "(none)",
+					nf->n.metric1);
 				rte_update(&p->p, ne, e);
 			}
 		} else if (nf->old_rta) {

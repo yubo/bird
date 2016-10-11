@@ -605,8 +605,8 @@ static void nl_parse_addr(struct nlmsghdr *h, int scan)
 		if (!nl_parse_attrs(IFA_RTA(i), ifa_attr_want4, a, sizeof(a)))
 			return;
 		if (!a[IFA_LOCAL]) {
-			log(L_ERR
-			    "KIF: Malformed message received (missing IFA_LOCAL)");
+			log(L_ERR "KIF: Malformed message received (missing "
+					"IFA_LOCAL)");
 			return;
 		}
 		break;
@@ -621,16 +621,15 @@ static void nl_parse_addr(struct nlmsghdr *h, int scan)
 	}
 
 	if (!a[IFA_ADDRESS]) {
-		log(L_ERR
-		    "KIF: Malformed message received (missing IFA_ADDRESS)");
+		log(L_ERR "KIF: Malformed message received (missing "
+				"IFA_ADDRESS)");
 		return;
 	}
 
 	ifi = if_find_by_index(i->ifa_index);
 	if (!ifi) {
-		log(L_ERR
-		    "KIF: Received address message for unknown interface %d",
-		    i->ifa_index);
+		log(L_ERR "KIF: Received address message for unknown "
+				"interface %d", i->ifa_index);
 		return;
 	}
 
@@ -681,9 +680,8 @@ static void nl_parse_addr(struct nlmsghdr *h, int scan)
 			    || ipa_equal(xbrd, ifa.brd))
 				ifa.brd = xbrd;
 			else if (ifi->flags & IF_TMP_DOWN)	/* Complain only during the first scan */
-				log(L_ERR
-				    "KIF: Invalid broadcast address %I for %s",
-				    xbrd, ifi->name);
+				log(L_ERR "KIF: Invalid broadcast address %I "
+						"for %s", xbrd, ifi->name);
 		}
 #endif
 	}
@@ -696,7 +694,11 @@ static void nl_parse_addr(struct nlmsghdr *h, int scan)
 	}
 	ifa.scope = scope & IADDR_SCOPE_MASK;
 
-	DBG("KIF: IF%d(%s): %s IPA %I, flg %x, struct network %I/%d, brd %I, opp %I\n", ifi->index, ifi->name, new ? "added" : "removed", ifa.ip, ifa.flags, ifa.prefix, ifa.pxlen, ifa.brd, ifa.opposite);
+	DBG("KIF: IF%d(%s): %s IPA %I, flg %x, struct network %I/%d, "
+			"brd %I, opp %I\n", ifi->index,
+			ifi->name, new ? "added" : "removed",
+			ifa.ip, ifa.flags, ifa.prefix, ifa.pxlen,
+			ifa.brd, ifa.opposite);
 
 	if (new)
 		ifa_update(&ifa);
@@ -719,9 +721,8 @@ void kif_do_scan(struct kif_proto *p UNUSED)
 		    || h->nlmsg_type == RTM_DELLINK)
 			nl_parse_link(h, 1);
 		else
-			log(L_DEBUG
-			    "nl_scan_ifaces: Unknown packet received (type=%d)",
-			    h->nlmsg_type);
+			log(L_DEBUG "nl_scan_ifaces: Unknown packet received "
+					"(type=%d)", h->nlmsg_type);
 
 	nl_request_dump(BIRD_AF, RTM_GETADDR);
 	while (h = nl_get_scan())
@@ -729,9 +730,8 @@ void kif_do_scan(struct kif_proto *p UNUSED)
 		    || h->nlmsg_type == RTM_DELADDR)
 			nl_parse_addr(h, 1);
 		else
-			log(L_DEBUG
-			    "nl_scan_ifaces: Unknown packet received (type=%d)",
-			    h->nlmsg_type);
+			log(L_DEBUG "nl_scan_ifaces: Unknown packet received "
+					"(type=%d)", h->nlmsg_type);
 
 	if_end_update();
 }
@@ -1017,9 +1017,9 @@ static void nl_parse_route(struct nlmsghdr *h, int scan)
 			ra.dest = RTD_MULTIPATH;
 			ra.nexthops = nl_parse_multipath(p, a[RTA_MULTIPATH]);
 			if (!ra.nexthops) {
-				log(L_ERR
-				    "KRT: Received strange multipath route %I/%d",
-				    net->n.prefix, net->n.pxlen);
+				log(L_ERR "KRT: Received strange multipath "
+						"route %I/%d",
+						net->n.prefix, net->n.pxlen);
 				return;
 			}
 
@@ -1028,9 +1028,9 @@ static void nl_parse_route(struct nlmsghdr *h, int scan)
 
 		ra.iface = if_find_by_index(oif);
 		if (!ra.iface) {
-			log(L_ERR
-			    "KRT: Received route %I/%d with unknown ifindex %u",
-			    net->n.prefix, net->n.pxlen, oif);
+			log(L_ERR "KRT: Received route %I/%d with unknown "
+					"ifindex %u",
+					net->n.prefix, net->n.pxlen, oif);
 			return;
 		}
 
@@ -1051,9 +1051,10 @@ static void nl_parse_route(struct nlmsghdr *h, int scan)
 					  rtm_flags & RTNH_F_ONLINK) ?
 					 NEF_ONLINK : 0);
 			if (!ng || (ng->scope == SCOPE_HOST)) {
-				log(L_ERR
-				    "KRT: Received route %I/%d with strange next-hop %I",
-				    net->n.prefix, net->n.pxlen, ra.gw);
+				log(L_ERR "KRT: Received route %I/%d with "
+						"strange next-hop %I",
+						net->n.prefix, net->n.pxlen,
+						ra.gw);
 				return;
 			}
 		} else {
@@ -1128,9 +1129,9 @@ static void nl_parse_route(struct nlmsghdr *h, int scan)
 
 		if (nl_parse_metrics
 		    (a[RTA_METRICS], metrics, ARRAY_SIZE(metrics)) < 0) {
-			log(L_ERR
-			    "KRT: Received route %I/%d with strange RTA_METRICS attribute",
-			    net->n.prefix, net->n.pxlen);
+			log(L_ERR "KRT: Received route %I/%d with strange "
+					"RTA_METRICS attribute",
+					net->n.prefix, net->n.pxlen);
 			return;
 		}
 
@@ -1168,9 +1169,8 @@ void krt_do_scan(struct krt_proto *p UNUSED)
 		    || h->nlmsg_type == RTM_DELROUTE)
 			nl_parse_route(h, 1);
 		else
-			log(L_DEBUG
-			    "nl_scan_fire: Unknown packet received (type=%d)",
-			    h->nlmsg_type);
+			log(L_DEBUG "nl_scan_fire: Unknown packet received "
+					"(type=%d)", h->nlmsg_type);
 }
 
 /*

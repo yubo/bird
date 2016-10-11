@@ -24,7 +24,8 @@ set(KEYWORDS_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/../proto/ospf/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/pipe/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/rip/config.Y 
-	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y)
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpdk/config.Y)
 
 set(COMMANDS_SRC 
 	${CMAKE_CURRENT_SOURCE_DIR}/gen_commands.m4 
@@ -40,7 +41,8 @@ set(COMMANDS_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/../proto/ospf/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/pipe/config.Y
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/rip/config.Y
-	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y)
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpdk/config.Y)
 
 set(PARSE_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/gen_parser.m4
@@ -55,7 +57,8 @@ set(PARSE_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/../proto/ospf/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/pipe/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/rip/config.Y 
-	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y)
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpdk/config.Y)
 
 add_custom_target(PARSE_HEAD ALL
 	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/keywords.h

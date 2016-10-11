@@ -945,6 +945,8 @@ static void sk_free(struct resource *r)
 {
 	struct birdsock *s = (struct birdsock *)r;
 
+	DBG("sk_free() fd:%d\n", s->sock.fd);
+
 	sk_free_bufs(s);
 	if (s->sock.fd >= 0)
 		close(s->sock.fd);
@@ -1061,9 +1063,13 @@ static int sk_setup(struct birdsock *s)
 	if (s->iface) {
 #ifdef SO_BINDTODEVICE
 		struct ifreq ifr = { };
+#ifdef CONFIG_DPDK
+		strcpy(ifr.ifr_name, "eth1");
+#else
 		strcpy(ifr.ifr_name, s->iface->name);
-		if (setsockopt
-		    (s->fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(ifr)) < 0)
+#endif
+		if (setsockopt(s->fd, SOL_SOCKET, SO_BINDTODEVICE,
+					&ifr, sizeof(ifr)) < 0)
 			ERR("SO_BINDTODEVICE");
 #endif
 
@@ -1166,6 +1172,7 @@ static void sk_insert(struct birdsock *s)
 	int ret;
 	unsigned int flags = 0;
 
+	DBG("sk_insert() fd:%d\n", s->fd);
 	if (s->rx_hook){
 		flags |= ULOOP_READ;
 	}
@@ -1179,6 +1186,7 @@ static void sk_insert(struct birdsock *s)
 		ret = uloop_fd_add(&s->sock,
 				flags | ULOOP_EDGE_TRIGGER
 				| USOCK_NOCLOEXEC);
+		DBG("uloop_fd_add fd %d %d\n", s->sock.fd, ret);
 		if (ret == -1){
 			log(L_ERR "uloop_fd_add fd %d error(%d:%s)",
 					s->sock.fd, errno, strerror(errno));

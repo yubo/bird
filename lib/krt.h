@@ -40,7 +40,6 @@ struct kif_proto;
 /* krt.c */
 
 extern struct protocol proto_unix_kernel;
-extern struct protocol proto_dpdk;
 
 struct krt_config {
   struct proto_config c;
@@ -94,6 +93,9 @@ void krt_got_route_async(struct krt_proto *p, struct rte *e, int new);
 #define KRT_SRC_KERNEL	 3	/* Kernel routes, are ignored by krt syncer */
 
 extern struct protocol proto_unix_iface;
+
+extern uint32_t kif_flag;
+#define KIF_F_SCAN_DISABLE   1
 
 struct kif_primary_item {
   struct list_head n;

@@ -640,7 +640,6 @@ static int ospf_reconfigure(struct proto *P, struct proto_config *c)
 	struct iface_patt *ip;
 	struct ospf_iface_patt *oip;
 
-log(L_TRACE "---------- ospf_reconfigure");
 	if (proto_get_router_id(c) != p->router_id)
 		return 0;
 

@@ -1243,8 +1243,9 @@ find_surrogate_fwaddr(struct ospf_proto *p, struct ospf_area *oa)
 }
 
 void
-ospf_rt_notify(struct proto *P, struct rtable * tbl UNUSED, struct network * n, struct rte * new,
-	       struct rte * old UNUSED, struct ea_list * ea)
+ospf_rt_notify(struct proto *P, struct rtable * tbl UNUSED,
+		struct network * n, struct rte * new,
+		struct rte * old UNUSED, struct ea_list * ea)
 {
 	struct ospf_proto *p = (struct ospf_proto *)P;
 	struct ospf_area *oa = NULL;	/* non-NULL for NSSA-LSA */
@@ -1636,7 +1637,6 @@ void ospf_update_topology(struct ospf_proto *p)
 			 * requested, will succeed unless there is also a seqnum wrapping, which
 			 * is not a problem because in that case rtcalc is blocked by MaxAge.
 			 */
-
 			if (breaks_minlsinterval(oa->rt)
 			    || breaks_minlsinterval(oa->pxr_lsa))
 				continue;

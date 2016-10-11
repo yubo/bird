@@ -637,9 +637,10 @@ static void static_show_rt(struct static_route *r)
 	struct static_route *r2;
 	if (r->dest == RTD_MULTIPATH)
 		for (r2 = r->mp_next; r2; r2 = r2->mp_next)
-			cli_msg(-1009, "\tvia %I%J weight %d%s%s", r2->via, r2->via_if, r2->masklen + 1,	/* really */
-				r2->bfd_req ? " (bfd)" : "",
-				r2->installed ? "" : " (dormant)");
+			cli_msg(-1009, "\tvia %I%J weight %d%s%s",
+					r2->via, r2->via_if, r2->masklen + 1,	/* really */
+					r2->bfd_req ? " (bfd)" : "",
+					r2->installed ? "" : " (dormant)");
 }
 
 void static_show(struct proto *P)

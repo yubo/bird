@@ -33,6 +33,7 @@
 #include "nest/locks.h"
 #include "conf/conf.h"
 #include "filter/filter.h"
+#include "proto/dpdk/dpdk.h"
 
 #include "lib/unix.h"
 #include "lib/krt.h"
@@ -441,7 +442,7 @@ static int cli_connect(struct birdsock *s, int size UNUSED)
 	return 1;
 }
 
-static void cli_init_unix(uid_t use_uid, gid_t use_gid)
+UNUSED static void cli_init_unix(uid_t use_uid, gid_t use_gid)
 {
 	struct birdsock *s;
 
@@ -757,8 +758,8 @@ int main(int argc, char **argv)
 	gid_t use_gid = get_gid(use_group);
 
 	if (!parse_and_exit) {
-		test_old_bird(path_control_socket);
-		cli_init_unix(use_uid, use_gid);
+		/*test_old_bird(path_control_socket);*/
+		/*cli_init_unix(use_uid, use_gid);*/
 	}
 
 	if (use_gid)
@@ -776,8 +777,9 @@ int main(int argc, char **argv)
 
 	struct config *conf = read_config();
 
-	if (parse_and_exit)
+	if (parse_and_exit){
 		exit(0);
+	}
 
 	if (!(debug_flag || run_in_foreground)) {
 		pid_t pid = fork();

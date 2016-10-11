@@ -58,6 +58,7 @@ CF_DECLS
   void *g;
   bird_clock_t time;
   struct prefix px;
+  struct ip_prefix ipx;
   struct proto_spec ps;
   struct timeformat *tf;
 }
@@ -77,6 +78,7 @@ CF_DECLS
 %type <time> datetime
 %type <a> ipa
 %type <px> prefix prefix_or_ipa
+%type <ipx> ip_prefix
 %type <t> text
 %type <t> text_or_none
 
@@ -172,6 +174,16 @@ prefix_or_ipa:
    prefix
  | ipa { $$.addr = $1; $$.len = BITS_PER_IP_ADDRESS; }
  ;
+
+ip_prefix:
+   ipa pxlen {
+     $$.ip = $1;
+     $$.pxlen = $2;
+     $$.prefix = ipa_mkmask($2);
+     $$.brd = ipa_or($1, ipa_not(ipa_mkmask($2)));
+   }
+ ;
+
 
 pxlen:
    '/' expr {

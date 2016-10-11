@@ -215,11 +215,14 @@ drop:
  * authentication, checksums, size) are done before the packet is passed to
  * non generic functions.
  */
+#define DPDK_PORT_FLAG 0x0100
 int ospf_rx_hook(struct birdsock * sk, int len)
 {
 	/* We want just packets from sk->iface. Unfortunately, on BSD we cannot filter
 	   out other packets at kernel level and we receive all packets on all sockets */
-	if (sk->lifindex != sk->iface->index)
+	DBG("OSPF: RX hook called (lifindex %d, iface->index %d)\n",
+			sk->lifindex , sk->iface->index);
+	if (sk->iface->index < DPDK_PORT_FLAG && sk->lifindex != sk->iface->index)
 		return 1;
 
 	DBG("OSPF: RX hook called (iface %s, src %I, dst %I)\n",

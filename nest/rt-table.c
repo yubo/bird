@@ -860,11 +860,11 @@ rte_recalculate(struct announce_hook *ah, struct network * net, struct rte *new,
 			 */
 			if (old->sender->proto != p) {
 				if (new) {
-					log_rl(&rl_pipe,
-					       L_ERR
-					       "Pipe collision detected when sending %I/%d to table %s",
-					       net->n.prefix, net->n.pxlen,
-					       table->name);
+					log_rl(&rl_pipe, L_ERR "Pipe collision "
+						"detected when sending %I/%d "
+						"to table %s",
+						net->n.prefix, net->n.pxlen,
+						table->name);
 					rte_free_quick(new);
 				}
 				return;
@@ -1044,9 +1044,8 @@ do_recalculate:
 	/* Log the route change */
 	if (p->debug & D_ROUTES) {
 		if (new_ok)
-			rte_trace(p, new, '>',
-				  new ==
-				  net->routes ? "added [best]" : "added");
+			rte_trace(p, new, '>', new == net->routes ?
+					"added [best]" : "added");
 		else if (old_ok) {
 			if (old != old_best)
 				rte_trace(p, old, '>', "removed");
@@ -1187,9 +1186,8 @@ rte_update2(struct announce_hook *ah, struct network * net, struct rte *new,
 			tmpa = make_tmp_attrs(new, rte_update_pool);
 			if (filter && (filter != FILTER_REJECT)) {
 				struct ea_list *old_tmpa = tmpa;
-				int fr =
-				    f_run(filter, &new, &tmpa, rte_update_pool,
-					  0);
+				int fr = f_run(filter, &new, &tmpa,
+						rte_update_pool, 0);
 				if (fr > F_ACCEPT) {
 					stats->imp_updates_filtered++;
 					rte_trace_in(D_FILTERS, p, new,
