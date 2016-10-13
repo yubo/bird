@@ -466,14 +466,14 @@ static inline struct ip6_addr get_ip6(void *buf)
 static inline void *put_ip4(void *buf, struct ip4_addr a)
 {
 	put_u32(buf, _I(a));
-	return buf + 4;
+	return (char *)buf + 4;
 }
 
 static inline void *put_ip6(void *buf, struct ip6_addr a)
 {
 	a = ip6_hton(a);
 	memcpy(buf, &a, 16);
-	return buf + 16;
+	return (char *)buf + 16;
 }
 
 // XXXX these functions must be redesigned or removed

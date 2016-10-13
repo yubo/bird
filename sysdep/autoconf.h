@@ -39,7 +39,7 @@
 /* Protocols compiled in */
 #define CONFIG_STATIC 1
 #define CONFIG_OSPF 1
-#define CONFIG_DPDK 1
+#define CONFIG_DPVS 1
 #if 0
 #define CONFIG_RIP 0
 /* #undef CONFIG_RADV */

@@ -215,10 +215,10 @@ struct rte {
 			u32 router_id;	/* Router that originated this route */
 		} ospf;
 #endif
-#ifdef CONFIG_DPDK
+#ifdef CONFIG_DPVS
 		struct {
-			void *rt;	/* dpdk route */
-		} dpdk;
+			void *rt;	/* dpvs route */
+		} dpvs;
 #endif
 #ifdef CONFIG_BGP
 		struct {
@@ -306,7 +306,7 @@ struct rte *rt_export_merged(struct announce_hook *ah, struct network * net,
 void rt_refresh_begin(struct rtable *t, struct announce_hook *ah);
 void rt_refresh_end(struct rtable *t, struct announce_hook *ah);
 void rte_dump(struct rte *);
-void rte_free(struct rte *);
+void bird_rte_free(struct rte *);
 struct rte *rte_do_cow(struct rte *);
 static inline struct rte *rte_cow(struct rte *r)
 {
@@ -409,7 +409,7 @@ struct rta {
 #define RTS_BGP 11		/* BGP route */
 #define RTS_PIPE 12		/* Inter-table wormhole */
 #define RTS_BABEL 13		/* Babel route */
-#define RTS_DPDK 14		/* Normal DPDK route */
+#define RTS_DPVS 14		/* Normal DPVS route */
 
 #define RTC_UNICAST 0
 #define RTC_BROADCAST 1
@@ -625,7 +625,7 @@ extern struct protocol *attr_class_to_protocol[EAP_MAX];
 
 #define DEF_PREF_DIRECT	    	240	/* Directly connected */
 #define DEF_PREF_STATIC		200	/* Static route */
-#define DEF_PREF_DPDK		110	/* DPDK route */
+#define DEF_PREF_DPVS		110	/* DPVS route */
 #define DEF_PREF_OSPF		150	/* OSPF intra-area, inter-area and type 1 external routes */
 #define DEF_PREF_BABEL		130	/* Babel */
 #define DEF_PREF_RIP		120	/* RIP */

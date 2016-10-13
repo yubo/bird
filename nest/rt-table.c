@@ -298,7 +298,7 @@ accept:
 reject:
 	/* Discard temporary struct rte */
 	if (rt != rt0)
-		rte_free(rt);
+		bird_rte_free(rt);
 	return NULL;
 }
 
@@ -456,9 +456,9 @@ rt_notify_basic(struct announce_hook *ah, struct network * net, struct rte *new0
 
 	/* Discard temporary rte's */
 	if (new_free)
-		rte_free(new_free);
+		bird_rte_free(new_free);
 	if (old_free)
-		rte_free(old_free);
+		bird_rte_free(old_free);
 }
 
 static void
@@ -551,7 +551,7 @@ rt_notify_accepted(struct announce_hook *ah, struct network * net, struct rte *n
 	/* Third case, we use r instead of new_best, because export_filter() could change it */
 	if (r != new_changed) {
 		if (new_free)
-			rte_free(new_free);
+			bird_rte_free(new_free);
 		return;
 	}
 
@@ -573,9 +573,9 @@ found:
 
 	/* Discard temporary rte's */
 	if (new_free)
-		rte_free(new_free);
+		bird_rte_free(new_free);
 	if (old_free)
-		rte_free(old_free);
+		bird_rte_free(old_free);
 }
 
 static struct mpnh *mpnh_merge_rta(struct mpnh *nhs, struct rta *a, int max)
@@ -618,7 +618,7 @@ struct rte *rt_export_merged(struct announce_hook *ah, struct network * net,
 					   ah->proto->merge_limit);
 
 		if (tmp)
-			rte_free(tmp);
+			bird_rte_free(tmp);
 	}
 
 	if (nhs) {
@@ -689,13 +689,13 @@ rt_notify_merged(struct announce_hook *ah, struct network * net, struct rte *new
 
 	/* Discard temporary rte's */
 	if (new_best_free)
-		rte_free(new_best_free);
+		bird_rte_free(new_best_free);
 	if (old_best_free)
-		rte_free(old_best_free);
+		bird_rte_free(old_best_free);
 	if (new_changed_free)
-		rte_free(new_changed_free);
+		bird_rte_free(new_changed_free);
 	if (old_changed_free)
-		rte_free(old_changed_free);
+		bird_rte_free(old_changed_free);
 }
 
 /**
@@ -799,19 +799,19 @@ static inline int rte_validate(struct rte *e)
 }
 
 /**
- * rte_free - delete a &rte
+ * bird_rte_free - delete a &rte
  * @e: &rte to be deleted
  *
- * rte_free() deletes the given &rte from the routing table it's linked to.
+ * bird_rte_free() deletes the given &rte from the routing table it's linked to.
  */
-void rte_free(struct rte *e)
+void bird_rte_free(struct rte *e)
 {
 	if (rta_is_cached(e->attrs))
 		rta_free(e->attrs);
 	sl_free(rte_slab, e);
 }
 
-static inline void rte_free_quick(struct rte *e)
+static inline void bird_rte_free_quick(struct rte *e)
 {
 	rta_free(e->attrs);
 	sl_free(rte_slab, e);
@@ -865,7 +865,7 @@ rte_recalculate(struct announce_hook *ah, struct network * net, struct rte *new,
 						"to table %s",
 						net->n.prefix, net->n.pxlen,
 						table->name);
-					rte_free_quick(new);
+					bird_rte_free_quick(new);
 				}
 				return;
 			}
@@ -879,7 +879,7 @@ rte_recalculate(struct announce_hook *ah, struct network * net, struct rte *new,
 						     "ignored");
 				}
 
-				rte_free_quick(new);
+				bird_rte_free_quick(new);
 				return;
 			}
 			*k = old->next;
@@ -913,7 +913,7 @@ rte_recalculate(struct announce_hook *ah, struct network * net, struct rte *new,
 
 			stats->imp_updates_ignored++;
 			rte_trace_in(D_FILTERS, p, new, "ignored [limit]");
-			rte_free_quick(new);
+			bird_rte_free_quick(new);
 			return;
 		}
 	}
@@ -937,7 +937,7 @@ rte_recalculate(struct announce_hook *ah, struct network * net, struct rte *new,
 			if (ah->in_keep_filtered)
 				new->flags |= REF_FILTERED;
 			else {
-				rte_free_quick(new);
+				bird_rte_free_quick(new);
 				new = NULL;
 			}
 
@@ -1078,7 +1078,7 @@ do_recalculate:
 		p->rte_insert(net, new);
 
 	if (old)
-		rte_free_quick(old);
+		bird_rte_free_quick(old);
 }
 
 static int rte_update_nest_cnt;	/* Nesting counter to allow recursive updates */
@@ -1224,7 +1224,7 @@ recalc:
 	return;
 
 drop:
-	rte_free(new);
+	bird_rte_free(new);
 	new = NULL;
 	goto recalc;
 }
@@ -1272,7 +1272,7 @@ rt_examine(struct rtable *t, ip_addr prefix, int pxlen, struct proto *p,
 
 	/* Discard temporary struct rte */
 	if (rt != n->routes)
-		rte_free(rt);
+		bird_rte_free(rt);
 
 	rte_update_unlock();
 
@@ -1680,7 +1680,7 @@ static inline int rt_next_hop_update_net(struct rtable *tab, struct network * n)
 								      NULL);
 
 			if (e != old_best)
-				rte_free_quick(e);
+				bird_rte_free_quick(e);
 			else	/* Freeing of the old best struct rte is postponed */
 				free_old_best = 1;
 
@@ -1717,7 +1717,7 @@ static inline int rt_next_hop_update_net(struct rtable *tab, struct network * n)
 	rte_announce_i(tab, RA_MERGED, n, new, old_best, new, old_best);
 
 	if (free_old_best)
-		rte_free_quick(old_best);
+		bird_rte_free_quick(old_best);
 
 	return count;
 }
@@ -2429,7 +2429,7 @@ static void rt_show_net(struct cli *c, struct network * n, struct rt_show_data *
 
 skip:
 		if (e != ee) {
-			rte_free(e);
+			bird_rte_free(e);
 			e = ee;
 		}
 		rte_update_unlock();

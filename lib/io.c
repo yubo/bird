@@ -1063,7 +1063,7 @@ static int sk_setup(struct birdsock *s)
 	if (s->iface) {
 #ifdef SO_BINDTODEVICE
 		struct ifreq ifr = { };
-#ifdef CONFIG_DPDK
+#ifdef CONFIG_DPVS
 		strcpy(ifr.ifr_name, "eth1");
 #else
 		strcpy(ifr.ifr_name, s->iface->name);

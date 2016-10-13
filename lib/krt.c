@@ -363,12 +363,12 @@ static void krt_learn_scan(struct krt_proto *p, struct rte *e)
 	if (m) {
 		if (krt_uptodate(m, e)) {
 			krt_trace_in_rl(&rl_alien, p, e, "[alien] seen");
-			rte_free(e);
+			bird_rte_free(e);
 			m->u.krt.seen = 1;
 		} else {
 			krt_trace_in(p, e, "[alien] updated");
 			*mm = m->next;
-			rte_free(m);
+			bird_rte_free(m);
 			m = NULL;
 		}
 	} else {
@@ -410,7 +410,7 @@ again:
 
 			if (!e->u.krt.seen) {
 				*ee = e->next;
-				rte_free(e);
+				bird_rte_free(e);
 				continue;
 			}
 
@@ -467,12 +467,12 @@ static void krt_learn_async(struct krt_proto *p, struct rte *e, int new)
 		if (g) {
 			if (krt_uptodate(g, e)) {
 				krt_trace_in(p, e, "[alien async] same");
-				rte_free(e);
+				bird_rte_free(e);
 				return;
 			}
 			krt_trace_in(p, e, "[alien async] updated");
 			*gg = g->next;
-			rte_free(g);
+			bird_rte_free(g);
 		} else
 			krt_trace_in(p, e, "[alien async] created");
 
@@ -480,13 +480,13 @@ static void krt_learn_async(struct krt_proto *p, struct rte *e, int new)
 		n->routes = e;
 	} else if (!g) {
 		krt_trace_in(p, e, "[alien async] delete failed");
-		rte_free(e);
+		bird_rte_free(e);
 		return;
 	} else {
 		krt_trace_in(p, e, "[alien async] removed");
 		*gg = g->next;
-		rte_free(e);
-		rte_free(g);
+		bird_rte_free(e);
+		bird_rte_free(g);
 	}
 	best = n->routes;
 	bestp = &n->routes;
@@ -598,7 +598,7 @@ accept:
 
 reject:
 	if (rt != net->routes)
-		rte_free(rt);
+		bird_rte_free(rt);
 	return NULL;
 }
 
@@ -645,7 +645,7 @@ void krt_got_route(struct krt_proto *p, struct rte *e)
 			krt_learn_scan(p, e);
 		else {
 			krt_trace_in_rl(&rl_alien, p, e, "[alien] ignored");
-			rte_free(e);
+			bird_rte_free(e);
 		}
 		return;
 	}
@@ -655,7 +655,7 @@ void krt_got_route(struct krt_proto *p, struct rte *e)
 	if (net->n.flags & KRF_VERDICT_MASK) {
 		/* Route to this destination was already seen. Strange, but it happens... */
 		krt_trace_in(p, e, "already seen");
-		rte_free(e);
+		bird_rte_free(e);
 		return;
 	}
 
@@ -682,7 +682,7 @@ void krt_got_route(struct krt_proto *p, struct rte *e)
 			verdict = KRF_SEEN;
 
 		if (rt_free)
-			rte_free(rt_free);
+			bird_rte_free(rt_free);
 
 		lp_flush(krt_filter_lp);
 	} else
@@ -701,7 +701,7 @@ sentenced:
 		e->next = net->routes;
 		net->routes = e;
 	} else
-		rte_free(e);
+		bird_rte_free(e);
 }
 
 static void krt_prune(struct krt_proto *p)
@@ -759,9 +759,9 @@ static void krt_prune(struct krt_proto *p)
 		}
 
 		if (old)
-			rte_free(old);
+			bird_rte_free(old);
 		if (rt_free)
-			rte_free(rt_free);
+			bird_rte_free(rt_free);
 		lp_flush(krt_filter_lp);
 		f->flags &= ~KRF_VERDICT_MASK;
 	}
@@ -800,7 +800,7 @@ void krt_got_route_async(struct krt_proto *p, struct rte *e, int new)
 		}
 #endif
 	}
-	rte_free(e);
+	bird_rte_free(e);
 }
 
 /*

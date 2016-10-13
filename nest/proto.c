@@ -874,8 +874,8 @@ void protos_build(void)
 #ifdef CONFIG_OSPF
 	proto_build(&proto_ospf);
 #endif
-#ifdef CONFIG_DPDK
-	proto_build(&proto_dpdk);
+#ifdef CONFIG_DPVS
+	proto_build(&proto_dpvs);
 #endif
 #ifdef CONFIG_PIPE
 	proto_build(&proto_pipe);

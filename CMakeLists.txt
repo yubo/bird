@@ -6,12 +6,15 @@
 # Authors:    Yu Bo <yubo@xiaomi.com>
 #
 cmake_minimum_required(VERSION 2.6)
+project(bird C)
 
-add_definitions(-I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR}/libubox/include)
+#add_definitions(-I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR}/libubox/include)
+#set(DEBUG ON)
 
 add_definitions(-pthread -Wall -Wstrict-prototypes -Wno-parentheses -Wno-pointer-sign -fno-strict-aliasing -fno-strict-overflow)
 
-set(DEBUG ON)
+set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
 if(DEBUG)
 	message(STATUS "build Debug")
@@ -26,8 +29,8 @@ else(DEBUG)
 endif(DEBUG)
 
 #add_definitions(-I${CMAKE_CURRENT_SOURCE_DIR}/lib/jsonrpc) 
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-set(CMAKE_INSTALL_PREFIX /usr)
+#set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+#set(CMAKE_INSTALL_PREFIX /usr)
 
 #if(BUILD_STRIP)
 #	add_custom_command(TARGET dpvs POST_BUILD COMMAND strip -s  ${EXECUTABLE_OUTPUT_PATH}/dpvs)
@@ -38,8 +41,8 @@ add_subdirectory(lib)
 add_subdirectory(nest)
 add_subdirectory(filter)
 add_subdirectory(proto)
-add_subdirectory(libubox)
+#add_subdirectory(libubox)
 
 
-add_executable(bird main.c)
-target_link_libraries(bird ubox-static bird-static nest-static conf-static proto-static filter-static rt)
+#add_executable(bird main.c)
+#target_link_libraries(bird ubox-static bird-static nest-static conf-static proto-static filter-static rt)

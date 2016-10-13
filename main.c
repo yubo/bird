@@ -33,7 +33,7 @@
 #include "nest/locks.h"
 #include "conf/conf.h"
 #include "filter/filter.h"
-#include "proto/dpdk/dpdk.h"
+#include "proto/dpvs/dpvs.h"
 
 #include "lib/unix.h"
 #include "lib/krt.h"

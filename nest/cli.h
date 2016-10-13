@@ -68,9 +68,10 @@ void cli_echo(uint class, byte * msg);
 
 static inline int cli_access_restricted(void)
 {
-	if (this_cli && this_cli->restricted)
-		return (cli_printf(this_cli, 8007, "Access denied"), 1);
-	else
+	if (this_cli && this_cli->restricted){
+		/*cli_printf(this_cli, 8007, "Access denied");*/
+		return 1;
+	} else
 		return 0;
 }
 

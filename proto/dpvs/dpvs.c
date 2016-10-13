@@ -17,20 +17,20 @@
 #include "lib/alloca.h"
 #include "nest/rt-dev.h"
 
-#include "dpdk.h"
+#include "dpvs.h"
 
 
 
-struct dpdk_config *dpdk_conf; 
-static struct timer *dpdk_timer;
+struct dpvs_config *dpvs_conf; 
+static struct timer *dpvs_timer;
 
-static void dpdk_dump(struct proto *p);
-static void dpdk_dump_rt(struct dpdk_route *r);
+static void dpvs_dump(struct proto *p);
+static void dpvs_dump_rt(struct dpvs_route *r);
 
-static struct iface *dpdk_install_link(struct dpdk_iface *i)
+static struct iface *dpvs_install_link(struct dpvs_iface *i)
 {
 	struct iface f, *ifi;
-	unsigned index = i->port|DPDK_PORT_FLAG;
+	unsigned index = i->port|DPVS_PORT_FLAG;
 
 	ifi = if_find_by_index(index);
 	if (!ifi) {
@@ -41,13 +41,13 @@ static struct iface *dpdk_install_link(struct dpdk_iface *i)
 		// IF_MULTICAST for PtP 
 		f.flags = IF_LINK_UP | IF_ADMIN_UP | IF_MULTICAST | IF_BROADCAST | IF_MULTIACCESS;
 		ifi = if_update(&f);
-		debug("install dpdk ifaces: %s mtu: %d\n", f.name, f.mtu);
+		debug("install dpvs ifaces: %s mtu: %d\n", f.name, f.mtu);
 	}
 	return ifi;
 }
 
-static void dpdk_install_addr(struct proto *p,
-		struct dpdk_iface *i, struct iface *ifi)
+static void dpvs_install_addr(struct proto *p,
+		struct dpvs_iface *i, struct iface *ifi)
 {
 	struct ifa ifa;
 	int scope;
@@ -114,7 +114,7 @@ static void dpdk_install_addr(struct proto *p,
 	ifa.scope = scope & IADDR_SCOPE_MASK;
 
 	DBG("KIF: IF%d(%s): %s IPA %I, flg %x, struct network %I/%d, "
-			"brd %I, opp %I\n", ifi->index & DPDK_PORT_MASK,
+			"brd %I, opp %I\n", ifi->index & DPVS_PORT_MASK,
 			ifi->name, new ? "added" : "removed",
 			ifa.ip, ifa.flags, ifa.prefix, ifa.pxlen,
 			ifa.brd, ifa.opposite);
@@ -128,21 +128,21 @@ static void dpdk_install_addr(struct proto *p,
 }
 
 /* see also: ospf_rt_spf */
-static void dpdk_install_route(struct proto *p, struct dpdk_route *r)
+static void dpvs_install_route(struct proto *p, struct dpvs_route *r)
 {
 	struct network *n;
 	struct rta a;
 	struct rte *e;
-	unsigned index = r->via_if | DPDK_PORT_FLAG; 
+	unsigned index = r->via_if | DPVS_PORT_FLAG; 
 
 	if (r->installed > 0)
 		return;
 
-	DBG("Installing dpdk route %I/%d, rtd=%d\n",
+	DBG("Installing dpvs route %I/%d, rtd=%d\n",
 			r->net, r->masklen, r->dest);
 	bzero(&a, sizeof(a));
 	a.src = p->main_source;
-	a.source = RTS_DPDK;
+	a.source = RTS_DPVS;
 	a.scope = SCOPE_UNIVERSE;
 	a.cast = RTC_UNICAST;
 	a.dest = r->dest;
@@ -160,27 +160,27 @@ static void dpdk_install_route(struct proto *p, struct dpdk_route *r)
 	e = rte_get_temp(&a);
 	e->net = n;
 	e->pflags = 0;
-	e->u.dpdk.rt = r;
+	e->u.dpvs.rt = r;
 
 
 	rte_update(p, n, e);
 	r->installed = 1;
 
-	/* call libdpdk */
+	/* call libdpvs */
 
 }
 
-static void dpdk_setup(struct timer *t UNUSED)
+static void dpvs_setup(struct timer *t UNUSED)
 {
 	struct proto *p = t->data;
-	struct dpdk_config *c = (void *)p->cf;
+	struct dpvs_config *c = (void *)p->cf;
 	static int init;
-	struct dpdk_iface *i;
-	struct dpdk_route *r;
+	struct dpvs_iface *i;
+	struct dpvs_route *r;
 	struct iface *ifi;
-	/*struct dpdk_proto *p = t->data;*/
+	/*struct dpvs_proto *p = t->data;*/
 
-	dpdk_dump(p);
+	dpvs_dump(p);
 
 	if (init) 
 		return;
@@ -189,30 +189,30 @@ static void dpdk_setup(struct timer *t UNUSED)
 	if_start_update();
 	list_for_each_entry(i, &c->ifaces, n){
 		/* install interface */
-		ifi = dpdk_install_link(i);
+		ifi = dpvs_install_link(i);
 		/* install interface address */
-		dpdk_install_addr(p, i, ifi);
+		dpvs_install_addr(p, i, ifi);
 	}
 	if_end_update();
 
 	/* setup route */
 	list_for_each_entry(r, &c->iface_routes, n){
-		dpdk_install_route(p, r);
-		dpdk_dump_rt(r);
+		dpvs_install_route(p, r);
+		dpvs_dump_rt(r);
 	}
 	init = 1;
 }
 
-static int dpdk_start(struct proto *p)
+static int dpvs_start(struct proto *p)
 {
-	/*struct dpdk_config *cf = (void *)p->cf;
-	struct dpdk_proto *p = (struct dpdk_proto *)P;
-	struct dpdk_route *r;*/
+	/*struct dpvs_config *cf = (void *)p->cf;
+	struct dpvs_proto *p = (struct dpvs_proto *)P;
+	struct dpvs_route *r;*/
 
-	DBG("dpdk: dpdk_start!\n");
+	DBG("dpvs: dpvs_start!\n");
 
-	dpdk_timer = tm_new_set(p->pool, dpdk_setup, p, 0, 0);
-	tm_start(dpdk_timer, 1);
+	dpvs_timer = tm_new_set(p->pool, dpvs_setup, p, 0, 0);
+	tm_start(dpvs_timer, 1);
 
 	/* We have to go UP before routes could be installed */
 	/*proto_notify_state(p, PS_UP);*/
@@ -225,48 +225,48 @@ static int dpdk_start(struct proto *p)
 	return PS_UP;
 }
 
-static void dpdk_dump_rt(struct dpdk_route *r)
+static void dpvs_dump_rt(struct dpvs_route *r)
 {
 	debug("%-1I/%2d: sip %I via %I dev port%d\n",
 			r->net, r->masklen, r->sip, r->tip, r->via_if);
 }
 
-static void dpdk_dump_if(struct dpdk_iface *i)
+static void dpvs_dump_if(struct dpvs_iface *i)
 {
 	debug("port%d %I, network %I/%-2d bc %I\n",
 			i->port, i->ip, i->prefix, i->pxlen, i->brd);
 }
 
-static void dpdk_dump(struct proto *p)
+static void dpvs_dump(struct proto *p)
 {
-	struct dpdk_config *c = (void *)p->cf;
-	struct dpdk_iface *i;
-	struct dpdk_route *r;
+	struct dpvs_config *c = (void *)p->cf;
+	struct dpvs_iface *i;
+	struct dpvs_route *r;
 
-	debug("dpdk ifaces:\n");
+	debug("dpvs ifaces:\n");
 	list_for_each_entry(i, &c->ifaces, n)
-	    dpdk_dump_if(i);
+	    dpvs_dump_if(i);
 
-	debug("dpdk routes:\n");
+	debug("dpvs routes:\n");
 	list_for_each_entry(r, &c->iface_routes, n)
-	    dpdk_dump_rt(r);
+	    dpvs_dump_rt(r);
 }
 
 /*
- * get lpm and add/remove to dpdk rte lpm table
+ * get lpm and add/remove to dpvs rte lpm table
  */
-static void dpdk_rt_notify(struct proto *P, struct rtable * tbl UNUSED,
+static void dpvs_rt_notify(struct proto *P, struct rtable * tbl UNUSED,
 		struct network * n, struct rte * new,
 		struct rte * old UNUSED, struct ea_list * ea)
 {
 }
 
-static int dpdk_reload_routes(struct proto *P)
+static int dpvs_reload_routes(struct proto *P)
 {
-	struct dpdk_proto *p = (struct dpdk_proto *)P;
+	struct dpvs_proto *p = (struct dpvs_proto *)P;
 
 	if (p->calcrt != 2)
-		DPDK_TRACE(D_EVENTS,
+		DPVS_TRACE(D_EVENTS,
 			   "Scheduling routing table calculation with route reload");
 
 	p->calcrt = 2;
@@ -274,45 +274,45 @@ static int dpdk_reload_routes(struct proto *P)
 	return 1;
 }
 
-static int dpdk_rte_same(struct rte *new, struct rte *old)
+static int dpvs_rte_same(struct rte *new, struct rte *old)
 {
 	/* new->attrs == old->attrs always */
-	return new->u.dpdk.rt == old->u.dpdk.rt;
+	return new->u.dpvs.rt == old->u.dpvs.rt;
 }
 
-void dpdk_init_config(struct dpdk_config *c)
+void dpvs_init_config(struct dpvs_config *c)
 {
-	dpdk_conf = c;
+	dpvs_conf = c;
 	INIT_LIST_HEAD(&c->iface_routes);
 	INIT_LIST_HEAD(&c->ifaces);
 }
 
-static struct proto *dpdk_init(struct proto_config *c)
+static struct proto *dpvs_init(struct proto_config *c)
 {
-	struct proto *P = proto_new(c, sizeof(struct dpdk_proto));
+	struct proto *P = proto_new(c, sizeof(struct dpvs_proto));
 
-	P->rt_notify = dpdk_rt_notify;
-	P->reload_routes = dpdk_reload_routes;
-	P->rte_same = dpdk_rte_same;
+	P->rt_notify = dpvs_rt_notify;
+	P->reload_routes = dpvs_reload_routes;
+	P->rte_same = dpvs_rte_same;
 	kif_flag |= KIF_F_SCAN_DISABLE;
 
 /*
-	p->neigh_notify = dpdk_neigh_notify;
-	p->if_notify = dpdk_if_notify;
-	p->rte_mergable = dpdk_rte_mergable;
+	p->neigh_notify = dpvs_neigh_notify;
+	p->if_notify = dpvs_if_notify;
+	p->rte_mergable = dpvs_rte_mergable;
 */
 	return P;
 }
 
-static void dpdk_copy_routes(struct list_head *dlst, struct list_head *slst)
+static void dpvs_copy_routes(struct list_head *dlst, struct list_head *slst)
 {
-	struct dpdk_route *dr, *sr;
+	struct dpvs_route *dr, *sr;
 
 	INIT_LIST_HEAD(dlst);
 	list_for_each_entry(sr, slst, n) {
 		/* copy one route */
-		dr = cfg_alloc(sizeof(struct dpdk_route));
-		memcpy(dr, sr, sizeof(struct dpdk_route));
+		dr = cfg_alloc(sizeof(struct dpvs_route));
+		memcpy(dr, sr, sizeof(struct dpvs_route));
 
 		/* This fn is supposed to be called on fresh src routes, which have 'live'
 		   fields (like .chain, .neigh or .installed) zero, so no need to zero them */
@@ -321,47 +321,47 @@ static void dpdk_copy_routes(struct list_head *dlst, struct list_head *slst)
 	}
 }
 
-static void dpdk_copy_ifaces(struct list_head *dlst, struct list_head *slst)
+static void dpvs_copy_ifaces(struct list_head *dlst, struct list_head *slst)
 {
-	struct dpdk_iface *di, *si;
+	struct dpvs_iface *di, *si;
 
 	INIT_LIST_HEAD(dlst);
 	list_for_each_entry(si, slst, n) {
 		/* copy one iface */
-		di = cfg_alloc(sizeof(struct dpdk_iface));
-		memcpy(di, si, sizeof(struct dpdk_iface));
+		di = cfg_alloc(sizeof(struct dpvs_iface));
+		memcpy(di, si, sizeof(struct dpvs_iface));
 
 		list_add_tail((struct list_head *)di, dlst);
 	}
 }
 
 static void
-dpdk_copy_config(struct proto_config *dest, struct proto_config *src)
+dpvs_copy_config(struct proto_config *dest, struct proto_config *src)
 {
-	struct dpdk_config *d = (struct dpdk_config *)dest;
-	struct dpdk_config *s = (struct dpdk_config *)src;
+	struct dpvs_config *d = (struct dpvs_config *)dest;
+	struct dpvs_config *s = (struct dpvs_config *)src;
 
 	/* Shallow copy of everything */
-	proto_copy_rest(dest, src, sizeof(struct dpdk_config));
+	proto_copy_rest(dest, src, sizeof(struct dpvs_config));
 
 	/* Copy route lists */
-	dpdk_copy_routes(&d->iface_routes, &s->iface_routes);
-	dpdk_copy_ifaces(&d->ifaces, &s->ifaces);
+	dpvs_copy_routes(&d->iface_routes, &s->iface_routes);
+	dpvs_copy_ifaces(&d->ifaces, &s->ifaces);
 }
 
-struct protocol proto_dpdk = {
-	.name = "DPDK",
-	.template = "dpdk%d",
-	.preference = DEF_PREF_DPDK,
-	.config_size = sizeof(struct dpdk_config),
-	.init = dpdk_init,
-	.dump = dpdk_dump,
-	.start = dpdk_start,
-	.copy_config = dpdk_copy_config
+struct protocol proto_dpvs = {
+	.name = "DPVS",
+	.template = "dpvs%d",
+	.preference = DEF_PREF_DPVS,
+	.config_size = sizeof(struct dpvs_config),
+	.init = dpvs_init,
+	.dump = dpvs_dump,
+	.start = dpvs_start,
+	.copy_config = dpvs_copy_config
 /*
-	.reconfigure = dpdk_reconfigure,
-	.shutdown = dpdk_shutdown,
-	.cleanup = dpdk_cleanup,
+	.reconfigure = dpvs_reconfigure,
+	.shutdown = dpvs_shutdown,
+	.cleanup = dpvs_cleanup,
 */
 };
 

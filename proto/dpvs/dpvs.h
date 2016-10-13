@@ -4,44 +4,44 @@
  * license that can be found in the LICENSE file.
  */
 
-#ifndef _BIRD_DPDK_H_
-#define _BIRD_DPDK_H_
+#ifndef _BIRD_DPVS_H_
+#define _BIRD_DPVS_H_
 
 #include "nest/route.h"
 #include "nest/bfd.h"
 
 #ifdef LOCAL_DEBUG
-#define DPDK_FORCE_DEBUG 1
+#define DPVS_FORCE_DEBUG 1
 #else
-#define DPDK_FORCE_DEBUG 0
+#define DPVS_FORCE_DEBUG 0
 #endif
 
-// dpdk dev port 0~255 -> 256->511
-#define DPDK_PORT_FLAG 0x0100
-#define DPDK_PORT_MASK 0x00ff
+// dpvs dev port 0~255 -> 256->511
+#define DPVS_PORT_FLAG 0x0100
+#define DPVS_PORT_MASK 0x00ff
 
-#define DPDK_TRACE(flags, msg, args...) \
-  do { if ((p->p.debug & flags) || DPDK_FORCE_DEBUG) \
+#define DPVS_TRACE(flags, msg, args...) \
+  do { if ((p->p.debug & flags) || DPVS_FORCE_DEBUG) \
     log(L_TRACE "%s: " msg, p->p.name , ## args ); } while(0)
 
-struct dpdk_proto {
+struct dpvs_proto {
 	struct proto p;
 	int calcrt;		/* Routing table calculation scheduled?
 				   0=no, 1=normal, 2=forced reload */
 };
 
 
-struct dpdk_config {
+struct dpvs_config {
 	struct proto_config c;
 	struct list_head iface_routes;	/* interface routes */
-	struct list_head ifaces;	/* dpdk interfaces */
+	struct list_head ifaces;	/* dpvs interfaces */
 };
 
-void dpdk_init_config(struct dpdk_config *);
+void dpvs_init_config(struct dpvs_config *);
 
-struct dpdk_route {
+struct dpvs_route {
 	struct list_head n;	/* Next for the same struct neighbor */
-	struct dpdk_route *chain;
+	struct dpvs_route *chain;
 	ip_addr net;	/* Network we route */
 	int masklen;	/* Mask length */
 	int dest;	/* Destination type (RTD_*) */
@@ -51,7 +51,7 @@ struct dpdk_route {
 	int installed;	/* Installed in rt table, -1 for reinstall */
 };
 
-struct dpdk_iface {
+struct dpvs_iface {
 	struct list_head n;	/* Next for the same struct neighbor */
 	ip_addr ip;		/* ip address of this host */
 	ip_addr prefix;		/* network prefix */
@@ -63,8 +63,8 @@ struct dpdk_iface {
 /* Dummy nodes (parts of multipath route) abuses masklen field for weight
    and if_name field for a ptr to the master (RTD_MULTIPATH) node. */
 
-#define DPDK_RTDX_RECURSIVE 0x7f	/* Phony dest value for recursive routes */
+#define DPVS_RTDX_RECURSIVE 0x7f	/* Phony dest value for recursive routes */
 
-void dpdk_show(struct proto *);
+void dpvs_show(struct proto *);
 
 #endif

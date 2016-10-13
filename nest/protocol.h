@@ -77,7 +77,7 @@ void protos_dump_all(void);
 extern struct protocol
   proto_device, proto_radv, proto_rip, proto_static,
   proto_ospf, proto_pipe, proto_bgp, proto_bfd, proto_babel,
-  proto_dpdk;
+  proto_dpvs;
 
 /*
  *	Routing Protocol Instance

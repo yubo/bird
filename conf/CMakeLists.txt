@@ -13,7 +13,8 @@ find_package(FLEX)
 
 add_definitions(-Wno-unused)
 set(KEYWORDS_SRC
-	${CMAKE_CURRENT_SOURCE_DIR}/gen_keywords.m4 confbase.Y 
+	${CMAKE_CURRENT_SOURCE_DIR}/gen_keywords.m4
+	${CMAKE_CURRENT_SOURCE_DIR}/confbase.Y 
 	${CMAKE_CURRENT_SOURCE_DIR}/../sysdep/unix/config.Y 
 	${CMAKE_CURRENT_SOURCE_DIR}/../sysdep/unix/krt.Y 
 	${CMAKE_CURRENT_SOURCE_DIR}/../sysdep/linux/netlink.Y 
@@ -25,7 +26,7 @@ set(KEYWORDS_SRC
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/pipe/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/rip/config.Y 
 	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y
-	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpdk/config.Y)
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpvs/config.Y)
 
 set(COMMANDS_SRC 
 	${CMAKE_CURRENT_SOURCE_DIR}/gen_commands.m4 
@@ -42,7 +43,7 @@ set(COMMANDS_SRC
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/pipe/config.Y
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/rip/config.Y
 	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y
-	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpdk/config.Y)
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpvs/config.Y)
 
 set(PARSE_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/gen_parser.m4
@@ -58,7 +59,7 @@ set(PARSE_SRC
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/pipe/config.Y 
 	#${CMAKE_CURRENT_SOURCE_DIR}/../proto/rip/config.Y 
 	${CMAKE_CURRENT_SOURCE_DIR}/../proto/static/config.Y
-	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpdk/config.Y)
+	${CMAKE_CURRENT_SOURCE_DIR}/../proto/dpvs/config.Y)
 
 add_custom_target(PARSE_HEAD ALL
 	DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/keywords.h

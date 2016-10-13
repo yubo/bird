@@ -40,7 +40,7 @@ get_u64(const void *p)
 {
   u32 xh, xl;
   memcpy(&xh, p, 4);
-  memcpy(&xl, p+4, 4);
+  memcpy(&xl, (char *)p+4, 4);
   return (((u64) ntohl(xh)) << 32) | ntohl(xl);
 }
 
@@ -65,7 +65,7 @@ put_u64(void *p, u64 x)
   xh = htonl(x >> 32);
   xl = htonl((u32) x);
   memcpy(p, &xh, 4);
-  memcpy(p+4, &xl, 4);
+  memcpy((char *)p+4, &xl, 4);
 }
 
 #endif
