@@ -16,10 +16,6 @@
 #define DPVS_FORCE_DEBUG 0
 #endif
 
-// dpvs dev port 0~255 -> 256->511
-#define DPVS_PORT_FLAG 0x0100
-#define DPVS_PORT_MASK 0x00ff
-
 #define DPVS_TRACE(flags, msg, args...) \
   do { if ((p->p.debug & flags) || DPVS_FORCE_DEBUG) \
     log(L_TRACE "%s: " msg, p->p.name , ## args ); } while(0)
@@ -45,7 +41,7 @@ struct dpvs_route {
 	ip_addr net;	/* Network we route */
 	int masklen;	/* Mask length */
 	int dest;	/* Destination type (RTD_*) */
-	int via_if;	/* Destination iface, for link-local vias */
+	int port;	/* Destination iface, for link-local vias */
 	ip_addr  sip;	/* via_if's addr */
 	ip_addr tip;	/* Destination router */
 	int installed;	/* Installed in rt table, -1 for reinstall */
@@ -65,6 +61,7 @@ struct dpvs_iface {
 
 #define DPVS_RTDX_RECURSIVE 0x7f	/* Phony dest value for recursive routes */
 
+extern struct dpvs_config *dpvs_conf; 
 void dpvs_show(struct proto *);
 
 #endif

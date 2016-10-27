@@ -88,7 +88,8 @@ struct nbma_node *find_nbma_node_(struct list_head * nnl, ip_addr ip)
 	return NULL;
 }
 
-static int ospf_sk_open(struct ospf_iface *ifa)
+extern int ospf_sk_open(struct birdsock *sk);
+static int _ospf_sk_open(struct ospf_iface *ifa)
 {
 	struct ospf_proto *p = ifa->oa->po;
 
@@ -108,21 +109,23 @@ static int ospf_sk_open(struct ospf_iface *ifa)
 	sk->flags = SKF_LADDR_RX | (ifa->check_ttl ? SKF_TTL_RX : 0);
 	sk->ttl = ifa->cf->ttl_security ? 255 : 1;
 
-	if (sk_open(sk) < 0)
+
+	/* ugly hack */
+	//if (sk_open(sk) < 0)
+	if (ospf_sk_open(sk) < 0)
 		goto err;
 
 	/* 12 is an offset of the checksum in an OSPFv3 packet */
 	if (ospf_is_v3(p))
 		if (sk_set_ipv6_checksum(sk, 12) < 0)
 			goto err;
-
 	if ((ifa->type == OSPF_IT_BCAST) || (ifa->type == OSPF_IT_PTP)) {
 		if (ifa->cf->real_bcast) {
 			ifa->all_routers = ifa->addr->brd;
 			ifa->des_routers = IPA_NONE;
 
-			if (sk_setup_broadcast(sk) < 0)
-				goto err;
+			/*if (sk_setup_broadcast(sk) < 0)
+				goto err;*/
 		} else {
 			ifa->all_routers =
 			    ospf_is_v2(p) ? IP4_OSPF_ALL_ROUTERS :
@@ -131,14 +134,13 @@ static int ospf_sk_open(struct ospf_iface *ifa)
 			    ospf_is_v2(p) ? IP4_OSPF_DES_ROUTERS :
 			    IP6_OSPF_DES_ROUTERS;
 
-			if (sk_setup_multicast(sk) < 0)
-				goto err;
+			/*if (sk_setup_multicast(sk) < 0)
+				goto err;*/
 
-			if (sk_join_group(sk, ifa->all_routers) < 0)
-				goto err;
+			/*if (sk_join_group(sk, ifa->all_routers) < 0)
+				goto err;*/
 		}
 	}
-
 	ifa->sk = sk;
 	ifa->sk_dr = 0;
 	return 1;
@@ -448,7 +450,7 @@ static void ospf_iface_add(struct object_lock *lock)
 	struct ospf_proto *p = ifa->oa->po;
 
 	/* Open socket if interface is not stub */
-	if (!ifa->stub && !ospf_sk_open(ifa)) {
+	if (!ifa->stub && !_ospf_sk_open(ifa)) {
 		log(L_ERR "%s: Cannot open socket for %s, declaring as stub",
 		    p->p.name, ifa->ifname);
 		ifa->ioprob = OSPF_I_SK;
@@ -486,7 +488,7 @@ static inline void
 add_nbma_node(struct ospf_iface *ifa, struct nbma_node *src, int found)
 {
 	struct nbma_node *n = mb_alloc(ifa->pool, sizeof(struct nbma_node));
-	list_add_tail( &n->n,&ifa->nbma_list);
+	list_add_tail(&n->n, &ifa->nbma_list);
 	n->ip = src->ip;
 	n->eligible = src->eligible;
 	n->found = found;

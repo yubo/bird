@@ -49,14 +49,12 @@ struct tcp_md5sig {
  *	Linux IPv4 multicast syscalls
  */
 
-#define DPVS_PORT_FLAG 0x0100
-
 #define INIT_MREQ4(maddr,ifa) \
-  { .imr_multiaddr = ipa_to_in4(maddr), .imr_ifindex = ifa->index < DPVS_PORT_FLAG ? ifa->index : 0 }
+  { .imr_multiaddr = ipa_to_in4(maddr), .imr_ifindex = ifa->index }
 
 static inline int sk_setup_multicast4(struct birdsock *s)
 {
-	struct ip_mreqn mr = {.imr_ifindex = s->iface->index < DPVS_PORT_FLAG ? s->iface->index : 0};
+	struct ip_mreqn mr = {.imr_ifindex = s->iface->index};
 	int ttl = s->ttl;
 	int n = 0;
 
@@ -156,7 +154,7 @@ sk_prepare_cmsgs4(struct birdsock *s, struct msghdr *msg, void *cbuf,
 	controllen += CMSG_SPACE(sizeof(*pi));
 
 	pi = (struct in_pktinfo *)CMSG_DATA(cm);
-	pi->ipi_ifindex = s->iface ? (s->iface->index < DPVS_PORT_FLAG ? s->iface->index : 0): 0;
+	pi->ipi_ifindex = s->iface ? s->iface->index : 0;
 	pi->ipi_spec_dst = ipa_to_in4(s->saddr);
 	pi->ipi_addr = ipa_to_in4(IPA_NONE);
 

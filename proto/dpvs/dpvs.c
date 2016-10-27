@@ -30,7 +30,7 @@ static void dpvs_dump_rt(struct dpvs_route *r);
 static struct iface *dpvs_install_link(struct dpvs_iface *i)
 {
 	struct iface f, *ifi;
-	unsigned index = i->port|DPVS_PORT_FLAG;
+	unsigned index = i->port;
 
 	ifi = if_find_by_index(index);
 	if (!ifi) {
@@ -114,7 +114,7 @@ static void dpvs_install_addr(struct proto *p,
 	ifa.scope = scope & IADDR_SCOPE_MASK;
 
 	DBG("KIF: IF%d(%s): %s IPA %I, flg %x, struct network %I/%d, "
-			"brd %I, opp %I\n", ifi->index & DPVS_PORT_MASK,
+			"brd %I, opp %I\n", ifi->index,
 			ifi->name, new ? "added" : "removed",
 			ifa.ip, ifa.flags, ifa.prefix, ifa.pxlen,
 			ifa.brd, ifa.opposite);
@@ -133,7 +133,7 @@ static void dpvs_install_route(struct proto *p, struct dpvs_route *r)
 	struct network *n;
 	struct rta a;
 	struct rte *e;
-	unsigned index = r->via_if | DPVS_PORT_FLAG; 
+	unsigned index = r->port; 
 
 	if (r->installed > 0)
 		return;
@@ -150,7 +150,7 @@ static void dpvs_install_route(struct proto *p, struct dpvs_route *r)
 
 	a.iface = if_find_by_index(index);
 	if (!a.iface){
-		log(L_ERR "can not found port %d", r->via_if);
+		log(L_ERR "can not found port %d", r->port);
 		return;
 	}
 
@@ -228,7 +228,7 @@ static int dpvs_start(struct proto *p)
 static void dpvs_dump_rt(struct dpvs_route *r)
 {
 	debug("%-1I/%2d: sip %I via %I dev port%d\n",
-			r->net, r->masklen, r->sip, r->tip, r->via_if);
+			r->net, r->masklen, r->sip, r->tip, r->port);
 }
 
 static void dpvs_dump_if(struct dpvs_iface *i)

@@ -20,6 +20,9 @@ static struct f_inst **this_drt_last_cmd;
 static void
 dpvs_route_finish(void)
 {
+	int ret;
+	if ((ret = parse_arg_route(this_drt)))
+		cf_error("parse_arg_route error %d", ret);
 }
 
 static void
@@ -42,41 +45,18 @@ CF_ADDTO(proto, dpvs_proto '}' { dpvs_proto_finish(); } )
 dpvs_proto_start: proto_start DPVS {
      this_proto = proto_config_new(&proto_dpvs, $1);
      dpvs_init_config((struct dpvs_config *) this_proto);
+     vs_parse_start();
   }
  ;
 
 dpvs_proto:
    dpvs_proto_start proto_name '{'
- | dpvs_proto proto_item ';'
- | dpvs_proto dpvs_if ';'
- | dpvs_proto RX text ';' {
-	int ret;
-	if ((ret = parse_arg_rx($3)))
-		cf_error("Incorrect value for rx argument (%d)", ret);
-}| dpvs_proto TX text ';' {
-	int ret;
-	if ((ret = parse_arg_tx($3)))
-		cf_error("Incorrect value for tx argument (%d)", ret);
-}| dpvs_proto WORKER_LCORES text ';' {
-	int ret;
-	if ((ret = parse_arg_w($3)))
-		cf_error("Incorrect value for w argument (%d)", ret);
-}| dpvs_proto RING_SIZES text ';' {
-	int ret;
-	if ((ret = parse_arg_rsz($3)))
-		cf_error("Incorrect value for rsz argument (%d)", ret);
-}| dpvs_proto BURST_SIZES text ';' {
-	int ret;
-	if ((ret = parse_arg_bsz($3)))
-		cf_error("Incorrect value for bsz argument (%d)", ret);
-}| dpvs_proto CTRL_LCORE text ';' {
-	int ret;
-	if ((ret = parse_arg_c($3)))
-		cf_error("Incorrect value for c argument (%d)", ret);
-}| dpvs_proto dpvs_route ';' { dpvs_route_finish(); }
+ | dpvs_proto dpvs_proto_item ';'
 ;
 
-dpvs_if: IFA ip_prefix PORT expr {
+dpvs_proto_item:
+  proto_item
+| IFA ip_prefix PORT expr {
 	this_if = cfg_allocz(sizeof(struct dpvs_iface));
 	list_add_tail(&this_if->n, &DPVS_CFG->ifaces);
 	this_if->ip = $2.ip;
@@ -84,7 +64,32 @@ dpvs_if: IFA ip_prefix PORT expr {
 	this_if->pxlen = $2.pxlen;
 	this_if->brd = $2.brd;
 	this_if->port = $4;
-}
+	vs_parse_ifa(this_if->port, this_if->ip.addr, this_if->prefix.addr, this_if->pxlen);
+}| RX text {
+	int ret;
+	if ((ret = parse_arg_rx($2)))
+		cf_error("Incorrect value for rx argument (%d)", ret);
+}| TX text {
+	int ret;
+	if ((ret = parse_arg_tx($2)))
+		cf_error("Incorrect value for tx argument (%d)", ret);
+}| WORKER_LCORES text {
+	int ret;
+	if ((ret = parse_arg_w($2)))
+		cf_error("Incorrect value for w argument (%d)", ret);
+}| RING_SIZES text {
+	int ret;
+	if ((ret = parse_arg_rsz($2)))
+		cf_error("Incorrect value for rsz argument (%d)", ret);
+}| BURST_SIZES text {
+	int ret;
+	if ((ret = parse_arg_bsz($2)))
+		cf_error("Incorrect value for bsz argument (%d)", ret);
+}| CTRL_LCORE text {
+	int ret;
+	if ((ret = parse_arg_c($2)))
+		cf_error("Incorrect value for c argument (%d)", ret);
+}| dpvs_route { dpvs_route_finish(); }
 ;
 
 dpvs_route0: LPM prefix {
@@ -97,13 +102,11 @@ dpvs_route0: LPM prefix {
 
 dpvs_route: 
   dpvs_route0
-| dpvs_route PORT expr {
-     this_drt->via_if = $3;
-}
-| dpvs_route SIP ipa {
+ | dpvs_route PORT expr {
+     this_drt->port = $3;
+}| dpvs_route SIP ipa {
      this_drt->sip = $3;
-}
-| dpvs_route TIP ipa {
+}| dpvs_route TIP ipa {
      this_drt->tip = $3;
 }
 ;

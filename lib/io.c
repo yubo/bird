@@ -76,6 +76,7 @@ static struct event_log_entry event_log[EVENT_LOG_LENGTH];
 static struct event_log_entry *event_open;
 static int event_log_pos, event_log_num;
 static btime last_time;
+static struct list_head ospf_sk_list;
 
 
 /*
@@ -1136,6 +1137,41 @@ static int sk_setup(struct birdsock *s)
 	return 0;
 }
 
+typedef uint32_t __be32;
+void ospf_recv_cb(char *data, uint16_t data_len, uint8_t port,
+		__be32 saddr, __be32 daddr){
+	int c;
+	struct birdsock *s;
+
+	printf("ospf_recv_cb, len:%d\n", data_len);
+	/*int i = 0;
+	for (; i < data_len; i++){
+		printf("%02x", (uint8_t)data[i]);
+		if (i % 4 == 3) printf(" ");
+		if (i % 32 == 31) printf("\n");
+	}
+	printf("\n");*/
+
+	saddr = ntohl(saddr);
+	daddr = ntohl(daddr);
+
+	update_times();
+	list_for_each_entry(s, &ospf_sk_list, n) {
+		s->faddr.addr = saddr;
+		s->laddr.addr = daddr;
+		if (s->rx_hook && s->iface->index == port){
+			io_log_event(s->rx_hook, s->data);
+			while (data_len > 0){
+				c =  MIN(data_len, s->rbsize);
+				memcpy(s->rbuf, data, c);
+				s->rpos = s->rbuf + c;
+				s->rx_hook(s, c);
+				data_len -= c;
+			}
+		}
+	}
+}
+
 static void sk_cb(struct uloop_fd *sock, unsigned int events)
 {
 	int e;
@@ -1245,6 +1281,14 @@ static int sk_passive_connected(struct birdsock *s, int type)
 	sk_alloc_bufs(t);
 	s->rx_hook(t, 0);
 	return 1;
+}
+
+int ospf_sk_open(struct birdsock *sk)
+{
+	sk->af = AF_INET;
+	sk_alloc_bufs(sk);
+	list_add_tail(&sk->n, &ospf_sk_list);
+	return 0;
 }
 
 /**
@@ -1394,7 +1438,7 @@ int sk_open_unix(struct birdsock *s, char *name)
 #define CMSG_RX_SPACE MAX(CMSG4_SPACE_PKTINFO+CMSG4_SPACE_TTL, \
 			  CMSG6_SPACE_PKTINFO+CMSG6_SPACE_TTL)
 #define CMSG_TX_SPACE MAX(CMSG4_SPACE_PKTINFO,CMSG6_SPACE_PKTINFO)
-
+/*
 static void
 sk_prepare_cmsgs(struct birdsock *s, struct msghdr *msg, void *cbuf,
 		 size_t cbuflen)
@@ -1404,6 +1448,7 @@ sk_prepare_cmsgs(struct birdsock *s, struct msghdr *msg, void *cbuf,
 	else
 		sk_prepare_cmsgs6(s, msg, cbuf, cbuflen);
 }
+*/
 
 static void sk_process_cmsgs(struct birdsock *s, struct msghdr *msg)
 {
@@ -1426,8 +1471,25 @@ static void sk_process_cmsgs(struct birdsock *s, struct msghdr *msg)
 	}
 }
 
+
+/* ugly hack: only use for ospf */
 static inline int sk_sendmsg(struct birdsock *s)
 {
+	int i = 0;
+	int len = s->tpos - s->tbuf;
+	printf("sk_sendmsg, len:%d\n", len);
+	for (; i < len; i++){
+		printf("%02x", s->tbuf[i]);
+		if (i % 4 == 3) printf(" ");
+		if (i % 32 == 31) printf("\n");
+	}
+	printf("\n");
+
+	ipv4_vs_ospf_xmit(s->saddr.addr, s->daddr.addr, s->iface->index,
+			s->tbuf, s->tpos - s->tbuf);
+
+	return 0;
+#if 0
 	struct iovec iov = { s->tbuf, s->tpos - s->tbuf };
 	byte cmsg_buf[CMSG_TX_SPACE];
 	struct sockaddr_bird dst;
@@ -1456,6 +1518,7 @@ static inline int sk_sendmsg(struct birdsock *s)
 		sk_prepare_cmsgs(s, &msg, cmsg_buf, sizeof(cmsg_buf));
 
 	return sendmsg(s->fd, &msg, 0);
+#endif
 }
 
 static inline int sk_recvmsg(struct birdsock *s)
@@ -1626,7 +1689,7 @@ sk_send_full(struct birdsock *s, unsigned len, struct iface *ifa,
 
  /* sk_read() and sk_write() are called from BFD's struct event loop */
 
-static int sk_read(struct birdsock *s, int revents)
+int sk_read(struct birdsock *s, int revents)
 {
 	int c;
 
@@ -1723,7 +1786,7 @@ void sk_dump_all(void)
  */
 void io_log_event(void *hook, void *data)
 {
-	struct event_log_entry *en = event_log + event_log_pos;
+	struct event_log_entry *en = &event_log[event_log_pos];
 
 	en->hook = hook;
 	en->data = data;
@@ -1744,7 +1807,6 @@ void io_log_event(void *hook, void *data)
 volatile int async_config_flag;	/* Asynchronous reconfiguration/dump scheduled */
 volatile int async_dump_flag;
 
-#ifdef HAVE_UBOX
 static struct uloop_timeout event_timer;
 
 static void event_timer_cb(struct uloop_timeout *timeout)
@@ -1772,7 +1834,6 @@ static void event_timer_cb(struct uloop_timeout *timeout)
 		async_shutdown_flag = 0;
 	}
 }
-#endif
 
 void io_init(void)
 {
@@ -1780,6 +1841,7 @@ void io_init(void)
 	update_times();
 
 	INIT_LIST_HEAD(&global_event_list);
+	INIT_LIST_HEAD(&ospf_sk_list);
 	event_timer.cb = event_timer_cb;
 	uloop_timeout_set(&event_timer, EVENT_LOOPTIME);
 }
